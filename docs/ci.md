@@ -1,5 +1,10 @@
 # Permora CI: Tests, Belege und Grenzen
 
+## Neuer Stand: echte Locks, ausschließlich lesende Standard-CI
+
+Alle sieben C#-Projekte besitzen ein auf dem isolierten GitHub-Runner erzeugtes `packages.lock.json`; das Angular-Frontend besitzt `web/package-lock.json`. Der reguläre Workflow führt nun `dotnet restore --locked-mode` und `npm ci` aus. Es existiert **kein** dauerhafter CI-Job mit Schreibberechtigungen, Push/Deploy oder Zugriff auf produktive Secrets. Die temporäre One-shot-Lockfile-Übernahme wurde danach entfernt. Ein anschließender vollständiger PR-Run muss den grünen Status erneut nachweisen. Die in dieser Datei erwähnten roten Lockfile-Gates gehören zu den **historischen** Läufen vor der Lockfile-Übernahme.
+
+
 ## Auslöser und Sicherheit
 
 Workflow: `.github/workflows/ci.yml`. Läuft auf Pull Requests gegen `main`, Pushes auf `main` und manuell über **Actions → Permora CI → Run workflow**. Kein Deployment, kein Merge-Bot, kein `pull_request_target`. Workflow-Token hat nur `contents: read`, Checkout persistiert keine Credentials. PR-Code kann Build- und Testprozesse ausführen; deshalb niemals Produktionssecrets an diese Jobs geben.
@@ -17,7 +22,7 @@ Docker-Dienste und Passwörter sind **ausschließlich** für die ephemeren Runne
 | `dependency-locks` | Überprüft, dass echtes `web/package-lock.json` und pro C#-Projekt echte `packages.lock.json` eingecheckt sind | SBOM- und Lizenzbewertung sämtlicher transitiver Abhängigkeiten |
 | `scope-summary` | Sichtbare GitHub-Actions-Zusammenfassung der einzelnen Jobzustände und Grenzen | Kein eigener Freigabeprüfer |
 
-Die ersten Buildjobs können **diagnostische** Lockfiles auf dem Runner erzeugen. Diese werden als temporäre Artefakte angeboten, damit ein erster CI-Lauf auch Buildfehler sichtbar macht. Die `dependency-locks`-Prüfung bleibt aber **rot**, bis die tatsächlich aufgelösten, kontrollierten Dateien eingecheckt sind. Danach kann mit gesperrtem Restore/`npm ci` gearbeitet werden. Die CI schreibt selbst keine Änderungen auf `main`.
+Die ursprünglichen diagnostischen Läufe erzeugten echte Lockfiles als Artefakte. Die Dateien wurden danach auf einem isolierten GitHub-Runner aufgelöst und übernommen; nun ist ein **gesperrter** Restore mit `--locked-mode`/`npm ci` verpflichtend. Die CI schreibt keine Änderungen auf `main`.
 
 ## Erste Einrichtung
 

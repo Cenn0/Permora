@@ -1,5 +1,10 @@
 # Roadmap und Umsetzungsabgleich
 
+## CI-Fortschritt: echte Abhängigkeits-Lockfiles vorhanden
+
+Die bislang fehlenden 8 Lockfiles (7 NuGet-Projekte, 1 Angular) wurden aus einer **tatsächlichen** isolierten GitHub-Actions-Auflösung übernommen. Standard-Builds verwenden nur noch gesperrte Abhängigkeiten; die nächste vollständige CI-Ausführung auf diesem Stand muss nachweisen, dass sie dazu passen. **M7.6 bleibt teilweise offen**: Eine vollständige SBOM, die transitive Lizenzprüfung, Security-Advisories und die Auditierung des finalen Releases werden durch Lockfiles allein nicht erledigt. Ebenso sind FGAP-Zielbenutzer-/Gruppenmappings, echtes BFF-OIDC/MFA, Last/HA/Restore und Penetrationstests offen.
+
+
 Stand: 16. Oktober 2026. Ausgangspunkt war ein Repository mit ausschließlich Apache-2.0-Lizenz.
 
 **Statuslegende:** `S` = Quellcode vorhanden, Laufzeit-Abnahme offen; `T` = tatsächlich ausgeführter, eng abgegrenzter Test; `O` = offen. Ein vorhandener Test ist noch kein bestandener Test. Kein Enterprise-Meilenstein wird allein aufgrund vorhandener Dateien als produktiv abgeschlossen markiert.

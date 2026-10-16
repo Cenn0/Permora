@@ -64,19 +64,8 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - name: Restore packages (locked when committed, diagnostic bootstrap otherwise)
-        shell: bash
-        run: |
-          missing=0
-          while IFS= read -r project; do
-            if [[ ! -f "$(dirname "$project")/packages.lock.json" ]]; then missing=1; fi
-          done < <(find src tests -name '*.csproj' -print | sort)
-          if [[ $missing -eq 0 ]]; then
-            dotnet restore Permora.slnx --locked-mode --verbosity minimal
-          else
-            echo "::warning::No committed NuGet lockfile set; diagnostic --use-lock-file restore only."
-            dotnet restore Permora.slnx --use-lock-file --verbosity minimal
-          fi
+      - name: Restore exact committed NuGet dependencies
+        run: dotnet restore Permora.slnx --locked-mode --verbosity minimal
       - name: Build all .NET projects (warnings are errors)
         run: dotnet build Permora.slnx -c Release --no-restore
       - name: xUnit including real PostgreSQL integration
@@ -86,14 +75,14 @@ jobs:
         run: python3 scripts/ci-verify-trx.py tests/Permora.Tests/TestResults
       - name: Exercise ASP.NET API over HTTP with two scoped test identities
         run: python3 scripts/ci-api-smoke.py
-      - name: Upload TRX and generated NuGet lockfiles
+      - name: Upload xUnit TRX and PostgreSQL evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: dotnet-test-and-dependencies
           path: |
             tests/Permora.Tests/TestResults/**/*.trx
-            **/packages.lock.json
+            tests/Permora.Tests/TestResults/**/ci-summary.json
           if-no-files-found: warn
           retention-days: 7
 
@@ -109,14 +98,9 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Install from a lockfile (bootstrap a diagnostic one if missing)
+      - name: Install exact committed npm dependencies
         working-directory: web
-        run: |
-          if [[ ! -f package-lock.json ]]; then
-            echo "::warning::web/package-lock.json is not yet committed. CI-generated dependencies are diagnostic only."
-            npm install --package-lock-only --ignore-scripts
-          fi
-          npm ci
+        run: npm ci
       - name: Unit tests without a browser
         working-directory: web
         run: npm run test:logic
@@ -134,7 +118,7 @@ jobs:
       - name: Audit production npm dependencies
         working-directory: web
         run: npm audit --omit=dev --audit-level=high
-      - name: Upload browser traces and generated npm lock
+      - name: Upload Playwright reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -142,7 +126,6 @@ jobs:
           path: |
             web/playwright-report/
             web/test-results/
-            web/package-lock.json
           if-no-files-found: warn
           retention-days: 7
 
