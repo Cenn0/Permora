@@ -75,16 +75,16 @@ jobs:
         run: python3 scripts/ci-verify-trx.py tests/Permora.Tests/TestResults
       - name: Exercise ASP.NET API over HTTP with two scoped test identities
         run: python3 scripts/ci-api-smoke.py
-      - name: Upload xUnit TRX and PostgreSQL evidence
+      - name: Summarize local test evidence without upload
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: dotnet-test-and-dependencies
-          path: |
-            tests/Permora.Tests/TestResults/**/*.trx
-            tests/Permora.Tests/TestResults/**/ci-summary.json
-          if-no-files-found: warn
-          retention-days: 7
+        shell: bash
+        run: |
+          echo "### .NET / PostgreSQL" >> "$GITHUB_STEP_SUMMARY"
+          if find tests/Permora.Tests/TestResults -type f -name '*.trx' -print -quit 2>/dev/null | grep -q .; then
+            echo "xUnit TRX produced locally; see job logs for results. No Actions artifact was saved." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No TRX report generated (review test/restore steps above)." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   angular:
     name: Angular 22, frontend logic and Playwright
@@ -98,8 +98,6 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-          cache: npm
-          cache-dependency-path: web/package-lock.json
       - name: Install exact committed npm dependencies
         working-directory: web
         run: npm ci --fetch-retries=5 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=120000
@@ -120,16 +118,16 @@ jobs:
       - name: Audit production npm dependencies
         working-directory: web
         run: npm audit --omit=dev --audit-level=high
-      - name: Upload Playwright reports
+      - name: Summarize Playwright evidence without upload
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: angular-browser-and-dependencies
-          path: |
-            web/playwright-report/
-            web/test-results/
-          if-no-files-found: warn
-          retention-days: 7
+        shell: bash
+        run: |
+          echo "### Angular / Playwright" >> "$GITHUB_STEP_SUMMARY"
+          if test -f web/playwright-report/index.html; then
+            echo "Browser report generated locally; results are available in job logs. No Actions artifact was saved." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Browser report unavailable (inspect the Angular test steps)." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   keycloak:
     name: Keycloak 26.8.1 FGAP, roles and token contract
