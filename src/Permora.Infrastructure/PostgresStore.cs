@@ -282,12 +282,20 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
         public async Task<Operation?> NextOperationAsync(DateTimeOffset now, CancellationToken ct)
         {
             await using var command = new NpgsqlCommand("""
-                SELECT document::text FROM operations WHERE application_id=@app AND status='Queued'
-                ORDER BY (document->>'systemRevocation')::boolean DESC, created_at, id LIMIT 1 FOR UPDATE
+                SELECT o.document::text FROM operations o
+                WHERE o.application_id=@app AND o.status='Queued' AND o.next_at<=@now
+                  AND (COALESCE((o.document->>'systemRevocation')::boolean, false)
+                    OR NOT EXISTS (
+                        SELECT 1 FROM operations prior
+                        WHERE prior.application_id=o.application_id AND prior.status='Queued'
+                          AND NOT COALESCE((prior.document->>'systemRevocation')::boolean, false)
+                          AND (prior.created_at, prior.id) < (o.created_at, o.id)))
+                ORDER BY COALESCE((o.document->>'systemRevocation')::boolean, false) DESC,
+                    o.created_at, o.id LIMIT 1 FOR UPDATE OF o
                 """, connection, transaction);
             command.Parameters.AddWithValue("app", app.Id);
-            var next = await OneAsync<Operation>(command, ct);
-            return next?.NextAttemptAt <= now ? next : null;
+            command.Parameters.AddWithValue("now", now);
+            return await OneAsync<Operation>(command, ct);
         }
         public async Task SaveOperationAsync(Operation operation, CancellationToken ct)
         {

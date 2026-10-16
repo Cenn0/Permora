@@ -53,8 +53,13 @@ public sealed class MemoryStore(Fixture fixture) : IPortalStore
         public Task<IReadOnlyList<Operation>> UnresolvedMutationsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Operation>>(Operations.Values.Where(o => o.Status is OperationStatus.Conflict or OperationStatus.Failed).Where(o => o.Attempts > 0 && o.Change.Kind != ChangeKind.Reconcile).ToArray());
         public Task<Operation?> NextOperationAsync(DateTimeOffset now, CancellationToken ct)
         {
-            var next = Operations.Values.Where(o => o.Status == OperationStatus.Queued).OrderByDescending(o => o.SystemRevocation).ThenBy(o => o.CreatedAt).ThenBy(o => o.Id).FirstOrDefault();
-            return Task.FromResult(next?.NextAttemptAt <= now ? next : null);
+            var pending = Operations.Values.Where(o => o.Status == OperationStatus.Queued).ToArray();
+            var urgent = pending.Where(o => o.SystemRevocation && o.NextAttemptAt <= now)
+                .OrderBy(o => o.CreatedAt).ThenBy(o => o.Id).FirstOrDefault();
+            if (urgent is not null) return Task.FromResult<Operation?>(urgent);
+            var firstMutation = pending.Where(o => !o.SystemRevocation)
+                .OrderBy(o => o.CreatedAt).ThenBy(o => o.Id).FirstOrDefault();
+            return Task.FromResult(firstMutation?.NextAttemptAt <= now ? firstMutation : null);
         }
         public Task SaveOperationAsync(Operation operation, CancellationToken ct) { Operations[operation.Id] = operation; return Task.CompletedTask; }
         public Task AppendAuditAsync(Actor actor, string action, string detail, DateTimeOffset now, CancellationToken ct) { Audit.Add(AuditChain.Create(Application.Id, actor.Key, action, detail, now, Audit.LastOrDefault())); return Task.CompletedTask; }

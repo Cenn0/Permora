@@ -72,6 +72,25 @@ public sealed class WorkflowTests
         store.Operations[first.Id] = first; store.Operations[second.Id] = second;
         Assert.False(await new OperationProcessor(store, connector, f.Admins, f.Clock).ProcessAsync(f.App.Id, Ct)); Assert.Equal(0, connector.Writes);
     }
+    [Fact] public async Task Due_revocation_is_not_blocked_by_earlier_revocation_backoff()
+    {
+        var f = new Fixture(); var store = new MemoryStore(f); var connector = new FakeConnector();
+        var grant1 = f.Assignment(); var grant2 = f.Assignment(f.Supervisor.Id);
+        store.App = store.App with { Assignments = [grant1, grant2] };
+        var older = new Operation(Guid.NewGuid(), f.App.Id, new Actor("system", "Lifecycle"),
+            new Change { Kind = ChangeKind.RevokeAccess, TargetId = grant1.Id, Reason = "Expired" },
+            1, "revoke:" + grant1.Id, "hash1", OperationStatus.Queued, f.Clock.Now,
+            f.Clock.Now.AddMinutes(2), 1, SystemRevocation: true);
+        var newer = older with { Id = Guid.NewGuid(), Change = new Change { Kind = ChangeKind.RevokeAccess,
+            TargetId = grant2.Id, Reason = "Emergency" }, IdempotencyKey = "revoke:" + grant2.Id,
+            CreatedAt = f.Clock.Now.AddSeconds(1), NextAttemptAt = f.Clock.Now, Attempts = 0 };
+        store.Operations[older.Id] = older; store.Operations[newer.Id] = newer;
+        await new OperationProcessor(store, connector, f.Admins, f.Clock).ProcessAsync(f.App.Id, Ct);
+        Assert.DoesNotContain(store.App.Assignments, a => a.Id == grant2.Id);
+        Assert.Contains(store.App.Assignments, a => a.Id == grant1.Id);
+        Assert.Equal(OperationStatus.Queued, store.Operations[older.Id].Status);
+        Assert.Equal(OperationStatus.Applied, store.Operations[newer.Id].Status);
+    }
     [Fact] public async Task Exhausted_retries_become_failed_without_changing_domain_state()
     {
         var f = new Fixture(); var store = new MemoryStore(f); var service = new ChangeService(store, f.Admins, f.Clock); var connector = new FakeConnector { Failure = new HttpRequestException("Offline") };
@@ -118,10 +137,37 @@ public sealed class WorkflowTests
         var service = new ChangeService(store, f.Admins, f.Clock); var review = await service.StartReviewAsync(f.App.Id, f.Owner, "Quarterly review", f.Clock.Now.AddHours(1), Ct);
         Assert.Equal("self_certification", (await Assert.ThrowsAsync<DomainException>(() => service.ReviewAsync(f.App.Id, review.Id, assignment.Id, f.Owner, true, Ct))).Code);
     }
-    [Fact] public async Task Awaiting_binding_only_activates_after_clean_verification()
+    [Fact] public async Task Pending_binding_never_activates_without_explicit_central_iam_attestation()
     {
         var f = new Fixture(); var store = new MemoryStore(f) { App = f.App with { Status = ApplicationStatus.AwaitingIam } };
-        var service = new ChangeService(store, f.Admins, f.Clock); await service.RequestAsync(f.App.Id, f.Owner, new Change { Kind = ChangeKind.Reconcile, Reason = "IAM verification" }, 1, "binding-check", Ct);
-        await new OperationProcessor(store, new FakeConnector(), f.Admins, f.Clock).ProcessAsync(f.App.Id, Ct); Assert.Equal(ApplicationStatus.Active, store.App.Status);
+        var service = new ChangeService(store, f.Admins, f.Clock);
+        var operation = await service.RequestAsync(f.App.Id, f.Owner, new Change { Kind = ChangeKind.Reconcile,
+            Reason = "IAM verification" }, 1, "binding-no-approval", Ct);
+        await new OperationProcessor(store, new FakeConnector(), f.Admins, f.Clock).ProcessAsync(f.App.Id, Ct);
+        Assert.Equal(ApplicationStatus.AwaitingIam, store.App.Status);
+        Assert.Equal("iam_approval_required", store.Operations[operation.Id].ErrorCode);
+    }
+    [Fact] public async Task Attested_binding_activates_only_after_clean_remote_verification()
+    {
+        var f = new Fixture(); var approval = new IamApproval(f.Owner.Key, f.Clock.Now,
+            f.App.KeycloakClientUuid!, f.App.KeycloakClientId!, "IAM-TICKET-42");
+        var store = new MemoryStore(f) { App = f.App with { Status = ApplicationStatus.AwaitingIam, IamApproval = approval } };
+        var service = new ChangeService(store, f.Admins, f.Clock);
+        await service.RequestAsync(f.App.Id, f.Owner, new Change { Kind = ChangeKind.Reconcile,
+            Reason = "IAM verification" }, 1, "binding-attested", Ct);
+        await new OperationProcessor(store, new FakeConnector(), f.Admins, f.Clock).ProcessAsync(f.App.Id, Ct);
+        Assert.Equal(ApplicationStatus.Active, store.App.Status);
+    }
+    [Fact] public async Task Approval_for_a_different_client_does_not_activate_the_application()
+    {
+        var f = new Fixture(); var approval = new IamApproval(f.Owner.Key, f.Clock.Now,
+            Guid.NewGuid().ToString(), f.App.KeycloakClientId!, "IAM-TICKET-43");
+        var store = new MemoryStore(f) { App = f.App with { Status = ApplicationStatus.AwaitingIam, IamApproval = approval } };
+        var service = new ChangeService(store, f.Admins, f.Clock);
+        var operation = await service.RequestAsync(f.App.Id, f.Owner, new Change { Kind = ChangeKind.Reconcile,
+            Reason = "IAM verification" }, 1, "binding-mismatch", Ct);
+        await new OperationProcessor(store, new FakeConnector(), f.Admins, f.Clock).ProcessAsync(f.App.Id, Ct);
+        Assert.Equal(ApplicationStatus.AwaitingIam, store.App.Status);
+        Assert.Equal("iam_approval_required", store.Operations[operation.Id].ErrorCode);
     }
 }

@@ -38,3 +38,10 @@ Für reale PostgreSQL-Prüfung eine separate Datenbank erzeugen und die Verbindu
 - Last, Backlog-Fairness, Wiederherstellung, Datenbankschema-Upgrades, Accessibility und Security-Review.
 
 Kein Coverage-Prozentsatz wird ausgewiesen, weil kein instrumentierter Gesamtlauf stattgefunden hat. Die Zahl von C#-Testmethoden ist keine Zahl bestandener Testfälle.
+
+
+## Ergänzte Testquellen und manuelle Gates
+
+`WorkflowTests` enthält Negativfälle zur Aktivierung ohne zentrale IAM-Attestierung bzw. mit falscher Client-UUID sowie einen positiven Simulationsfall. Ein Regressionstest fordert, dass ein fälliger automatischer Entzug einen älteren Entzug im Backoff überholen darf. `ConnectorTests` prüft eine Rollenlöschung bei unbekannter direkter Keycloak-Zuweisung. **Diese C#-Tests sind bislang nicht ausgeführt.**
+
+`scripts/bootstrap-locks.sh` erzeugt Lockfiles nur in einer netzwerkfähigen Umgebung; danach müssen die tatsächlichen Abhängigkeits-Lockfiles geprüft und eingecheckt werden. `scripts/check.sh` bricht ohne Lockfiles, .NET-SDK und isolierte `PERMORA_TEST_POSTGRES`-Datenbank ausdrücklich ab. `--lightweight` umfasst nur Struktur und isolierte Frontendlogik. Weder BFF-Login noch FGAP/Token-Audience können durch Mock-Tests abgenommen werden.

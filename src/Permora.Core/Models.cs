@@ -29,12 +29,15 @@ public sealed record AppPolicy(bool RequireApproval, int MaxGrantDays, IReadOnly
 {
     public static AppPolicy Default => new(true, 90, []);
 }
+// An audited attestation by central IAM, not a claim that FGAP can be inferred from the client alone.
+public sealed record IamApproval(string ApprovedBy, DateTimeOffset ApprovedAt,
+    string ClientUuid, string ClientId, string EvidenceReference);
 public sealed record ApplicationDocument(
     Guid Id, Guid TeamId, string RealmKey, string Slug, string Name, string Description,
     string Environment, ApplicationStatus Status, long Revision,
     string? KeycloakClientUuid, string? KeycloakClientId, string? LoginClientUuid,
     AppPolicy Policy, IReadOnlyList<Permission> Permissions, IReadOnlyList<AppRole> Roles,
-    IReadOnlyList<Assignment> Assignments);
+    IReadOnlyList<Assignment> Assignments, IamApproval? IamApproval = null);
 
 public sealed record DirectoryPrincipal(
     Guid Id, string RealmKey, string SubjectKey, string KeycloakId, string Name,

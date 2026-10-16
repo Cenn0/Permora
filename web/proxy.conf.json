@@ -6,5 +6,13 @@
   "/bff": {
     "target": "http://127.0.0.1:5080",
     "secure": false
+  },
+  "/signin-oidc": {
+    "target": "http://127.0.0.1:5080",
+    "secure": false
+  },
+  "/signout-callback-oidc": {
+    "target": "http://127.0.0.1:5080",
+    "secure": false
   }
 }

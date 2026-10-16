@@ -6,6 +6,10 @@
 
 > **Entwicklungsstand: erste Implementierung, keine Produktionsfreigabe.** Der Quellcode umfasst die zentrale Verwaltungskette einschließlich Oberfläche, Worker und Connector. Ein vollständiger .NET-/Angular-Build und die Abnahme gegen echtes Keycloak/PostgreSQL stehen noch aus. 32 eigenständig ausführbare Frontend-Logiktests wurden tatsächlich erfolgreich ausgeführt; dies ersetzt keine Backend- oder Sicherheitstests. Details: [Prüfbericht](docs/review.md), [Roadmap mit Abnahmekriterien](docs/roadmap.md).
 
+> **Nachgehärtet, noch nicht abgenommen:** Eine zentrale IAM-Attestierung mit Nachweis ist nun zwingende Voraussetzung vor der ersten Anwendung-Aktivierung. Dringende automatische Entzüge überholen verzögerte andere automatische Entzüge. Nicht vom Portal verwaltete Keycloak-Zuweisungen verhindern eine Rollenlöschung. Die dazugehörigen C#-Testquellen sind noch **nicht ausgeführt**.
+
+**Manuelle Lockfile-Erstellung:** `bash scripts/bootstrap-locks.sh` in einer netzwerkfähigen .NET-10-/Node-Umgebung ausführen, erzeugte `packages.lock.json` und `web/package-lock.json` auflösen, prüfen und einchecken. Danach verlangt `bash scripts/check.sh` einen gesperrten Restore und eine isolierte `PERMORA_TEST_POSTGRES`-Datenbank. `--lightweight` bleibt ohne Backend-/Angular-/Keycloak-Abnahme nutzbar. **Keine CI eingerichtet.**
+
 ## Was enthalten ist
 
 - Teambezogener Anwendungskatalog, kontrollierte Registrierung, explizite Owner/Maintainer/AccessManager/Approver/Auditor-Mandate.
