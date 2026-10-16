@@ -1,11 +1,15 @@
-<p align="center"><img src="web/public/brand/permora.svg" width="78" alt="Permora logo: colorful modules forming a P"></p>
+<p align="center"><img src="web/public/brand/permora.svg" width="78" alt="Permora logo: colorful flowing ribbon forming a P"></p>
 
 # Permora
+
+**Brand and UI design:** [Logo + light/dark templates](docs/branding/README.md) (design concepts only).
 
 **Language:** **English** · [Deutsch](README.de.md)
 
 [![CI](https://github.com/Cenn0/Permora/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Cenn0/Permora/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+
+**Explore:** [Scope](#scope) · [Trust boundaries](#trust-boundaries) · [Local development](#local-development) · [Docs](docs/README.md) · [Roadmap](docs/roadmap.md)
 
 **Delegate application and access management in Keycloak without handing over realm administration.**
 
@@ -24,6 +28,20 @@ Permora is an independent open-source **C# / Angular portal** designed to let ap
 The critical security boundary remains **centralized**: realm settings, cross-application privileges, IAM policy, and approval of newly prepared clients/delegation rights are outside team self-service. Prepared clients remain disabled until the documented IAM approval. An HTTP `202 Accepted` response **does not** prove a change has taken effect in Keycloak.
 
 **Not yet implemented or accepted:** Automatic FGAP provisioning, complete cross-issuer identity correlation, ABAC, full HR/AD integration, externally immutable audit storage, and load, recovery, and penetration testing. The [roadmap](docs/roadmap.md) distinguishes implemented source code, executed tests, and outstanding acceptance criteria.
+
+## Trust boundaries
+
+```mermaid
+flowchart LR
+  T[Application team in browser] -->|Session / CSRF| A[Permora BFF and API]
+  A --> P[(Portal PostgreSQL)]
+  W[Separate worker] --> P
+  W -->|Scoped admin calls| K[Keycloak Admin API]
+  I[Central IAM approver] -->|Attested approval in portal| A
+  Z[Isolated provisioner] -->|Prepare disabled clients| K
+```
+
+This is a **design boundary**, not proof of production permission isolation. A central IAM approval is required before client activation, and any accepted change request must be reconciled against Keycloak. The [architecture](docs/architecture.md), [security model](docs/security.md) and [CI evidence](docs/ci.md) distinguish technical behavior, Keycloak support and security acceptance.
 
 ## Technology
 
@@ -85,6 +103,6 @@ bash scripts/check.sh
 
 ## Documentation and contributions
 
-[Architecture](docs/architecture.md) · [Keycloak delegation](docs/keycloak.md) · [Security model](docs/security.md) · [Operations](docs/operations.md) · [Roadmap](docs/roadmap.md) · [API](docs/api.md) · [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md)
+[Documentation index](docs/README.md) · [Architecture](docs/architecture.md) · [Keycloak delegation](docs/keycloak.md) · [Security model](docs/security.md) · [Operations](docs/operations.md) · [Roadmap](docs/roadmap.md) · [API](docs/api.md) · [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md)
 
 Licensed under the [Apache License 2.0](LICENSE). Report vulnerabilities through the private procedure in [SECURITY.md](SECURITY.md), not in public issues containing credentials or internal deployment details.

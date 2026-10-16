@@ -1,5 +1,7 @@
 # Sicherheitsmodell und Grenzen
 
+> **Stand der Nachweise:** Für aktuelle ausgeführte Tests gilt [docs/ci.md](ci.md). Ältere, in diesem Dokument enthaltene Hinweise auf noch nicht ausgeführte Tests beschreiben historische Review-Zeitpunkte und dürfen nicht als aktueller CI-Status gelesen werden. Die produktive Sicherheitsfreigabe bleibt weiterhin ausstehend.
+
 ## Vier getrennte Aussagen
 
 **Funktioniert grundsätzlich:** dokumentierte Keycloak-Admin-APIs können anwendungsspezifische Rollen und Mappings bearbeiten; der Connector implementiert diesen Weg. Die tatsächliche Laufzeitkompatibilität dieses Codes ist noch nicht vollständig geprüft.

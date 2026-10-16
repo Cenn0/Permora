@@ -1,11 +1,15 @@
-<p align="center"><img src="web/public/brand/permora.svg" width="78" alt="Permora-Logo: farbige Module als P"></p>
+<p align="center"><img src="web/public/brand/permora.svg" width="78" alt="Permora-Logo: farbiges Band in P-Form"></p>
 
 # Permora
+
+**Marke und UI:** [Logo und Hell-/Dunkel-Designvorlagen](docs/branding/README.md) (ausschließlich Entwürfe).
 
 **Sprache:** [English](README.md) · **Deutsch**
 
 [![CI](https://github.com/Cenn0/Permora/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Cenn0/Permora/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+
+**Direkt zu:** [Funktionsumfang](#was-permora-abdeckt) · [Vertrauensgrenzen](#vertrauensgrenzen) · [Lokale Entwicklung](#lokale-entwicklungsumgebung) · [Dokumentation](docs/README.md) · [Roadmap](docs/roadmap.md)
 
 **Anwendungen und Berechtigungen in Keycloak gezielt an Teams delegieren.**
 
@@ -24,6 +28,20 @@ Permora ist ein eigenständiges, quelloffenes **C#-/Angular-Portal** für die ei
 Die wesentliche Sicherheitsgrenze bleibt **zentral**: Realm-Einstellungen, übergreifende Berechtigungen, IAM-Sicherheitsrichtlinien und die Freigabe neuer Clients/Delegationsrechte gehören nicht zum Self-Service. Neu vorbereitete Clients bleiben bis zur dokumentierten IAM-Abnahme deaktiviert. Eine API-Antwort `202 Accepted` bedeutet **nicht**, dass eine Änderung bereits in Keycloak wirksam ist.
 
 **Noch nicht umgesetzt oder abgenommen** sind insbesondere automatisiertes FGAP-Provisioning, vollständige externe Identitätskorrelation, ABAC, vollständige HR-/AD-Konnektoren, externe unveränderliche Audit-Speicherung sowie Last-, Wiederanlauf- und Penetrationstests. Die [Roadmap](docs/roadmap.md) unterscheidet Quellcode, ausgeführte Tests und offene Abnahmekriterien.
+
+## Vertrauensgrenzen
+
+```mermaid
+flowchart LR
+  T[Anwendungsteam im Browser] -->|Session / CSRF| A[Permora BFF und API]
+  A --> P[(Portal PostgreSQL)]
+  W[Getrennter Worker] --> P
+  W -->|Begrenzte Admin-Aufrufe| K[Keycloak Admin API]
+  I[Zentrale IAM-Stelle] -->|Attestierte Freigabe im Portal| A
+  Z[Isolierter Provisioner] -->|Deaktivierte Clients vorbereiten| K
+```
+
+Dies beschreibt eine **Architekturgrenze**, keine nachgewiesene produktive Berechtigungsisolation. Client-Aktivierung erfordert eine zentrale IAM-Freigabe; angenommene Änderungsaufträge müssen mit Keycloak abgeglichen werden. [Architektur](docs/architecture.md), [Sicherheitsmodell](docs/security.md) und [CI-Nachweise](docs/ci.md) trennen Funktion, Herstellersupport und Sicherheitsabnahme.
 
 ## Technische Basis
 
@@ -85,6 +103,6 @@ bash scripts/check.sh
 
 ## Dokumentation und Mitarbeit
 
-[Architektur](docs/architecture.md) · [Keycloak und Delegation](docs/keycloak.md) · [Sicherheit](docs/security.md) · [Betrieb](docs/operations.md) · [Roadmap](docs/roadmap.md) · [API](docs/api.md) · [Contributing](CONTRIBUTING.md) · [Security Policy](SECURITY.md)
+[Dokumentationsindex](docs/README.md) · [Architektur](docs/architecture.md) · [Keycloak und Delegation](docs/keycloak.md) · [Sicherheit](docs/security.md) · [Betrieb](docs/operations.md) · [Roadmap](docs/roadmap.md) · [API](docs/api.md) · [Contributing](CONTRIBUTING.md) · [Security Policy](SECURITY.md)
 
 Veröffentlicht unter der [Apache License 2.0](LICENSE). Sicherheitslücken bitte über den in [SECURITY.md](SECURITY.md) beschriebenen privaten Meldeweg melden, nicht mit Zugangsdaten oder internen Systeminformationen in öffentlichen Issues.
