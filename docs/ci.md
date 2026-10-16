@@ -4,7 +4,7 @@
 
 [GitHub Actions #38946163282](https://github.com/Cenn0/Permora/actions/runs/38946163282) hat **alle sieben Pflichtjobs** erfolgreich ausgeführt: C#-Release-Build und 102 xUnit-Tests mit echter PostgreSQL-Integration ohne Skips, API-HTTP-Sicherheitstest, Angular-Produktionsbuild und 32 Frontend-Logiktests sowie 8 Playwright-Tests, Keycloak 26.8.1 mit zwei delegierten FGAP-Servicekonten inklusive Zielbenutzer-/Gruppen-Positiv-/Negativfällen, gesperrte npm-/NuGet-Dependency-Restores, lokaler Docker-Build des tatsächlichen Produktionsimages und fail-closed Zusammenfassungs-Gate.
 
-GitHub-Action-Quellcode ist auf verifizierte Commit-SHAs gepinnt. npm hat einen Lockfile-Cache und begrenzte Download-Wiederholungen. **Die CI veröffentlicht weder Container noch Releases und deployt nichts.** Weitere Freigabegrenzen: produktiver OIDC-BFF-/MFA-Flow, AD-/LDAP-Federation und deren Gruppen-Lifecycle, vollständige SoD-/Audit-/SBOM-/Lizenz-/Betriebs-/Wiederherstellungs- und Pentest-Prüfung.
+GitHub-Action-Quellcode ist auf verifizierte Commit-SHAs gepinnt. npm verwendet das eingecheckte Lockfile und begrenzte Download-Wiederholungen, aber keinen persistenten Actions-Cache. **Die CI veröffentlicht weder Container noch Releases und deployt nichts.** Weitere Freigabegrenzen: produktiver OIDC-BFF-/MFA-Flow, AD-/LDAP-Federation und deren Gruppen-Lifecycle, vollständige SoD-/Audit-/SBOM-/Lizenz-/Betriebs-/Wiederherstellungs- und Pentest-Prüfung.
 
 [Ausführlicher Nachweis](evidence/ci-2026-10-16-final.md) · [frühere Diagnosehistorie](evidence/ci-2026-10-16.md)
 
@@ -13,12 +13,16 @@ GitHub-Action-Quellcode ist auf verifizierte Commit-SHAs gepinnt. npm hat einen 
 
 Ein echter Keycloak-26.8.1-Test bestätigt jetzt zusätzlich: Client-`map-roles` allein berechtigt nicht zur Zuweisung an beliebige Benutzer oder Gruppen. Bei expliziter FGAP-Freigabe für einen Zielbenutzer bzw. eine Zielgruppe lassen sich Rollen des eigenen Clients zuweisen und wieder entziehen. Fremde Clients und nicht freigegebene Zielidentitäten bleiben gesperrt, ebenso allgemeine Änderungen am Benutzerkonto. Alle Tests laufen mit isolierten Servicekonten ohne breite Realm-Adminrollen. Externe LDAP-/AD-Federation, vollständiges produktives OIDC-BFF/MFA und betriebliche Abnahme bleiben offen.
 
-Vier Actions sind auf bei GitHub offiziell verifizierte Release-Commit-SHAs fixiert. Für Angular wird ein npm-Cache mit `web/package-lock.json` als Cache-Key und eine begrenzte zusätzliche Retry-Konfiguration für Registry-Netzwerkunterbrechungen verwendet. Ein vorheriger `ECONNRESET` beim Download war kein Lockfile-Konflikt.
+Vier Actions sind auf bei GitHub offiziell verifizierte Release-Commit-SHAs fixiert. Für Angular wird `web/package-lock.json` mit `npm ci` verwendet; der vorherige Actions-npm-Cache ist deaktiviert. Die begrenzten Download-Wiederholungen bei Registry-Netzwerkunterbrechungen bleiben aktiv. Ein vorheriger `ECONNRESET` beim Download war kein Lockfile-Konflikt.
 
 ## Neuer Stand: echte Locks, ausschließlich lesende Standard-CI
 
 Alle sieben C#-Projekte besitzen ein auf dem isolierten GitHub-Runner erzeugtes `packages.lock.json`; das Angular-Frontend besitzt `web/package-lock.json`. Der reguläre Workflow führt nun `dotnet restore --locked-mode` und `npm ci` aus. Es existiert **kein** dauerhafter CI-Job mit Schreibberechtigungen, Push/Deploy oder Zugriff auf produktive Secrets. Die temporäre One-shot-Lockfile-Übernahme wurde danach entfernt. Der gesperrte PR-Run #38946163282 ist inzwischen vollständig grün. Die in dieser Datei erwähnten roten Lockfile-Gates gehören zu den **historischen** Läufen vor der Lockfile-Übernahme.
 
+
+## Kontingentfreier Lauf (16.10.2026)
+
+Der [geprüfte Pull-Request-Lauf #38963609610](https://github.com/Cenn0/Permora/actions/runs/38963609610) hat alle sieben Pflichtjobs erfolgreich abgeschlossen und **keine Actions-Artefakte gespeichert**. Die Workflow-Änderung wurde in PR #10 gemergt. npm-Cache und Uploads für TRX/Playwright wurden entfernt; die Prüfungen, PostgreSQL-/Keycloak-Integration, Docker-Builds und der npm-Security-Audit bleiben erhalten. Das senkt die Cache-/Artefaktnutzung, kann aber Downloads bei jedem Lauf etwas verlängern.
 
 ## Auslöser und Sicherheit
 
@@ -43,8 +47,8 @@ Die ursprünglichen diagnostischen Läufe erzeugten echte Lockfiles als Artefakt
 ## Erste Einrichtung
 
 1. PR gegen `main` öffnen und die Jobzustände abwarten. Kein Token, Keycloak-Secret oder persönliches Produktionskonto für die CI nötig.
-2. **Wenn Lockfiles fehlen:** `dotnet-test-and-dependencies` und `angular-browser-and-dependencies` unter dem Workflow-Run herunterladen, NuGet-/npm-Auflösung, Lizenz- und Security-Advisories prüfen, die benötigten Lockfiles ins Repository übernehmen.
-3. Bei fehlgeschlagenen Builds die Logs und TRX/Playwright-Artefakte öffnen, Quellcode korrigieren und PR erneut testen.
+2. **Wenn Lockfiles fehlen:** Abhängigkeiten in einer isolierten Entwicklungsumgebung auflösen, Security-/Lizenzlage überprüfen, die passenden `packages.lock.json` beziehungsweise `web/package-lock.json` lokal erzeugen und als geprüften Code-Commit einreichen. Die CI erzeugt dafür keine herunterladbaren Actions-Artefakte.
+3. Bei fehlgeschlagenen Builds die Job-Logs und `GITHUB_STEP_SUMMARY` prüfen. TRX-/Playwright-Dateien entstehen nur temporär auf dem Runner und werden nicht mehr hochgeladen; für eine vollständige lokale Analyse die Tests selbst ausführen. Danach Fehler korrigieren und PR erneut testen.
 4. Bei grünem `keycloak`: Rollen/Token-Vertrag und clientbezogene FGAP-v2-Isolation zweier minimal berechtigter Servicekonten bestätigt. Zusätzliche Prüfungen für vollständiges Zielbenutzer-/Gruppen-Mapping, LDAP-Sicht und produktive Anwendungs-SSO bleiben offen.
 5. Erst bei vollständig bestandenen technischen Tests, minimalen Keycloak-Rechten, überprüftem BFF-OIDC/MFA, Betriebs- und Recovery-Nachweis eine Pilotfreigabe diskutieren.
 
