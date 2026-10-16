@@ -35,7 +35,7 @@ flowchart LR
   A --> P[(Portal PostgreSQL)]
   W[Separate worker] --> P
   W -->|Scoped admin calls| K[Keycloak Admin API]
-  I[Central IAM approval] -->|Required before activation| W
+  I[Central IAM approver] -->|Attested approval in portal| A
   Z[Isolated provisioner] -->|Prepare disabled clients| K
 ```
 
