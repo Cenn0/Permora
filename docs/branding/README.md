@@ -1,5 +1,9 @@
 # Permora brand identity and UI concepts
 
+## Brand banners
+
+The README uses a theme-aware `<picture>` to show the [light](banner-light.svg) or [dark](banner-dark.svg) version of the brand logo together with **ORGANIZE TODAY. BUILD TOMORROW.** The compact [P mark](logo.svg) remains the favicon and application identity. The banner is a self-contained brand graphic and not a screenshot of production authorization behavior.
+
 **Design reference, not a product screenshot or an implementation claim.**
 
 ![Permora light theme](design-light.svg)

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" role="img" aria-labelledby="brandTitle brandDescription">
+ <title id="brandTitle">Permora — Organize today. Build tomorrow.</title>
+ <desc id="brandDescription">Permora application access governance banner in dark theme</desc>
+ <defs><linearGradient id="bannerWash" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111B41"/><stop offset=".5" stop-color="#151638"/><stop offset="1" stop-color="#37143E"/></linearGradient>
+ <linearGradient id="bannerAccent" x1="0" y1="0" x2="1" y2=".2"><stop stop-color="#198BFC"/><stop offset=".48" stop-color="#8950F8"/><stop offset=".78" stop-color="#F43F86"/><stop offset="1" stop-color="#FFB020"/></linearGradient></defs>
+ <rect width="1200" height="320" rx="30" fill="#09112B"/>
+ <rect x="6" y="6" width="1188" height="308" rx="26" fill="url(#bannerWash)" stroke="#3C397B"/>
+ <path d="M0 278C220 210 444 354 674 246S1040 199 1200 266" fill="none" stroke="url(#bannerAccent)" opacity=".18" stroke-width="67"/>
+ <rect x="47" y="54" width="192" height="210" rx="30" fill="#151A3E" stroke="#3C397B"/>
+ <g transform="translate(62 79) scale(1.02)"><defs>
+ <linearGradient id="main" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#198BFC"/><stop offset=".54" stop-color="#8950F8"/><stop offset="1" stop-color="#F43F86"/></linearGradient>
+ <linearGradient id="sun" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#FFE064"/><stop offset=".52" stop-color="#FFB020"/><stop offset="1" stop-color="#F43F86"/></linearGradient>
+ <linearGradient id="sea" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#2EEBEE"/><stop offset="1" stop-color="#F43F86"/></linearGradient>
+ <linearGradient id="shadow" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#003BAF"/><stop offset="1" stop-color="#169CFF"/></linearGradient>
+ </defs><g transform="scale(1)"><path d="M18 30Q18 14 35 14H61Q78 14 78 35V94Q78 114 62 125L19 147Z" fill="url(#sea)"/><path d="M49 14H98Q148 14 148 65Q148 99 119 111L77 127V83H99Q117 83 117 64Q117 45 98 45H66Z" fill="url(#sun)"/><path d="M74 54Q76 47 87 47H99Q118 47 118 68Q116 90 96 90H79Q87 81 87 68Q87 57 74 54Z" fill="url(#main)"/><path d="M19 94C35 78 50 60 77 42V108Q77 123 61 131L19 147Z" fill="url(#shadow)" opacity=".8"/></g></g>
+ <g font-family="Inter,'Segoe UI',Arial,sans-serif">
+ <text x="268" y="144" font-size="81" font-weight="800" letter-spacing="-3" fill="#F6F7FF">Permora</text>
+ <text x="272" y="191" font-size="22" font-weight="750" letter-spacing="2" fill="#D1B5FF">ORGANIZE TODAY. BUILD TOMORROW.</text>
+ <rect x="274" y="217" width="191" height="5" rx="3" fill="url(#bannerAccent)"/>
+ <text x="271" y="258" font-size="16" font-weight="700" letter-spacing="1.35" fill="#B7B8DD">APPLICATIONS  ·  TEAMS  ·  ROLES  ·  APPROVALS</text>
+ </g><g transform="translate(943 68)">
+ <rect x="30" y="3" width="145" height="87" rx="19" fill="#252051" stroke="#3C397B" stroke-width="2"/>
+ <rect x="7" y="120" width="120" height="87" rx="19" fill="#1C254B" stroke="#3C397B" stroke-width="2"/>
+ <path d="M69 120V95H98V90" fill="none" stroke="#8950F8" stroke-width="5" stroke-linecap="round"/>
+ <circle cx="69" cy="120" r="8" fill="#F43F86"/><circle cx="99" cy="90" r="8" fill="#198BFC"/>
+ <path d="M78 34V58M66 46H91" stroke="#198BFC" stroke-width="8" stroke-linecap="round"/>
+ <circle cx="117" cy="47" r="16" fill="#F43F86" opacity=".9"/>
+ <path d="M51 161 64 172 86 144" fill="none" stroke="#10B9A3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M152 132V108H197" fill="none" stroke="#FFB020" stroke-width="5" stroke-linecap="round"/>
+ <circle cx="197" cy="108" r="8" fill="#FFB020"/>
+ </g>
+ </svg>
