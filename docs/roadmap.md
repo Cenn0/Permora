@@ -1,8 +1,15 @@
 # Roadmap und Umsetzungsabgleich
 
+## Vollständige technische CI – neuer Nachweis
+
+**[Workflow #38946163282](https://github.com/Cenn0/Permora/actions/runs/38946163282): sieben von sieben Pflichtjobs grün**, einschließlich Docker-Paketierung, gesperrter npm-/NuGet-Auflösung und zwei FGAP-Servicekonten mit positiven und negativen Client-/Benutzer-/Gruppenzuweisungsprüfungen. Vorherige Aussagen über rote Lockfile-Gates im Dokument beziehen sich auf die **historischen** Läufe davor. [Nachweis und Abgrenzungen](evidence/ci-2026-10-16-final.md).
+
+Kein Freigabenachweis für externes AD/LDAP, den produktiven OIDC-BFF/MFA-Flow, die vollständige SoD-/IGA-Roadmap, SBOM, Lizenzen aller transitiven Abhängigkeiten, Disaster Recovery oder einen unabhängigen Pentest.
+
+
 ## CI-Fortschritt: echte Abhängigkeits-Lockfiles vorhanden
 
-Die bislang fehlenden 8 Lockfiles (7 NuGet-Projekte, 1 Angular) wurden aus einer **tatsächlichen** isolierten GitHub-Actions-Auflösung übernommen. Standard-Builds verwenden nur noch gesperrte Abhängigkeiten; die nächste vollständige CI-Ausführung auf diesem Stand muss nachweisen, dass sie dazu passen. **M7.6 bleibt teilweise offen**: Eine vollständige SBOM, die transitive Lizenzprüfung, Security-Advisories und die Auditierung des finalen Releases werden durch Lockfiles allein nicht erledigt. Ebenso sind FGAP-Zielbenutzer-/Gruppenmappings, echtes BFF-OIDC/MFA, Last/HA/Restore und Penetrationstests offen.
+Die bislang fehlenden 8 Lockfiles (7 NuGet-Projekte, 1 Angular) wurden aus einer **tatsächlichen** isolierten GitHub-Actions-Auflösung übernommen. Standard-Builds verwenden nur noch gesperrte Abhängigkeiten; der vollständige CI-Lauf #38946163282 hat diese reproduzierbare Auflösung erfolgreich nachgewiesen. **M7.6 bleibt teilweise offen**: Eine vollständige SBOM, die transitive Lizenzprüfung, Security-Advisories und die Auditierung des finalen Releases werden durch Lockfiles allein nicht erledigt. Eingeschränkte FGAP-Zielbenutzer-/Gruppenmappings sind mit Testidentitäten nachgewiesen; die vollständige Unternehmensmatrix, echtes BFF-OIDC/MFA, Last/HA/Restore und Penetrationstests bleiben offen.
 
 
 Stand: 16. Oktober 2026. Ausgangspunkt war ein Repository mit ausschließlich Apache-2.0-Lizenz.
@@ -11,10 +18,10 @@ Stand: 16. Oktober 2026. Ausgangspunkt war ein Repository mit ausschließlich Ap
 
 | ID | Ergebnis / Anforderung | Status | Implementierung / Nachweis | Abnahmekriterium |
 |---|---|---|---|---|
-| M0.1 | C#-/Angular-Struktur, getrennte Prozesse | S/T | `src/`, `web/`, `Permora.slnx`; CI-Lauf #38912134224 | Release-Builds ausgeführt; reproduzierbare Locks und Release-Abnahme noch offen |
+| M0.1 | C#-/Angular-Struktur, getrennte Prozesse | T | `src/`, `web/`, `Permora.slnx`; CI #38946163282 | Alle Release-Builds mit gesperrten Abhängigkeiten erfolgreich; Produktionsabnahme offen |
 | M0.2 | Logo und ausgewählte Designvariante 3 | S | `web/public/brand/`, Dashboard/CSS | Angular-Build, Desktop/Mobile-Vergleich, Accessibility |
 | M0.3 | README, Architektur, Betrieb, Tests | S | `README.md`, `docs/` | Anleitung auf frischer Maschine erfolgreich |
-| M0.4 | GitHub Actions für Builds, Tests und Integration | S/T | `.github/workflows/ci.yml`; CI-Lauf #38912134224 | Funktionsjobs bestanden; Lockfile-Gate rot, FGAP gesondert |
+| M0.4 | GitHub Actions für Builds, Tests und Integration | T | `.github/workflows/ci.yml`; CI #38946163282 | Sieben Pflichtjobs grün; produktives SSO, LDAP, HA/Recovery weiterhin offen |
 | M1.1 | Teams, eindeutige Ownership, Verwaltungsrollen | S | Policy, ApiEndpoints, Store | zwei Teams können gegenseitig weder lesen noch schreiben |
 | M1.2 | Registrierung nur durch tatsächliche Team-Owner | S | API + Transaktionsprüfung | konkurrierender Mandatsentzug vor Erstellung blockiert |
 | M1.3 | Serverautorisierung jeder App-Ressource | S | `Policy.RequireVisible`, App-Transaktionen | IDOR/API-Negativtests gegen echten Server |
@@ -49,7 +56,7 @@ Stand: 16. Oktober 2026. Ausgangspunkt war ein Repository mit ausschließlich Ap
 | M7.3 | Reine Frontend-Logiktests | T | 32/32 bestanden | TAP unter `docs/evidence/` |
 | M7.4 | Angular-/Browser-Testquellen | S/T | Angular-Produktionsbuild + Playwright 8/8 | Reale UI-Build-/Fixture-E2E-Tests bestanden, echtes BFF/SSO offen |
 | M7.5 | Real-Keycloak-Vertragstests | S/T | `scripts/ci-keycloak-contract.py` auf Keycloak 26.8.1 | Rollen/Token und clientbezogene FGAP-v2-Isolation zweier minimal privilegierter Konten bestanden; User-/Group-Mapping-Matrix offen |
-| M7.6 | Dependency-Locks, SBOM, Lizenz-/Security-Audit | O | direkte Versionen gesetzt | echte Lockfiles und transitive Abhängigkeiten geprüft |
+| M7.6 | Dependency-Locks, SBOM, Lizenz-/Security-Audit | S/T | acht echte Lockfiles; `--locked-mode`/`npm ci`; npm-Prod-Audit | Lockfiles reproduzierbar geprüft; SBOM, vollständige transitive Lizenz-/Securityprüfung offen |
 | M8.1 | Betriebs-/Recovery-Anleitung und lokale Hilfen | S | `deploy/`, `scripts/`, Operations | Neuinstallation, Upgrade und Restore ausgeführt |
 | M8.2 | Performance, HA, unabhängiger Pentest | O | keine Behauptung vorhandener Abnahme | verbindliche SLOs und nachweisbare Sicherheitsprüfung |
 | M8.3 | AD-/LDAP-Schreibkonnektoren und HR-Lifecycle | O | nur Keycloak-Directory-Lesen vorhanden | führende Systeme, Korrelation, Writeback und Audit |

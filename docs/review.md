@@ -1,8 +1,11 @@
 # Review und Prüfergebnis
 
+**Neuester technischer Stand:** [Workflow #38946163282](https://github.com/Cenn0/Permora/actions/runs/38946163282) auf dem CI-Branch ist komplett grün (7/7 Jobs). Docker-Build, Keycloak-FGAP-Zielbenutzer-/Gruppenzuweisungen und echte npm-/NuGet-Lockfiles sind geprüft. Historische Aussagen zu ursprünglich fehlenden .NET-/Angular-Testumgebungen und fehlenden Lockfiles sind als **damalige Befunde** zu lesen, nicht als aktuelle Blocker. Weiterhin offen: umfassendes Produkt-/BFF-SSO-/MFA-/LDAP-/ABAC-/SoD-/Release-Audit und Last-/Recovery-/Penetrationstests. [Aktuelles Protokoll](evidence/ci-2026-10-16-final.md).
+
+
 ## CI-Nachtrag – Lockfile-Blocker bearbeitet
 
-Die bisher nicht eingecheckten NuGet- und npm-Lockfiles wurden inzwischen von einem isolierten GitHub-Actions-Runner erzeugt und im neuen CI-Änderungsstand eingecheckt. Die CI wurde auf gesperrte Abhängigkeitsauflösung umgestellt; eine **neue** erfolgreiche Gesamt-CI muss den Status erst noch bestätigen. Frühere Aussagen in diesem Review beschreiben ausdrücklich die damalige Arbeitsumgebung bzw. die historischen Läufe. Das Repository ist inzwischen öffentlich; die Sicherheits-, FGAP-/OIDC- und Betriebsgrenzen bleiben unverändert.
+Die bisher nicht eingecheckten NuGet- und npm-Lockfiles wurden inzwischen von einem isolierten GitHub-Actions-Runner erzeugt und im neuen CI-Änderungsstand eingecheckt. Die CI wurde auf gesperrte Abhängigkeitsauflösung umgestellt; der vollständige GitHub-Workflow #38946163282 hat die gesperrten Builds und Tests inzwischen erfolgreich bestätigt. Frühere Aussagen in diesem Review beschreiben ausdrücklich die damalige Arbeitsumgebung bzw. die historischen Läufe. Das Repository ist inzwischen öffentlich; die Sicherheits-, FGAP-/OIDC- und Betriebsgrenzen bleiben unverändert.
 
 
 Stand: 16. Oktober 2026. Dieser Bericht trennt Quellcode-Review, tatsächlich ausgeführte Prüfungen und ausstehende Laufzeitabnahme.

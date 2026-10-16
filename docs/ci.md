@@ -1,5 +1,14 @@
 # Permora CI: Tests, Belege und Grenzen
 
+## Vollständiger grüner Prüflauf – 16.10.2026
+
+[GitHub Actions #38946163282](https://github.com/Cenn0/Permora/actions/runs/38946163282) hat **alle sieben Pflichtjobs** erfolgreich ausgeführt: C#-Release-Build und 102 xUnit-Tests mit echter PostgreSQL-Integration ohne Skips, API-HTTP-Sicherheitstest, Angular-Produktionsbuild und 32 Frontend-Logiktests sowie 8 Playwright-Tests, Keycloak 26.8.1 mit zwei delegierten FGAP-Servicekonten inklusive Zielbenutzer-/Gruppen-Positiv-/Negativfällen, gesperrte npm-/NuGet-Dependency-Restores, lokaler Docker-Build des tatsächlichen Produktionsimages und fail-closed Zusammenfassungs-Gate.
+
+GitHub-Action-Quellcode ist auf verifizierte Commit-SHAs gepinnt. npm hat einen Lockfile-Cache und begrenzte Download-Wiederholungen. **Die CI veröffentlicht weder Container noch Releases und deployt nichts.** Weitere Freigabegrenzen: produktiver OIDC-BFF-/MFA-Flow, AD-/LDAP-Federation und deren Gruppen-Lifecycle, vollständige SoD-/Audit-/SBOM-/Lizenz-/Betriebs-/Wiederherstellungs- und Pentest-Prüfung.
+
+[Ausführlicher Nachweis](evidence/ci-2026-10-16-final.md) · [frühere Diagnosehistorie](evidence/ci-2026-10-16.md)
+
+
 ## Erweiterte FGAP-v2-Zielbenutzer- und Gruppentests
 
 Ein echter Keycloak-26.8.1-Test bestätigt jetzt zusätzlich: Client-`map-roles` allein berechtigt nicht zur Zuweisung an beliebige Benutzer oder Gruppen. Bei expliziter FGAP-Freigabe für einen Zielbenutzer bzw. eine Zielgruppe lassen sich Rollen des eigenen Clients zuweisen und wieder entziehen. Fremde Clients und nicht freigegebene Zielidentitäten bleiben gesperrt, ebenso allgemeine Änderungen am Benutzerkonto. Alle Tests laufen mit isolierten Servicekonten ohne breite Realm-Adminrollen. Externe LDAP-/AD-Federation, vollständiges produktives OIDC-BFF/MFA und betriebliche Abnahme bleiben offen.
@@ -8,7 +17,7 @@ Vier Actions sind auf bei GitHub offiziell verifizierte Release-Commit-SHAs fixi
 
 ## Neuer Stand: echte Locks, ausschließlich lesende Standard-CI
 
-Alle sieben C#-Projekte besitzen ein auf dem isolierten GitHub-Runner erzeugtes `packages.lock.json`; das Angular-Frontend besitzt `web/package-lock.json`. Der reguläre Workflow führt nun `dotnet restore --locked-mode` und `npm ci` aus. Es existiert **kein** dauerhafter CI-Job mit Schreibberechtigungen, Push/Deploy oder Zugriff auf produktive Secrets. Die temporäre One-shot-Lockfile-Übernahme wurde danach entfernt. Ein anschließender vollständiger PR-Run muss den grünen Status erneut nachweisen. Die in dieser Datei erwähnten roten Lockfile-Gates gehören zu den **historischen** Läufen vor der Lockfile-Übernahme.
+Alle sieben C#-Projekte besitzen ein auf dem isolierten GitHub-Runner erzeugtes `packages.lock.json`; das Angular-Frontend besitzt `web/package-lock.json`. Der reguläre Workflow führt nun `dotnet restore --locked-mode` und `npm ci` aus. Es existiert **kein** dauerhafter CI-Job mit Schreibberechtigungen, Push/Deploy oder Zugriff auf produktive Secrets. Die temporäre One-shot-Lockfile-Übernahme wurde danach entfernt. Der gesperrte PR-Run #38946163282 ist inzwischen vollständig grün. Die in dieser Datei erwähnten roten Lockfile-Gates gehören zu den **historischen** Läufen vor der Lockfile-Übernahme.
 
 
 ## Auslöser und Sicherheit
