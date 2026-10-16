@@ -221,7 +221,7 @@ def run():
             }
         }, token=master_token)
         issued = kc_token(REALM, {
-            "grant_type": "password", "client_id": "ci-browser",
+            "grant_type": "password", "scope": "openid", "client_id": "ci-browser",
             "username": "permora-ci-person", "password": test_password
         })
         _, claims, _ = request("GET", "/realms/" + REALM + "/protocol/openid-connect/userinfo", token=issued)
