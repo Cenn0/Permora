@@ -39,7 +39,7 @@ BFF-Cookie HttpOnly/Secure, OIDC Code + PKCE, CSRF für alle schreibenden API-/B
 
 CSP erlaubt für Angular derzeit Inline-Styles, aber kein `unsafe-inline` für Skripte. Nonce-basierte Styles, Trust-Proxy-Konfiguration und eine vollständige browsergestützte CSP-Prüfung stehen aus. Die HTTPS-Terminierung muss gesichert erfolgen; `PublicOrigin` ist eine feste vertrauenswürdige Deployment-Einstellung, keine User-Eingabe.
 
-MFA wird als Anforderung an den Keycloak-Flow dokumentiert, derzeit jedoch nicht über einen separaten ACR-/AMR-Handler im Portal erzwungen. Step-up darf deshalb nicht als implementiert bezeichnet werden.
+Der Portalserver prüft nun für **alle mutierenden `/api/v1`-Endpunkte** ein spezifisches signiertes ID-Token-`acr` sowie ein frisches `auth_time` und verweigert die Änderung mit `403 step_up_required`, wenn diese Nachweise fehlen. `/bff/step-up` fordert das erforderliche Assurance-Niveau per essential OIDC claims an. **Nicht bewiesen:** dass ein konkreter produktiver Keycloak-Browser-Flow tatsächlich MFA mit korrektem LoA erzeugt; eine echte positive MFA-E2E-Abnahme steht noch aus. Fehlkonfigurierte IdP-LoA-Zuordnungen wären eine kritische Sicherheitslücke.
 
 ## Identitäten, Gruppen und Entzug
 

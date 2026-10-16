@@ -70,3 +70,14 @@ Vor dem erstmaligen Wechsel von `AwaitingIam` nach `Active` muss ein `PlatformAd
 Die zentrale Administration bestätigt dies über `POST /api/v1/admin/applications/{id}/iam-approval` mit `expectedRevision`, den vier Prüfflags und `evidenceReference`. Das Portal speichert Prüfer, Zeitpunkt und betroffene Keycloak-Client-UUID/ID, protokolliert ein Audit und erzeugt einen Reconcile-Auftrag. Ohne passenden Nachweis verweigert der Worker die Aktivierung mit `iam_approval_required`. Änderung der Bindung beziehungsweise erneutes Zurückstellen nach `AwaitingIam` entwertet die Bestätigung.
 
 **Ein Häkchen ist kein automatischer FGAP-Nachweis.** Das Portal legt Keycloak-FGAP-Policies derzeit nicht selbst an. Die negative Zwei-Team-Testmatrix muss im echten Zielsystem ausgeführt werden. Der Angular-Dev-Proxy enthält jetzt auch `/signin-oidc` und `/signout-callback-oidc`; die Demo-Anmeldung ist weiterhin kein echter OIDC-Test.
+
+
+## Step-up und privilegierte Änderungen (P1)
+
+Für **alle mutierenden** Portal-API-Endpunkte unter `/api/v1` verlangt die API eine frische, vom vertrauenswürdigen OIDC-ID-Token übernommene `acr`- und `auth_time`-Kombination. Die produktive Standardkonfiguration nutzt `Portal.PrivilegedAcr = "2"` und `Portal.PrivilegedAuthenticationMaxAgeMinutes = 10`; das sind **Permora-Vorgaben**, keine Keycloak-Defaults. Der Keycloak-Browser-Flow muss tatsächlich ein höheres Assurance Level erzeugen, und der verwendete OIDC-Client muss den `acr`-Mapper/Client-Scope korrekt ausliefern.
+
+`GET /bff/step-up` startet eine OIDC-Neuanmeldung mit **essentiellem** ID-Token-`acr`, `auth_time`, `max_age=0` und `prompt=login`. Der Server validiert beim folgenden API-Write unabhängig das **zurückgegebene**, signierte Assurance-Niveau sowie das Alter der Authentifizierung. Fehlen Claims oder ist der Authentifizierungszeitpunkt veraltet, liefert der Server `403 step_up_required` und nimmt **keinen Änderungsauftrag an**. Die UI verlinkt daraufhin zur erneuten MFA-Bestätigung.
+
+**Betriebsgrenzen:** Eine OIDC-Anforderung allein erzwingt keine MFA in einem ungeeigneten Keycloak-Browser-Flow; der Flow muss unter Keycloak 26.8.1 als höheres Level konfiguriert und durch einen **positiven** echten MFA-End-to-End-Test abgenommen werden. Die Isolation `EnableDevelopmentLogin = true` ist ausschließlich für Development auf Loopback zugelassen und **simuliert keine MFA**. Auch MFA verhindert weder einen kompromittierten BFF noch die Weiterverwendung bereits ausgegebener JWTs.
+
+**Teststand:** `SessionAssuranceTests` prüfen die lokale fail-closed Claim-Policy. `scripts/ci-oidc-bff.py` versucht den echten Keycloak-OIDC-Code-Flow mit Passwort-only und die Zurückweisung mutierender Requests; ein positiver realer MFA-Step-up bleibt Release-Blocker. Siehe [Teststrategie](testing.md) und [Security](security.md).

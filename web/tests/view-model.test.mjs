@@ -17,6 +17,7 @@ test('valid expiry has an explicit timezone',()=>assert.equal(safeExpiry('2026-1
 test('network errors never claim an effective change',()=>assert.match(problem({status:0}),/nicht bestätigt/));
 test('stale revision instructs a reload',()=>assert.match(problem({status:412}),/zwischenzeitlich/));
 test('expired session requests login',()=>assert.match(problem({status:401}),/erneut anmelden/));
+test('low assurance errors request MFA without claiming a write',()=>assert.match(problem({status:403,error:{title:'step_up_required'}}),/MFA-Bestätigung/));
 test('server problem detail is displayed as text',()=>assert.equal(problem({error:{detail:'Conflict'}}),'Conflict'));
 test('unknown errors have a safe fallback',()=>assert.equal(problem(null),'Der Vorgang konnte nicht abgeschlossen werden.'));
 test('success and failure tones are distinct',()=>{assert.equal(statusClass('Applied'),'good');assert.equal(statusClass('Failed'),'danger');assert.notEqual(statusClass('Queued'),'good');});

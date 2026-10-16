@@ -186,7 +186,14 @@ def run():
                     wait_for_bff(proc)
                     jar = http.cookiejar.CookieJar()
                     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
-                    status, _, _, page = browser(opener, "GET", "/bff/login")
+                    status, final_url, _, page = browser(opener, "GET", "/bff/login")
+                    if status != 200:
+                        # Only emit static hints and the route path. Never print codes, cookies or credentials.
+                        route = urllib.parse.urlsplit(final_url)
+                        hints = [s for s in ("Invalid parameter: redirect_uri", "Invalid redirect_uri",
+                                            "HTTPS required", "Client not found", "Invalid client",
+                                            "invalid_scope", "Invalid Request") if s.lower() in page.decode("utf-8", "replace").lower()]
+                        print("OIDC initial response:", status, route.netloc + route.path, "hints:", hints)
                     assert_status(status, 200, "OIDC redirects through Keycloak to the actual login form")
                     form = LoginForm()
                     form.feed(page.decode("utf-8"))
