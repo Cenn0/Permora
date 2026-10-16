@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Explicit one-off dependency resolution. Requires network; not a release or CI job.
+# Explicit one-off dependency resolution. Requires network; CI may also generate diagnostic lock artifacts.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 command -v dotnet >/dev/null || { echo 'Install the supported .NET 10 SDK first.' >&2; exit 2; }

@@ -1,5 +1,10 @@
 # Entwicklung
 
+## Reproduzierbare Paketauflösung
+
+Die echte, auf einem isolierten GitHub-Runner aufgelöste Lockfile-Menge ist nun im Repository enthalten. Nach einem Paketupdate müssen NuGet- und npm-Lockfiles bewusst aktualisiert, geprüft und zusammen mit den Manifests eingecheckt werden. Der reguläre CI-Workflow verwendet ausschließlich `--locked-mode` beziehungsweise `npm ci`; der temporäre Workflow für die erste Lockfile-Übernahme wurde **gelöscht**.
+
+
 ## Voraussetzungen und Wiederholbarkeit
 
 Backend: SDK-Version aus `global.json` (10.0.402), C# 14, net10.0. Web: Angular 22.2.3; Node laut `web/package.json`; TypeScript 6.0.x. Das vorhandene Host-Node 22.16.0 reicht für die isolierten Node-Tests, aber **nicht** für den gewählten Angular-22-Build. Globales TypeScript 5.8.3 ist ebenso kein Ersatz für den deklarieren Angular-Compiler.
@@ -24,7 +29,7 @@ Die API benutzt handgeschriebene typisierte Angular-Verträge; automatische Open
 
 Das Frontend verwendet Standalone Components, Signals, Lazy Routes und native Formulare mit Angular Forms. Es wurde nicht fälschlich eine ungenutzte Material-/NgRx-Abhängigkeit ergänzt. Sicherheitsentscheidungen treffen immer API/Worker, nie ein Route Guard.
 
-Es existiert absichtlich **keine CI**. Lokale Prüfskripte sind keine GitHub-Actions-Konfiguration.
+Die GitHub-Actions-CI befindet sich unter `.github/workflows/ci.yml`; der manuelle Ablauf bleibt unter `scripts/check.sh`. Die Builds wurden in GitHub Actions erfolgreich ausgeführt; für eine reproduzierbare Release-Abnahme fehlen weiterhin eingecheckte Lockfiles und die weitergehenden FGAP-Zielbenutzer-/Gruppen- und Betriebsnachweise.
 
 
 ## OIDC im lokalen Development-Proxy

@@ -1,14 +1,28 @@
 # Teststrategie und Ausführung
 
+**Aktueller Vollnachweis der vorhandenen CI:** [Run #38946163282](https://github.com/Cenn0/Permora/actions/runs/38946163282), 7/7 Pflichtjobs grün, 102/102 xUnit ohne Skips einschließlich PostgreSQL, 32 isolierte TypeScript-Tests, 8/8 Playwright, echte Keycloak 26.8.1 FGAP-Client- und User-/Group-Positiv-/Negativfälle, gesperrte Dependency-Restores und tatsächlicher Docker-Image-Build. [Evidenz und offene Grenzen](evidence/ci-2026-10-16-final.md).
+
+
+**Container-Test:** Die CI baut das tatsächliche Multi-Stage-Image (`deploy/Dockerfile`) ausschließlich aus gesperrten NuGet-/npm-Abhängigkeiten und prüft, dass die API-DLL, die Angular-Startseite und ein Nicht-Root-Runtime-User vorhanden sind. Das ist keine Docker-/Kubernetes-Betriebsabnahme.
+
+## FGAP-Negativtests mit echten Zielidentitäten
+
+Die Keycloak-26.8.1-Integration prüft zusätzlich user- und group-spezifische FGAP-Rechte, positive und negative Zuweisungen, fremde Clients sowie den tatsächlichen Rollenentzug. Eine bewusst eingesetzte Zielgruppen-`manage`-Berechtigung ist weiter gefasst als reine Rollenzuweisung; sie darf nicht als unabhängig minimaler Gruppen-Mapping-Scope ausgegeben werden. Die Permora-API muss solche administrativen Operationen serverseitig weiter beschränken. Produktives AD-/LDAP, BFF-OIDC/MFA und Load/Recovery bleiben eigene Gates.
+
+## Reproduzierbarkeit ab diesem Stand
+
+Die tatsächlich aufgelösten NuGet- und npm-Lockfiles sind eingecheckt. In der Standard-CI laufen `dotnet restore Permora.slnx --locked-mode` und `npm ci`. Fehlende, inkonsistente oder nicht zur Manifestversion passende Locks brechen ab. Der zuvor rote Diagnoselauf bleibt als historischer Nachweis erhalten, und der neue Lockfile-Stand wurde in GitHub Actions #38946163282 bereits mit vollständigen Release-Builds überprüft.
+
+
 ## Was tatsächlich läuft und was nur vorbereitet ist
 
 Die mitgelieferte Evidenz dokumentiert **32 erfolgreiche Node-Tests** der puren TypeScript-View-Model-Funktionen. Diese Tests benötigen keine Angular-Installation. Sie prüfen Labels, Fehlerbehandlung, sichere Zahlen-/Prozentdarstellung, Ablaufdatumsvalidierung und Idempotenzschlüssel. Sie beweisen weder gerenderte Angular-Templates noch .NET-Autorisierung.
 
-Die C#-Suite liegt als Testquellcode vor, wurde aber mangels SDK/Restore nicht ausgeführt. Darin enthalten: Policy-/Isolationsfälle, Rollen-/Gruppengrenzen, Selbsteskalation, SoD, Revision/Idempotenz, Freigaben, Remote-Retry, Reconciliation, Ablauf/Review, Audit und SDK sowie HTTP-Connector-Vertragssimulationen. Fake-Connector-Tests ersetzen kein echtes Keycloak.
+Historisch lagen zunächst nur die C#-Testquellen vor. Inzwischen hat [CI-Lauf #38912134224](https://github.com/Cenn0/Permora/actions/runs/38912134224) **102/102 xUnit-Tests**, einschließlich echtem PostgreSQL-Test ohne Skips, erfolgreich ausgeführt. Darin enthalten: Policy-/Isolationsfälle, Rollen-/Gruppengrenzen, Selbsteskalation, SoD, Revision/Idempotenz, Freigaben, Remote-Retry, Reconciliation, Ablauf/Review, Audit und SDK sowie HTTP-Connector-Vertragssimulationen. Fake-Connector-Tests ersetzen kein echtes Keycloak.
 
 PostgreSQL-Tests brauchen `PERMORA_TEST_POSTGRES`; der Datenbankname muss mit `permora_test_` beginnen. Jeder Test arbeitet in einem zufälligen eigenen Schema und entfernt dieses. Niemals produktive Credentials oder Datenbanken angeben. Ohne Variable melden Tests einen Skip, nicht einen bestandenen Integrationslauf.
 
-Playwright besitzt Desktop-Chromium- und Mobile-Projekte. Die vorhandenen Browserfälle verwenden explizite API-Fixtures für Layout, fehlende Authentifizierung, Scope und Fehlermeldungen. Serverautorisierung muss zusätzlich direkt über echte HTTP-Requests geprüft werden. Auch die Playwright-Fälle wurden hier nicht ausgeführt.
+Playwright besitzt Desktop-Chromium- und Mobile-Projekte. Die vorhandenen Browserfälle verwenden explizite API-Fixtures für Layout, fehlende Authentifizierung, Scope und Fehlermeldungen. Serverautorisierung muss zusätzlich direkt über echte HTTP-Requests geprüft werden. Die Playwright-Fälle wurden im GitHub-Runner mit Desktop- und Mobile-Projekt (**8/8**) ausgeführt. Sie verwenden ausdrücklich API-Fixtures; gesondert läuft ein echter ASP.NET-HTTP-Smoke-Test für ausgewählte Serverberechtigungen.
 
 ## Befehle
 
@@ -42,6 +56,10 @@ Kein Coverage-Prozentsatz wird ausgewiesen, weil kein instrumentierter Gesamtlau
 
 ## Ergänzte Testquellen und manuelle Gates
 
-`WorkflowTests` enthält Negativfälle zur Aktivierung ohne zentrale IAM-Attestierung bzw. mit falscher Client-UUID sowie einen positiven Simulationsfall. Ein Regressionstest fordert, dass ein fälliger automatischer Entzug einen älteren Entzug im Backoff überholen darf. `ConnectorTests` prüft eine Rollenlöschung bei unbekannter direkter Keycloak-Zuweisung. **Diese C#-Tests sind bislang nicht ausgeführt.**
+`WorkflowTests` enthält Negativfälle zur Aktivierung ohne zentrale IAM-Attestierung bzw. mit falscher Client-UUID sowie einen positiven Simulationsfall. Ein Regressionstest fordert, dass ein fälliger automatischer Entzug einen älteren Entzug im Backoff überholen darf. `ConnectorTests` prüft eine Rollenlöschung bei unbekannter direkter Keycloak-Zuweisung. **Diese C#-Tests wurden im GitHub-Lauf erfolgreich ausgeführt; damit ist keine vollständige Keycloak-FGAP-Betriebsfreigabe verbunden.**
 
 `scripts/bootstrap-locks.sh` erzeugt Lockfiles nur in einer netzwerkfähigen Umgebung; danach müssen die tatsächlichen Abhängigkeits-Lockfiles geprüft und eingecheckt werden. `scripts/check.sh` bricht ohne Lockfiles, .NET-SDK und isolierte `PERMORA_TEST_POSTGRES`-Datenbank ausdrücklich ab. `--lightweight` umfasst nur Struktur und isolierte Frontendlogik. Weder BFF-Login noch FGAP/Token-Audience können durch Mock-Tests abgenommen werden.
+
+## CI-Evidenz (nachträglich, 16.10.2026)
+
+[Ausgeführte GitHub-Prüfungen](evidence/ci-2026-10-16.md): .NET-Build, 102 xUnit-Tests (0 übersprungen, darunter echte PostgreSQL), ASP.NET-HTTP-Smoke mit zwei isolierten Development-Identitäten, Angular-Produktionsbuild, 32 Frontend-Unit-Tests, 8 Playwright und Keycloak 26.8.1 Rollen-/Token-Vertrag bestanden. Der Dependency-Lock-Gate scheitert mangels eingecheckter Lockfiles. Ein echter OIDC-BFF-Flow bleibt offen; clientbezogene FGAP-v2-Rechte sind mit zwei eingeschränkten Servicekonten getestet, die vollständige User-/Group-Zielmapping-Matrix jedoch nicht.

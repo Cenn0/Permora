@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Manual verification only. Never creates GitHub Actions or other CI configuration.
+# Manual equivalent of the GitHub Actions checks; this script never configures the remote repository.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 python3 scripts/check-repository.py
