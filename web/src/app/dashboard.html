@@ -1,0 +1,40 @@
+@if (error()) { <div class="alert danger" role="alert">{{ error() }} <button class="text-button" (click)="reload()">Erneut laden</button></div> }
+@if (loading() && !data()) { <div class="empty" role="status">Deine Anwendungen werden geladen …</div> }
+@if (data(); as d) {
+<div class="dashboard-grid" [attr.aria-busy]="loading()">
+ <section class="main-column">
+  <header class="welcome"><div><span class="eyebrow">DEIN ARBEITSBEREICH</span><h1>Willkommen zurück.</h1><p>Verwalte die Zugänge deiner Anwendungen.<br>Übersichtlich. Im Team. In deiner Verantwortung.</p></div><img src="/brand/permora.svg" width="100" height="132" alt="" /></header>
+  <section class="metrics" aria-label="Kennzahlen des eigenen Verwaltungsbereichs">
+   <div class="metric"><span class="icon-tile blue"><p-icon name="apps" /></span><div><strong>{{ d.counts.applications }}</strong><span>Anwendungen</span></div></div>
+   <div class="metric"><span class="icon-tile green"><p-icon name="users" /></span><div><strong>{{ d.counts.identities }}</strong><span>Personen / Gruppen</span></div></div>
+   <div class="metric"><span class="icon-tile purple"><p-icon name="roles" /></span><div><strong>{{ d.counts.roles }}</strong><span>Rollen</span></div></div>
+   <a class="metric" routerLink="/requests"><span class="icon-tile coral"><p-icon name="clock" /></span><div><strong>{{ d.counts.requests }}</strong><span>Offene Freigaben</span></div></a>
+  </section>
+  <section class="panel"><div class="section-heading"><h2>Meine Anwendungen</h2><a routerLink="/applications">Alle anzeigen <p-icon name="arrow" /></a></div>
+   <div class="application-cards">
+   @for (app of d.applications.slice(0, 4); track app.id; let i = $index) {
+    <a class="application-card" [class]="'application-card '+color(i)" [routerLink]="['/applications',app.id]">
+     <span class="icon-tile" [class]="'icon-tile '+color(i)"><p-icon [name]="i === 0 ? 'factory' : 'apps'" /></span>
+     <h3>{{ app.name }}</h3><span class="badge" [class]="'badge '+tone(app.status)">{{ label(app.status) }}</span>
+     <small>{{ app.roleCount }} Rollen <span aria-hidden="true">·</span> {{ app.identityCount }} Identitäten</small>
+    </a>
+   } @empty { <div class="empty">Noch keine Anwendung zugeordnet. Ein Team-Owner kann die erste Anwendung registrieren.</div> }
+   </div>
+  </section>
+  <div class="two-columns"><section class="panel"><h2>Zugriffe pro Anwendung</h2><p class="muted small">Bestätigte Personen- und Gruppenzuweisungen. Keine geschätzten Benutzerzahlen.</p>
+   @for (app of d.applications.slice(0,6); track app.id; let i = $index) { <div class="bar-row"><div><span>{{ app.name }}</span><strong>{{ app.identityCount }}</strong></div><div class="bar-track"><span [class]="color(i)" [style.width.%]="width(app.identityCount)"></span></div></div> }
+   @if (!d.applications.length) { <p class="empty">Noch keine bestätigten Zugriffe.</p> }
+  </section><section class="panel"><h2>Bearbeitungsstand</h2><div class="status-number"><strong>{{ d.counts.requests }}</strong><span>Änderungen warten auf eine zweite Person.</span></div><div class="divider"></div><p><span class="badge" [class]="'badge '+(d.counts.failed ? 'danger' : 'neutral')">{{ d.counts.failed }} offen zur Klärung</span></p><p class="muted small">Ein angenommener Auftrag ist noch keine wirksame Berechtigung. Permora zeigt den bestätigten Keycloak-Zustand.</p><button class="text-button" (click)="reload()"><p-icon name="refresh" /> Aktualisieren</button></section></div>
+  <section class="panel"><h2>Schnellaktionen</h2><div class="quick-actions"><a class="blue" routerLink="/applications/new"><p-icon name="plus" /><div>Neue Anwendung<small>Im eigenen Team registrieren</small></div></a><a class="purple" routerLink="/applications"><p-icon name="roles" /><div>Rollen verwalten<small>Anwendung auswählen</small></div></a><a class="green" routerLink="/applications"><p-icon name="users" /><div>Zugriff vergeben<small>Person oder Gruppe zuordnen</small></div></a></div></section>
+ </section>
+ <aside class="side-column" aria-label="Aktivitäten und Aufgaben">
+  <section class="panel"><div class="section-heading"><h2>Letzte Aktivitäten</h2><p-icon name="activity" /></div>
+   @for (event of d.activities.slice(0,5); track event.id) { <div class="feed-item"><span class="mini-tile purple"><p-icon name="activity" /></span><div><strong>{{ event.action }}</strong><a [routerLink]="['/applications',event.applicationId]">{{ appName(event.applicationId) }}</a><small>{{ event.at | date:'dd.MM., HH:mm' }}</small></div></div> } @empty { <p class="empty">Neue Änderungen erscheinen hier.</p> }
+  </section>
+  <section class="panel"><div class="section-heading"><h2>Anstehende Aufgaben</h2><span class="badge coral">{{ d.counts.requests }}</span></div>
+   @for (op of d.requests.slice(0,3); track op.id) { <a class="task-card" [routerLink]="['/applications',op.applicationId]" [queryParams]="{tab:'requests'}"><p-icon name="clock" /><div><strong>{{ label(op.change.kind) }}</strong><small>{{ appName(op.applicationId) }} · {{ op.requestedBy.name }}</small></div><p-icon name="arrow" /></a> } @empty { <p class="empty">Keine Freigaben offen.</p> }
+  </section>
+  <section class="panel learn-card"><span class="eyebrow">GUT ZU WISSEN</span><h2>Rechte mit klarem Rahmen.</h2><p>Dein Team verwaltet die eigenen Anwendungen. Die zentrale IAM-Verwaltung definiert die Sicherheitsgrenzen.</p><a routerLink="/help">Erste Schritte <p-icon name="arrow" /></a><div class="brand-blocks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div></section>
+ </aside>
+</div>
+}

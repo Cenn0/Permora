@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Permora.Core/Permora.Core.csproj" />
+    <Project Path="src/Permora.Infrastructure/Permora.Infrastructure.csproj" />
+    <Project Path="src/Permora.Api/Permora.Api.csproj" />
+    <Project Path="src/Permora.Worker/Permora.Worker.csproj" />
+    <Project Path="src/Permora.Provisioner/Permora.Provisioner.csproj" />
+    <Project Path="src/Permora.Authorization/Permora.Authorization.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Permora.Tests/Permora.Tests.csproj" />
+  </Folder>
+</Solution>

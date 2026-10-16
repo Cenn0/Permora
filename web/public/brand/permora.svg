@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 100" role="img" aria-label="Permora">
+<rect x="2" y="2" width="32" height="29" rx="6" fill="#2563EB"/>
+<path d="M44 2h9c12 0 21 10 21 22v1c0 4-3 6-7 6H44c-3 0-5-2-5-5V7c0-3 2-5 5-5Z" fill="#FBBF24"/>
+<rect x="2" y="36" width="32" height="29" rx="6" fill="#22C55E"/>
+<circle cx="55" cy="50.5" r="14.5" fill="#8B5CF6"/>
+<rect x="2" y="70" width="32" height="29" rx="6" fill="#F87171"/>
+</svg>
