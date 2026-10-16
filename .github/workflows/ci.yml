@@ -86,6 +86,49 @@ jobs:
             echo "No TRX report generated (review test/restore steps above)." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  oidc-bff:
+    name: Real Keycloak BFF OIDC sign-in and assurance gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: permora_ci
+          POSTGRES_PASSWORD: permora_ci_isolated
+          POSTGRES_DB: permora_test_ci_oidc
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U permora_ci -d permora_test_ci_oidc"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      PERMORA_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=permora_test_ci_oidc;Username=permora_ci;Password=permora_ci_isolated
+      PERMORA_TEST_KC_URL: http://127.0.0.1:18080
+      PERMORA_TEST_KC_USERNAME: ci-admin
+      PERMORA_TEST_KC_PASSWORD: permora-ci-ephemeral-only
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+      - name: Restore and build actual ASP.NET BFF and migration worker
+        run: |
+          dotnet restore Permora.slnx --locked-mode --verbosity minimal
+          dotnet build Permora.slnx -c Release --no-restore
+      - name: Launch isolated Keycloak browser identity provider
+        run: |
+          docker run --detach --rm --name permora-bff-idp             -p 127.0.0.1:18080:8080             -e KC_BOOTSTRAP_ADMIN_USERNAME="$PERMORA_TEST_KC_USERNAME"             -e KC_BOOTSTRAP_ADMIN_PASSWORD="$PERMORA_TEST_KC_PASSWORD"             quay.io/keycloak/keycloak:26.8.1 start-dev
+      - name: Real OIDC code flow, cookie, CSRF, and insufficient assurance denial
+        run: python3 scripts/ci-oidc-bff.py
+      - name: Stop disposable IdP
+        if: always()
+        run: docker rm -f permora-bff-idp 2>/dev/null || true
+
   angular:
     name: Angular 22, frontend logic and Playwright
     runs-on: ubuntu-24.04
@@ -188,7 +231,7 @@ jobs:
   scope-summary:
     name: Explicit CI coverage boundaries
     if: always()
-    needs: [structure, dotnet, angular, keycloak, container, dependency-locks]
+    needs: [structure, dotnet, oidc-bff, angular, keycloak, container, dependency-locks]
     runs-on: ubuntu-24.04
     permissions: {}
     steps:
@@ -196,6 +239,7 @@ jobs:
         env:
           STRUCTURE_RESULT: ${{ needs.structure.result }}
           DOTNET_RESULT: ${{ needs.dotnet.result }}
+          OIDC_RESULT: ${{ needs.oidc-bff.result }}
           ANGULAR_RESULT: ${{ needs.angular.result }}
           KEYCLOAK_RESULT: ${{ needs.keycloak.result }}
           CONTAINER_RESULT: ${{ needs.container.result }}
@@ -208,18 +252,19 @@ jobs:
             echo "|---|---|"
             echo "| Repository and isolated TypeScript | $STRUCTURE_RESULT |"
             echo "| C# build, xUnit, PostgreSQL | $DOTNET_RESULT |"
+            echo "| Real Keycloak BFF login and insufficient ACR denial | $OIDC_RESULT |"
             echo "| Angular build and Playwright | $ANGULAR_RESULT |"
             echo "| Keycloak roles and OIDC token scope | $KEYCLOAK_RESULT |"
             echo "| Docker production image (no registry push) | $CONTAINER_RESULT |"
             echo "| Committed, reproducible dependency locks | $LOCKS_RESULT |"
             echo
-            echo "**Not covered by a green workflow:** full delegated FGAP user/group mapping,"
-            echo "complete LDAP visibility, full OIDC BFF login/MFA,"
+            echo "**Not covered by a green workflow:** successful MFA/step-up at production LoA, full delegated FGAP user/group mapping,"
+            echo "complete LDAP visibility, full production MFA,"
             echo "external directory/HR writeback, SoD drift under changing external groups,"
             echo "load/HA/restore/penetration testing, and production deployment."
             echo "No production secrets, deployments, or publishing are used."
           } >> "$GITHUB_STEP_SUMMARY"
-          for result in "$STRUCTURE_RESULT" "$DOTNET_RESULT" "$ANGULAR_RESULT" "$KEYCLOAK_RESULT" "$CONTAINER_RESULT" "$LOCKS_RESULT"; do
+          for result in "$STRUCTURE_RESULT" "$DOTNET_RESULT" "$OIDC_RESULT" "$ANGULAR_RESULT" "$KEYCLOAK_RESULT" "$CONTAINER_RESULT" "$LOCKS_RESULT"; do
             if [[ "$result" != "success" ]]; then
               echo "::error::A mandatory Permora CI job failed, was cancelled, or was skipped. See the per-job results above."
               exit 1
