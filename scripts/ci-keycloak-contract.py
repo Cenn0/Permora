@@ -113,6 +113,8 @@ def create_role(token, client_uuid, role_name, app_id, entity):
 def create_user(token, user_name, password):
     request("POST", admin_path("/users"), {
         "username": user_name, "enabled": True, "requiredActions": [],
+        "firstName": "Permora", "lastName": "CI", "email": "ci-person@permora.invalid",
+        "emailVerified": True,
         "credentials": [{"type": "password", "value": password, "temporary": False}]
     }, token=token)
     users = request("GET", admin_path("/users?username=" + urllib.parse.quote(user_name) + "&exact=true"), token=token)[1]
