@@ -49,3 +49,21 @@ Rollen verwenden `permissionIds`; Zuweisung `roleId`, `principalId`, `expiresAt`
 Nur `PlatformAdmin`: `POST /admin/teams`, `PUT /admin/teams/{id}`, `PUT /admin/applications/{id}/binding`, `/policy`, `/state`. Team: `name`, `members[{subjectKey,name,role}]`, `expectedRevision`. Binding: interne `clientUuid`, `clientId`, optional `loginClientUuid`, `expectedRevision`. Policyänderungen an bereits vergebenen Rechten verlangen in dieser ersten Version vorherigen kontrollierten Entzug/Review. Suspendierung blockiert Portal-Erweiterungen; sie beendet nicht sämtliche Anwendungssitzungen.
 
 Die Laufzeit-OpenAPI-Beschreibung unter `/openapi/v1.json` ist auf zentrale Administratoren begrenzt. Sie wurde noch nicht aus einem erfolgreich gestarteten Build exportiert.
+
+
+## Zentrale IAM-Attestierung
+
+`POST /api/v1/admin/applications/{id}/iam-approval` (nur `PlatformAdmin`, mit Session/CSRF) verlangt:
+
+```json
+{
+  "expectedRevision": 12,
+  "fgapVerified": true,
+  "rolePermissionsVerified": true,
+  "assignmentPermissionsVerified": true,
+  "tokenAudienceVerified": true,
+  "evidenceReference": "IAM-TEST-1234"
+}
+```
+
+Alle vier Prüfungen und ein Nachweis mit mindestens sechs Zeichen sind Pflicht. Zulässig ist nur eine gebundene Anwendung im Status `AwaitingIam`. Der Backend-Auftrag erzeugt eine erneute Remote-Prüfung; eine positive Antwort allein ist kein erfolgreicher FGAP- oder Token-Test.

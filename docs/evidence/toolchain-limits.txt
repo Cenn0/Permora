@@ -1,0 +1,13 @@
+Permora verification environment – 16 October 2026
+node: v22.16.0 (below Angular 22 minimum ^22.22.3)
+npm: 10.9.2
+TypeScript: 5.8.3 (below Angular 22 required >=6.0.0 <6.1.0)
+dotnet: unavailable
+Docker / PostgreSQL: unavailable
+External package downloads: unavailable (DNS resolution failed)
+Executed and passed: 32 isolated Node frontend logic tests; 251 source/manifest structural checks;
+syntax transpilation of 12 TypeScript source files; isolated strict TypeScript view-model/models typecheck;
+shell script syntax check.
+NOT executed: dotnet restore/build/test, Angular install/build, Playwright, PostgreSQL integration,
+live Keycloak FGAP/role/token E2E, container build, penetration/load/recovery testing.
+No CI was created.

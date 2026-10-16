@@ -51,3 +51,10 @@ Keine echten Lockfiles/SBOMs konnten aus einem Restore gewonnen werden. Die enth
 6. Das ursprüngliche Repository bleibt privat; Veröffentlichung, History-Bereinigung und CI wurden nicht durchgeführt.
 
 **Nächster fachlich notwendiger Schritt ist die vollständige Build-/Integrationsabnahme, nicht die Behauptung einer fertigen Enterprise-Plattform.** Die [Roadmap](roadmap.md) enthält jede verbleibende Anforderung und ihr Abnahmekriterium.
+
+
+## Zweiter Härtungsdurchlauf (16.10.2026)
+
+Im Quellcode zusätzlich korrigiert: Aktivierung vor zentraler, auditierter IAM-Freigabe; ein älterer Entzug im Retry-Backoff blockiert keine fälligen weiteren automatischen Entzüge; Rollen mit tatsächlich vorhandenen Keycloak-Zuweisungen können nicht blind gelöscht werden; fehlende Keycloak-Flow-Angaben gelten nicht mehr als sichere Konfiguration; OIDC-Callback-Routen werden im lokalen Angular-Proxy weitergeleitet. Passende C#-Regressionstestquellen sind ergänzt.
+
+**Ausgeführte Tests:** 32/32 isolierte Node-Tests erfolgreich, 243/251 statische Strukturprüfungen erfolgreich, isolierte TypeScript-Typprüfung von Models/View-Model erfolgreich. **Nicht ausgeführt:** .NET-Build, xUnit, PostgreSQL, Angular-Template-Build, Playwright, echtes Keycloak/FGAP, Integration und Security-/Recovery-Abnahme. Keine erfundenen Lockdateien, Testergebnisse oder Sicherheitszusagen. Vor einem Pilot müssen die vorhandenen Testquellen erst mit echten SDKs und Diensten ausgeführt und Fehler korrigiert werden.

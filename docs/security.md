@@ -50,3 +50,10 @@ Bereits ausgegebene JWTs können nach einem Rollenentzug weiter Rechte transport
 ## Produktfreigabe
 
 Kein „Enterprise-ready“, keine Zertifizierung, kein Pentest-Erfolg und keine vollständige Roadmap-Abnahme behauptet. Offene Freigabepunkte stehen in [Roadmap](roadmap.md) und [Prüfbericht](review.md). Bei diesem neuen Projekt bestehen noch keine zugesagten Reaktionszeiten oder unterstützten Produktionsversionen.
+
+
+## Ergänzende Sicherheitsbarrieren
+
+Der Aktivierungs-Worker verlangt vor dem ersten `Active`-Status eine zentrale IAM-Attestierung mit konkreter Client-UUID/ID und anschließend einen sauberen Remote-Abgleich. Die Attestierung ist organisatorisch, keine kryptografische Prüfung von FGAP. Falsch konfigurierte weitreichende Keycloak-Service-Accounts bleiben ein wesentliches Risiko und dürfen vor einer echten Zwei-Team-Abnahme nicht als sicher gelten.
+
+Eine Rollenlöschung liest vor dem DELETE in Keycloak die zugehörigen Benutzer/Gruppen aus und verweigert die Löschung bei verbliebenen Zuweisungen. Dies setzt eine **vollständige, nicht durch FGAP gefilterte** Sicht des Connector-Accounts voraus. Nicht sichtbare Zuordnungen sind kein Nachweis ihrer Abwesenheit. Keycloak-Client-Flow-Flags müssen explizit sicher gesetzt sein; ausgelassene/nullable Flags reichen nicht.

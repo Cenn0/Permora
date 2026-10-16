@@ -54,3 +54,12 @@ Einzelrechte sind Client-Rollen. OIDC-Scopes, Keycloak-Authorization-Services-Sc
 ## ADR-004: Zentraler Aktivierungsschritt
 
 Die Client-Erstellung bereitet einen deaktivierten, restriktiven Rechte-Client vor. FGAP, Zielbenutzersicht, Audience und optionale Login-Client-Konfiguration werden separat abgenommen. Erst ein sauberer Abgleich kann die Portal-Anwendung aktivieren. Es wird kein erfundenes, versionsunabhängig sicheres FGAP-JSON ausgerollt.
+
+
+## ADR-005: Nachweispflichtige Aktivierung
+
+Das Application-Aggregat speichert optional eine `IamApproval` mit zentralem Prüfer, Zeitpunkt, Client-UUID, Client-ID und Prüfbeleg. `AwaitingIam` kann nur mit passender Freigabe und erfolgreicher technischer Rückprüfung in `Active` übergehen. Die Permission zur Bestätigung ist ein `PlatformAdmin`-Mandat; Teams können dieses Gate nicht über einen regulären Reconcile umgehen. Das ersetzt weder minimale FGAP-Profile noch Keycloak-Integrationstests.
+
+## ADR-006: Priorisierte fällige Systementzüge
+
+Der Worker verarbeitet fällige automatische Entzüge auch dann, wenn ein älterer automatischer Entzug im Retry-Backoff liegt. Reguläre Mutationen bleiben untereinander geordnet. Eine harte Entzugs-SLA besteht nicht; PostgreSQL-Concurrency und tatsächliche Keycloak-Entzugszeiten sind noch zu testen.
