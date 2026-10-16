@@ -4,6 +4,9 @@
 
 **Sprache:** [English](README.md) · **Deutsch**
 
+[![CI](https://github.com/Cenn0/Permora/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Cenn0/Permora/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+
 **Anwendungen und Berechtigungen in Keycloak gezielt an Teams delegieren.**
 
 Permora ist ein eigenständiges, quelloffenes **C#-/Angular-Portal** für die eingeschränkte Verwaltung eigener Anwendungen. Anwendungsteams können fachliche Rollen, Einzelberechtigungen und Zugriffsanträge bearbeiten, ohne die zentrale Realm-Verwaltung zu erhalten.
