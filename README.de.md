@@ -35,7 +35,7 @@ flowchart LR
   A --> P[(Portal PostgreSQL)]
   W[Getrennter Worker] --> P
   W -->|Begrenzte Admin-Aufrufe| K[Keycloak Admin API]
-  I[Zentrale IAM-Freigabe] -->|Vor Aktivierung erforderlich| W
+  I[Zentrale IAM-Stelle] -->|Attestierte Freigabe im Portal| A
   Z[Isolierter Provisioner] -->|Deaktivierte Clients vorbereiten| K
 ```
 
