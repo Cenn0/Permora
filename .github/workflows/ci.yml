@@ -136,7 +136,7 @@ jobs:
           retention-days: 7
 
   keycloak:
-    name: Keycloak 26.8.1 roles, assignments and token contract
+    name: Keycloak 26.8.1 FGAP, roles and token contract
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:

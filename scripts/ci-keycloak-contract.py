@@ -250,11 +250,95 @@ def run():
         status, _, _ = request("GET", admin_path("/clients"), token=no_admin_token, expected=(401, 403))
         check(status in (401, 403), "Unprivileged service account cannot manage realm clients")
 
+        # FGAP v2 security boundary, exercised with two genuinely delegated
+        # service account users. The bootstrap token is NOT used for assertions.
+        request("PUT", admin_path(), {"realm": REALM, "adminPermissionsEnabled": True},
+                token=master_token)
+        admin_clients = request("GET", admin_path("/clients?clientId=admin-permissions"),
+                                token=master_token)[1]
+        authz_clients = [c for c in admin_clients if c.get("clientId") == "admin-permissions"]
+        check(len(authz_clients) == 1, "FGAP v2 admin-permissions resource server created")
+        authz_path = admin_path("/clients/" + authz_clients[0]["id"] + "/authz/resource-server")
+
+        def delegated_token(alias, owned_client):
+            delegated_uuid = create_client(master_token, "ci-delegated-" + alias, service=True)
+            service_user = request("GET", admin_path("/clients/" + delegated_uuid + "/service-account-user"),
+                                   token=master_token)[1]
+            if not service_user.get("id"):
+                raise AssertionError("Delegated service account user missing")
+            realm_management_clients = request("GET",
+                admin_path("/clients?clientId=realm-management"), token=master_token)[1]
+            management_uuid = [c for c in realm_management_clients
+                               if c.get("clientId") == "realm-management"][0]["id"]
+            current_admin_roles = request("GET", admin_path("/users/" + service_user["id"]
+                + "/role-mappings/clients/" + management_uuid), token=master_token)[1]
+            check(not any(role.get("name") in {"realm-admin", "manage-clients", "view-clients",
+                      "manage-users"} for role in current_admin_roles),
+                  "Delegated service account " + alias + " has no broad realm admin roles")
+
+            policy_name = "ci-only-" + alias + "-delegate-policy"
+            request("POST", authz_path + "/policy/user",
+                    {"name": policy_name, "logic": "POSITIVE", "users": [service_user["id"]]},
+                    token=master_token)
+            request("POST", authz_path + "/permission/scope", {
+                "name": "ci-only-" + alias + "-client-permission",
+                "resourceType": "Clients",
+                "scopes": ["view", "manage", "map-roles", "map-roles-composite"],
+                "resources": [owned_client],
+                "policies": [policy_name]
+            }, token=master_token)
+            doc = request("GET", admin_path("/clients/" + delegated_uuid + "/client-secret"),
+                          token=master_token)[1]
+            secret = doc.get("value")
+            if not secret:
+                raise AssertionError("Delegated client credential unavailable")
+            return kc_token(REALM, {"grant_type": "client_credentials",
+                                   "client_id": "ci-delegated-" + alias,
+                                   "client_secret": secret})
+
+        delegated_a = delegated_token("app-a", ca)
+        delegated_b = delegated_token("app-b", cb)
+        for alias, delegated, own, other in (
+            ("A", delegated_a, ca, cb), ("B", delegated_b, cb, ca)
+        ):
+            status, own_details, _ = request("GET", admin_path("/clients/" + own),
+                                             token=delegated, expected=(200,))
+            check(status == 200 and own_details.get("id") == own,
+                  "FGAP delegated team " + alias + " can view only its own client")
+            status, _, _ = request("GET", admin_path("/clients/" + other),
+                                   token=delegated, expected=(403, 404))
+            check(status in (403, 404),
+                  "FGAP delegated team " + alias + " cannot read the foreign client")
+            status, _, _ = request("POST", admin_path("/clients/" + other + "/roles"), {
+                "name": "ci-foreign-should-not-exist-" + alias.lower()
+            }, token=delegated, expected=(401, 403, 404))
+            check(status in (401, 403, 404),
+                  "FGAP delegated team " + alias + " cannot create a role in the foreign client")
+            status, _, _ = request("PUT", admin_path(),
+                                  {"adminPermissionsEnabled": False}, token=delegated,
+                                  expected=(401, 403))
+            check(status in (401, 403),
+                  "FGAP delegated team " + alias + " cannot disable realm security")
+            status, _, _ = request("POST", admin_path("/clients"), {
+                "clientId": "ci-unapproved-client-" + alias.lower()
+            }, token=delegated, expected=(401, 403))
+            check(status in (401, 403),
+                  "FGAP delegated team " + alias + " cannot create arbitrary clients")
+            fresh_role = "ci-delegated-created-" + alias.lower()
+            status, _, _ = request("POST", admin_path("/clients/" + own + "/roles"), {
+                "name": fresh_role,
+                "description": "Scoped role created using FGAP, never realm-admin"
+            }, token=delegated, expected=(201, 204))
+            own_role = request("GET", admin_path("/clients/" + own + "/roles/" + fresh_role),
+                               token=master_token)[1]
+            check(status in (201, 204) and own_role.get("name") == fresh_role,
+                  "FGAP delegated team " + alias + " can create an own-client role")
+
         request("DELETE", roles_a_path, [composite_a], token=master_token)
         after_revoke = request("GET", roles_a_path, token=master_token)[1]
         check(not any(role["id"] == composite_a["id"] for role in after_revoke),
               "Direct role revocation is confirmed by a Keycloak read-back")
-        print("::warning::FGAP-v2 delegated per-client administration was NOT verified by this contract test.")
+        print("FGAP v2 delegated client administration: two-service-account positive/negative REST matrix passed.")
         print("Keycloak live contract completed; real RBAC/claims and negative unprivileged controls passed.")
     finally:
         request("DELETE", admin_path(), token=master_token)
