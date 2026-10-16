@@ -64,8 +64,19 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - name: Restore and materialize dependency locks
-        run: dotnet restore Permora.slnx --use-lock-file --verbosity minimal
+      - name: Restore packages (locked when committed, diagnostic bootstrap otherwise)
+        shell: bash
+        run: |
+          missing=0
+          while IFS= read -r project; do
+            if [[ ! -f "$(dirname "$project")/packages.lock.json" ]]; then missing=1; fi
+          done < <(find src tests -name '*.csproj' -print | sort)
+          if [[ $missing -eq 0 ]]; then
+            dotnet restore Permora.slnx --locked-mode --verbosity minimal
+          else
+            echo "::warning::No committed NuGet lockfile set; diagnostic --use-lock-file restore only."
+            dotnet restore Permora.slnx --use-lock-file --verbosity minimal
+          fi
       - name: Build all .NET projects (warnings are errors)
         run: dotnet build Permora.slnx -c Release --no-restore
       - name: xUnit including real PostgreSQL integration
@@ -200,8 +211,8 @@ jobs:
             echo "| Keycloak roles and OIDC token scope | $KEYCLOAK_RESULT |"
             echo "| Committed, reproducible dependency locks | $LOCKS_RESULT |"
             echo
-            echo "**Not covered by a green workflow:** FGAP v2 least-privilege"
-            echo "isolation between delegated service accounts, full OIDC BFF login/MFA,"
+            echo "**Not covered by a green workflow:** full delegated FGAP user/group mapping,"
+            echo "complete LDAP visibility, full OIDC BFF login/MFA,"
             echo "external directory/HR writeback, SoD drift under changing external groups,"
             echo "load/HA/restore/penetration testing, and production deployment."
             echo "No production secrets, deployments, or publishing are used."

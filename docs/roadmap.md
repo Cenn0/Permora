@@ -6,10 +6,10 @@ Stand: 16. Oktober 2026. Ausgangspunkt war ein Repository mit ausschließlich Ap
 
 | ID | Ergebnis / Anforderung | Status | Implementierung / Nachweis | Abnahmekriterium |
 |---|---|---|---|---|
-| M0.1 | C#-/Angular-Struktur, getrennte Prozesse | S | `src/`, `web/`, `Permora.slnx` | vollständiger Restore und Release-Build |
+| M0.1 | C#-/Angular-Struktur, getrennte Prozesse | S/T | `src/`, `web/`, `Permora.slnx`; CI-Lauf #38912134224 | Release-Builds ausgeführt; reproduzierbare Locks und Release-Abnahme noch offen |
 | M0.2 | Logo und ausgewählte Designvariante 3 | S | `web/public/brand/`, Dashboard/CSS | Angular-Build, Desktop/Mobile-Vergleich, Accessibility |
 | M0.3 | README, Architektur, Betrieb, Tests | S | `README.md`, `docs/` | Anleitung auf frischer Maschine erfolgreich |
-| M0.4 | GitHub Actions für Builds, Tests und Integration | S | `.github/workflows/ci.yml` | Ausgeführte Runs und auswertbare Artefakte, echte FGAP-Grenzen gesondert |
+| M0.4 | GitHub Actions für Builds, Tests und Integration | S/T | `.github/workflows/ci.yml`; CI-Lauf #38912134224 | Funktionsjobs bestanden; Lockfile-Gate rot, FGAP gesondert |
 | M1.1 | Teams, eindeutige Ownership, Verwaltungsrollen | S | Policy, ApiEndpoints, Store | zwei Teams können gegenseitig weder lesen noch schreiben |
 | M1.2 | Registrierung nur durch tatsächliche Team-Owner | S | API + Transaktionsprüfung | konkurrierender Mandatsentzug vor Erstellung blockiert |
 | M1.3 | Serverautorisierung jeder App-Ressource | S | `Policy.RequireVisible`, App-Transaktionen | IDOR/API-Negativtests gegen echten Server |
@@ -39,11 +39,11 @@ Stand: 16. Oktober 2026. Ausgangspunkt war ein Repository mit ausschließlich Ap
 | M6.2 | Antrags-, Rollen-, Rechte-, Zugriffsoberflächen | S | Angular ApplicationPage | erfolgreiche und negative reale End-to-End-Flows |
 | M6.3 | Tastatur, responsive Layouts, Fehlermeldungen | S | CSS/HTML, Playwright-Testquellen | Browser-/Screenreader-Abnahme ohne Überläufe |
 | M6.4 | Globale Such-/Reporting-/Benachrichtigungszentrale | O | kein Fake-Menü mit vorgetäuschter Funktion | Scope-sichere Suche, Filter, Zustellung, Zustandsmodell |
-| M7.1 | C# Unit-/Connector-/Workflow-Testquellen | S | `tests/Permora.Tests` | ausführbare, vollständig grüne Tests |
-| M7.2 | PostgreSQL-Integrationstestquellen | S | explizite Testdatenbank | tatsächlich ausgeführt, keine stillen Skips |
+| M7.1 | C# Unit-/Connector-/Workflow-Testquellen | T | `tests/Permora.Tests`; 102/102 xUnit im CI-Lauf #38912134224 | Bestehende Suite grün, vollständige User-/Group-FGAP-Matrix noch offen |
+| M7.2 | PostgreSQL-Integrationstestquellen | T | PostgreSQL 18 CI-Service, TRX-Prüfung | Echter Integrationstest bestanden, 0 übersprungen |
 | M7.3 | Reine Frontend-Logiktests | T | 32/32 bestanden | TAP unter `docs/evidence/` |
-| M7.4 | Angular-/Browser-Testquellen | S | `web/e2e`, Playwright | realer Build und beide Viewport-Projekte |
-| M7.5 | Real-Keycloak-Vertragstests | O | manuelle Abnahmematrix dokumentiert | reproduzierbare isolierte KC-Instanz, positive/negative Tests |
+| M7.4 | Angular-/Browser-Testquellen | S/T | Angular-Produktionsbuild + Playwright 8/8 | Reale UI-Build-/Fixture-E2E-Tests bestanden, echtes BFF/SSO offen |
+| M7.5 | Real-Keycloak-Vertragstests | S/T | `scripts/ci-keycloak-contract.py` auf Keycloak 26.8.1 | Rollen/Token und clientbezogene FGAP-v2-Isolation zweier minimal privilegierter Konten bestanden; User-/Group-Mapping-Matrix offen |
 | M7.6 | Dependency-Locks, SBOM, Lizenz-/Security-Audit | O | direkte Versionen gesetzt | echte Lockfiles und transitive Abhängigkeiten geprüft |
 | M8.1 | Betriebs-/Recovery-Anleitung und lokale Hilfen | S | `deploy/`, `scripts/`, Operations | Neuinstallation, Upgrade und Restore ausgeführt |
 | M8.2 | Performance, HA, unabhängiger Pentest | O | keine Behauptung vorhandener Abnahme | verbindliche SLOs und nachweisbare Sicherheitsprüfung |
@@ -73,10 +73,14 @@ Ein Release ist erst abgenommen, wenn Quelle, Build, Integration, Sicherheitsgre
 | M3.7 | OIDC-Callback-Routen im Angular-Entwicklungsproxy | Proxy-Konfiguration | echter Browser-/OIDC-Login offen |
 | M7.7 | Manuelle Locked-Restore-/Test-Gates und separates Lockfile-Bootstrap | scripts | abhängig von .NET-SDK, Node-/Paketnetzwerk und PostgreSQL |
 
-**Keine Freigabe:** .NET-Build, Angular-Build, echte PostgreSQL-/Keycloak-Tests und automatisches FGAP-Provisioning wurden mangels ausführbarer Umgebung nicht abgeschlossen. 32 Frontend-Logiktests und 251 Strukturprüfungen wurden lokal bestanden; diese beweisen keine Integrationsfähigkeit. CI bleibt absichtlich ausgeschaltet.
+**Keine Freigabe:** .NET-Build, Angular-Build, echte PostgreSQL-/Keycloak-Tests und automatisches FGAP-Provisioning wurden mangels ausführbarer Umgebung nicht abgeschlossen. 32 Frontend-Logiktests und 251 Strukturprüfungen wurden lokal bestanden; diese beweisen keine Integrationsfähigkeit. CI war zu diesem historischen Zeitpunkt ausgeschaltet; wurde später ausdrücklich eingerichtet.
 
 ## CI-Erweiterung (16. Oktober 2026)
 
 Die zuvor offene CI-Einrichtung ist nun als **Quellcode** vorhanden. Geplante Prüfpunkte: vollständiger .NET-Build/xUnit + echte PostgreSQL-Testinstanz, Angular-Release-Build/Node-Unit-Tests/Playwright auf Desktop und Mobil, Keycloak 26.8.1 Client-Rollen-/Composite-/Mapping-/OIDC-Token-Vertrag, verpflichtende Lockfile-Gates und getrennte Testartefakte. Siehe [CI-Handbuch](ci.md).
 
-Die Tests sind nach dem ersten GitHub-Run auszuwerten; bereits vorhandene Evidenz aus einem früheren Teiltest darf nicht zu einem bestandenen vollständigen CI-Lauf umetikettiert werden. FGAP-v2-Delegation mit minimalen Keycloak-Privilegien, echtes Portal-SSO/MFA, externe Directory-Gruppenänderungen, Last/HA/Recovery und Penetrationstests bleiben **nicht automatisiert abgenommen**.
+Die Tests sind nach dem ersten GitHub-Run auszuwerten; bereits vorhandene Evidenz aus einem früheren Teiltest darf nicht zu einem bestandenen vollständigen CI-Lauf umetikettiert werden. FGAP-v2-Client-Isolation ist inzwischen getestet; vollständige Zielbenutzer-/Gruppen-FGAP-Matrix, echtes Portal-SSO/MFA, externe Directory-Gruppenänderungen, Last/HA/Recovery und Penetrationstests bleiben **nicht automatisiert abgenommen**.
+
+## Ausgeführte CI-Nachweise – 16. Oktober 2026
+
+Der [GitHub-Actions-Lauf #38912134224](https://github.com/Cenn0/Permora/actions/runs/38912134224) bestätigt erfolgreiche .NET- und Angular-Release-Builds, 102/102 xUnit-Tests inkl. echter PostgreSQL-Integration ohne Skips, einen gestarteten ASP.NET-HTTP-Test mit zwei getrennten Verwaltungsidentitäten, 32/32 isolierte Frontend-Logiktests, 8/8 Playwright-Tests sowie reale Keycloak-26.8.1-Rollen-/Composite-/Gruppen-/Token-Vertragstests. Der **Lockfile-Gate schlägt weiterhin fehl**, daher kein vollständig grüner Workflow und keine reproduzierbare Releasefreigabe. FGAP-v2-Client-Isolation für zwei Accounts ist erfolgreich getestet; Zielbenutzer-/Gruppen-Mapping, produktiver OIDC-/MFA-BFF-Flow und Betriebs-/Security-Abnahme bleiben offen. [Prüfdetails](evidence/ci-2026-10-16.md).

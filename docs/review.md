@@ -62,3 +62,13 @@ Im Quellcode zusätzlich korrigiert: Aktivierung vor zentraler, auditierter IAM-
 ## CI-Konfiguration (nachträglicher Änderungsstand)
 
 Die Workflows und Testhilfen sind neu im Repository. Siehe [CI-Testmatrix](ci.md). Ein GitHub-Workflow, der vorhandene Testquellen ausführt, ist **noch kein bestandenes Testergebnis**. Die historische Teiltestevidenz oben bleibt als damaliger Stand erhalten. Insbesondere FGAP-Minimalrechte und vollständige Produkt-/Betriebssicherheit werden nicht durch Admin-API-Smoke-Tests belegt.
+
+## Tatsächliche GitHub-Actions-Ergebnisse – 16. Oktober 2026
+
+Die historische Nicht-Ausführbarkeit in der vorherigen Arbeitsumgebung wurde durch GitHub-Runner teilweise aufgehoben. [Lauf #38912134224](https://github.com/Cenn0/Permora/actions/runs/38912134224) hat die .NET- und Angular-Produktionsbuilds erfolgreich abgeschlossen, 102/102 xUnit-Tests mit 0 Skips inkl. PostgreSQL bestätigt, 32 isolierte TS-Tests und 8 Playwright-Tests bestanden und einen realen Keycloak-26.8.1-Contract-Test sowie den ASP.NET-HTTP-Scope-/CSRF-Test erfolgreich ausgeführt. Ein früherer CI-Lauf deckte C#-Primary-Constructor-Warnungen, xUnit-CancellationToken-Analyzerprobleme und Keycloak-OIDC-Testspezifika auf; diese wurden in PR #4 korrigiert.
+
+**Gesamtlauf bleibt rot:** NuGet-/npm-Lockfiles fehlen im Repository und sind noch zu prüfen/einzuchecken. Die funktionale Testabdeckung bestätigt eine begrenzte clientbezogene FGAP-v2-Delegation mit zwei minimal privilegierten Servicekonten; sie beweist aber **keine vollständige User-/Group-Mapping-FGAP-Matrix, keine produktive Browser-SSO-/MFA-Authentifizierung** und keine Belastungs-/Wiederherstellungs- oder unabhängige Sicherheitsabnahme. Siehe [Ausgeführte CI-Evidenz](evidence/ci-2026-10-16.md).
+
+### FGAP-v2-Negativmatrix (GitHub Actions #38912134224)
+
+Ein isolierter Keycloak 26.8.1 bestätigt bei **zwei eingeschränkten, eigenständigen Servicekonten**: eigener Client und Anlage eigener Rollen erlaubt; fremde Client-Zugriffe, fremde Rollenanlagen, beliebige Client-Erstellung und Änderung der Realm-Sicherheitskonfiguration verweigert. Die Testkonten haben keine breiten Realm-Adminrollen. Der zentrale Testadministrator wird ausschließlich zum Aufbau des Test-Realms und der Berechtigungspolicies verwendet. Benutzer-/Gruppen-Zielmappings und vollständige LDAP-Sicht bleiben offen.

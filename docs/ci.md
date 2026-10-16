@@ -11,9 +11,9 @@ Docker-Dienste und Passwörter sind **ausschließlich** für die ephemeren Runne
 | Job | Echte Ausführung | Was nicht nachgewiesen wird |
 |---|---|---|
 | `structure` | Repository-/CI-Kontrakt, Dateiformate, Python/Shell-Syntax, isolierte TypeScript-Logik | C#-/Angular-Compile oder Deployment |
-| `dotnet` | Restore, Release-Build sämtlicher C#-Projekte, xUnit und **echte PostgreSQL 18**-Integration; TRX-Nachprüfung verweigert Skips | Live-Keycloak-Benutzerauthentifizierung, Cluster-/Failover |
+| `dotnet` | Restore, Release-Build sämtlicher C#-Projekte, xUnit und **echte PostgreSQL 18**-Integration; TRX-Nachprüfung verweigert Skips; zusätzlicher ASP.NET-HTTP-Test mit CSRF, Registrierung, fremden Anwendungs-IDs und zwei Development-Testidentitäten | Produktiver OIDC-/MFA-BFF-Login, Live-FGAP, Cluster-/Failover |
 | `angular` | Node 24, Abhängigkeitsinstallation, Angular-Produktionsbuild, Node-Logiktests, Playwright Desktop und Mobile, npm Prod-Audit | Browser mit echtem Keycloak/OIDC-BFF; Playwright nutzt API-Fixtures |
-| `keycloak` | Keycloak 26.8.1 Admin REST: zwei Clients, Rollen, Composites, direkte Nutzer- und Gruppenmappings, Testtoken mit expliziter Audience und Ausschluss fremder Clientrollen, Rollentzug | **Keine FGAP-v2-Delegation** oder Portalend-to-end; Testaufbau benutzt kurzzeitig einen zentralen Testadministrator |
+| `keycloak` | Keycloak 26.8.1 REST mit zwei Clients, Rollen, Composite/User-/Group-Mappings, eingeschränkter Token-Audience sowie **echtem FGAP v2 mit zwei unabhängigen Servicekonten**: eigener Client erlaubt, fremde Clients und Realm-Konfiguration verweigert | Keine vollständige FGAP-v2-Zielbenutzer-/Gruppen-Mapping-Matrix oder produktiver Portal-End-to-End-Login; Admin wird nur für ephemeres Setup verwendet |
 | `dependency-locks` | Überprüft, dass echtes `web/package-lock.json` und pro C#-Projekt echte `packages.lock.json` eingecheckt sind | SBOM- und Lizenzbewertung sämtlicher transitiver Abhängigkeiten |
 | `scope-summary` | Sichtbare GitHub-Actions-Zusammenfassung der einzelnen Jobzustände und Grenzen | Kein eigener Freigabeprüfer |
 
@@ -24,7 +24,7 @@ Die ersten Buildjobs können **diagnostische** Lockfiles auf dem Runner erzeugen
 1. PR gegen `main` öffnen und die Jobzustände abwarten. Kein Token, Keycloak-Secret oder persönliches Produktionskonto für die CI nötig.
 2. **Wenn Lockfiles fehlen:** `dotnet-test-and-dependencies` und `angular-browser-and-dependencies` unter dem Workflow-Run herunterladen, NuGet-/npm-Auflösung, Lizenz- und Security-Advisories prüfen, die benötigten Lockfiles ins Repository übernehmen.
 3. Bei fehlgeschlagenen Builds die Logs und TRX/Playwright-Artefakte öffnen, Quellcode korrigieren und PR erneut testen.
-4. Bei grünem `keycloak`: **nur** Roles/Mappings und OIDC-Token-Vertrag bestätigt. Für FGAP mit zwei echten delegierten **Minimalrechte-Accounts** zusätzliche negative Live-Tests in einer eigenen isolierten Testinstanz durchführen und Ergebnis separat dokumentieren.
+4. Bei grünem `keycloak`: Rollen/Token-Vertrag und clientbezogene FGAP-v2-Isolation zweier minimal berechtigter Servicekonten bestätigt. Zusätzliche Prüfungen für vollständiges Zielbenutzer-/Gruppen-Mapping, LDAP-Sicht und produktive Anwendungs-SSO bleiben offen.
 5. Erst bei vollständig bestandenen technischen Tests, minimalen Keycloak-Rechten, überprüftem BFF-OIDC/MFA, Betriebs- und Recovery-Nachweis eine Pilotfreigabe diskutieren.
 
 ## Lokale Ausführung
@@ -47,9 +47,13 @@ Bei der ersten Ausführung werden die tatsächlich erreichten Testzahlen und Com
 
 ## Offene externe Nachweise
 
-- Realer FGAP-v2-Isolationstest mit **gezielt** delegierten Accounts und zwei fremden Clients: jede fremde Rolle und jeder fremde Zielbenutzer muss per REST blockiert sein.
+- Die FGAP-v2-Client-Isolation ist jetzt real getestet. **Weiter offen:** kombinierte Client-`map-roles`- und Zielbenutzer-/Gruppen-Rechte, LDAP-Sicht und vollständige negative Rollen-Zuweisungsmatrix.
 - End-to-end Anmeldung am ASP.NET-BFF mit Keycloak-OIDC inklusive korrektem Issuer, JWT-Audience, CSRF, Sessionablauf und MFA-/Step-up-ACR-Prüfung.
 - Dynamische Gruppen-/SoD-Änderungen aus LDAP/AD, fehlende Benutzer, Failover/Timeout und garantierter Widerruf bei bereits ausgestellten JWTs.
 - Sicherheit, Daten-/Audit-Retention, Lizenz/SBOM, Last, HA, Disaster Recovery und externer Pentest.
 
 **Grüne CI bedeutet keine Unternehmens- oder Produktionsfreigabe.**
+
+## Nachweis des ersten erfolgreichen Funktionsdurchlaufs
+
+[GitHub Actions #38912134224](https://github.com/Cenn0/Permora/actions/runs/38912134224): Struktur erfolgreich; **102/102 C#-Tests einschließlich PostgreSQL** sowie gesonderter gestarteter ASP.NET-HTTP-Smoke-Test erfolgreich; Angular-Produktionsbuild, 32 isolierte Frontend-Unit-Tests und 8 Playwright-Tests erfolgreich; Keycloak 26.8.1 Rollen-/OIDC-Vertrag sowie clientbezogene FGAP-v2-Isolation erfolgreich; npm-Produktion-Audit ohne gemeldete Schwachstellen. **`dependency-locks` fehlgeschlagen:** echte aufgelöste, geprüfte NuGet/npm-Lockfiles sind noch nicht eingecheckt. Alle anderen Jobs waren grün. [Prüfprotokoll mit Grenzen](evidence/ci-2026-10-16.md).
