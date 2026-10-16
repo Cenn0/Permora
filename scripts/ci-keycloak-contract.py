@@ -292,12 +292,13 @@ def run():
             secret = doc.get("value")
             if not secret:
                 raise AssertionError("Delegated client credential unavailable")
-            return kc_token(REALM, {"grant_type": "client_credentials",
+            return (kc_token(REALM, {"grant_type": "client_credentials",
                                    "client_id": "ci-delegated-" + alias,
-                                   "client_secret": secret})
+                                   "client_secret": secret}), policy_name)
 
-        delegated_a = delegated_token("app-a", ca)
-        delegated_b = delegated_token("app-b", cb)
+        delegated_a, policy_a = delegated_token("app-a", ca)
+        delegated_b, policy_b = delegated_token("app-b", cb)
+        new_roles = {}
         for alias, delegated, own, other in (
             ("A", delegated_a, ca, cb), ("B", delegated_b, cb, ca)
         ):
@@ -333,6 +334,73 @@ def run():
                                token=master_token)[1]
             check(status in (201, 204) and own_role.get("name") == fresh_role,
                   "FGAP delegated team " + alias + " can create an own-client role")
+            new_roles[alias] = own_role
+
+        # Delegated user/group mapping requires TWO independent permissions:
+        # permission to map this client's roles AND permission on the target identity.
+        # Never substitute realm-wide manage-users for a passing check.
+        other_person = create_user(master_token, "permora-ci-forbidden-user", "CI_only_complex_4569!")
+        other_group = create_group(master_token, "permora-ci-forbidden-team")
+        forbidden_user_path = admin_path("/users/" + other_person + "/role-mappings/clients/" + ca)
+        forbidden_group_path = admin_path("/groups/" + other_group + "/role-mappings/clients/" + ca)
+
+        status, _, _ = request("POST", roles_a_path, [new_roles["A"]], token=delegated_a,
+                               expected=(401, 403, 404))
+        check(status in (401, 403, 404),
+              "Client-level map-roles alone does not grant unrestricted user mappings")
+        status, _, _ = request("POST", group_path, [new_roles["A"]], token=delegated_a,
+                               expected=(401, 403, 404))
+        check(status in (401, 403, 404),
+              "Client-level map-roles alone does not grant unrestricted group mappings")
+
+        request("POST", authz_path + "/permission/scope", {
+            "name": "ci-only-a-target-user-role-mapping",
+            "resourceType": "Users", "scopes": ["view", "map-roles"],
+            "resources": [person], "policies": [policy_a]
+        }, token=master_token)
+        status, _, _ = request("POST", roles_a_path, [new_roles["A"]], token=delegated_a,
+                               expected=(201, 204))
+        actual = request("GET", roles_a_path, token=master_token)[1]
+        check(any(role["id"] == new_roles["A"]["id"] for role in actual),
+              "Team A can map its own client role onto an explicitly allowed user")
+
+        status, _, _ = request("POST", roles_b_path, [new_roles["B"]], token=delegated_a,
+                               expected=(401, 403, 404))
+        check(status in (401, 403, 404),
+              "Team A cannot map Client B roles even onto an allowed user")
+        status, _, _ = request("POST", forbidden_user_path, [new_roles["A"]], token=delegated_a,
+                               expected=(401, 403, 404))
+        check(status in (401, 403, 404),
+              "Team A cannot map own roles onto an unapproved target user")
+        status, _, _ = request("PUT", admin_path("/users/" + person),
+                               {"enabled": False}, token=delegated_a, expected=(401, 403, 404))
+        check(status in (401, 403, 404),
+              "User map-roles permission cannot modify the target user's account")
+
+        request("POST", authz_path + "/permission/scope", {
+            "name": "ci-only-a-target-group-role-mapping",
+            "resourceType": "Groups", "scopes": ["view", "manage"],
+            "resources": [group], "policies": [policy_a]
+        }, token=master_token)
+        status, _, _ = request("POST", group_path, [new_roles["A"]], token=delegated_a,
+                               expected=(201, 204))
+        actual = request("GET", group_path, token=master_token)[1]
+        check(any(role["id"] == new_roles["A"]["id"] for role in actual),
+              "Team A can map its own client role onto its explicitly allowed group")
+        status, _, _ = request("POST", forbidden_group_path, [new_roles["A"]], token=delegated_a,
+                               expected=(401, 403, 404))
+        check(status in (401, 403, 404),
+              "Team A cannot map own roles onto an unapproved group")
+        status, _, _ = request("POST", group_path, [new_roles["B"]], token=delegated_a,
+                               expected=(401, 403, 404))
+        check(status in (401, 403, 404),
+              "Group management alone does not allow foreign Client B roles")
+        request("DELETE", roles_a_path, [new_roles["A"]], token=delegated_a)
+        request("DELETE", group_path, [new_roles["A"]], token=delegated_a)
+        after_user = request("GET", roles_a_path, token=master_token)[1]
+        after_group = request("GET", group_path, token=master_token)[1]
+        check(not any(role["id"] == new_roles["A"]["id"] for role in after_user + after_group),
+              "Delegated user and group revocations are verified with real Keycloak read-back")
 
         request("DELETE", roles_a_path, [composite_a], token=master_token)
         after_revoke = request("GET", roles_a_path, token=master_token)[1]
