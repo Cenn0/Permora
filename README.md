@@ -1,6 +1,8 @@
-<p align="center"><img src="web/public/brand/permora.svg" width="78" alt="Permora logo: colorful modules forming a P"></p>
+<p align="center"><img src="web/public/brand/permora.svg" width="78" alt="Permora logo: colorful flowing ribbon forming a P"></p>
 
 # Permora
+
+**Brand and UI design:** [Logo + light/dark templates](docs/branding/README.md) (design concepts only).
 
 **Language:** **English** · [Deutsch](README.de.md)
 

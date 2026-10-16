@@ -1,6 +1,8 @@
-<p align="center"><img src="web/public/brand/permora.svg" width="78" alt="Permora-Logo: farbige Module als P"></p>
+<p align="center"><img src="web/public/brand/permora.svg" width="78" alt="Permora-Logo: farbiges Band in P-Form"></p>
 
 # Permora
+
+**Marke und UI:** [Logo und Hell-/Dunkel-Designvorlagen](docs/branding/README.md) (ausschließlich Entwürfe).
 
 **Sprache:** [English](README.md) · **Deutsch**
 

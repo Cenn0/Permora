@@ -1,7 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 100" role="img" aria-label="Permora">
-<rect x="2" y="2" width="32" height="29" rx="6" fill="#2563EB"/>
-<path d="M44 2h9c12 0 21 10 21 22v1c0 4-3 6-7 6H44c-3 0-5-2-5-5V7c0-3 2-5 5-5Z" fill="#FBBF24"/>
-<rect x="2" y="36" width="32" height="29" rx="6" fill="#22C55E"/>
-<circle cx="55" cy="50.5" r="14.5" fill="#8B5CF6"/>
-<rect x="2" y="70" width="32" height="29" rx="6" fill="#F87171"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Permora brand mark"><defs>
+ <linearGradient id="main" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#198BFC"/><stop offset=".54" stop-color="#8950F8"/><stop offset="1" stop-color="#F43F86"/></linearGradient>
+ <linearGradient id="sun" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#FFE064"/><stop offset=".52" stop-color="#FFB020"/><stop offset="1" stop-color="#F43F86"/></linearGradient>
+ <linearGradient id="sea" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#2EEBEE"/><stop offset="1" stop-color="#F43F86"/></linearGradient>
+ <linearGradient id="shadow" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#003BAF"/><stop offset="1" stop-color="#169CFF"/></linearGradient>
+ </defs><g transform="scale(1)"><path d="M18 30Q18 14 35 14H61Q78 14 78 35V94Q78 114 62 125L19 147Z" fill="url(#sea)"/><path d="M49 14H98Q148 14 148 65Q148 99 119 111L77 127V83H99Q117 83 117 64Q117 45 98 45H66Z" fill="url(#sun)"/><path d="M74 54Q76 47 87 47H99Q118 47 118 68Q116 90 96 90H79Q87 81 87 68Q87 57 74 54Z" fill="url(#main)"/><path d="M19 94C35 78 50 60 77 42V108Q77 123 61 131L19 147Z" fill="url(#shadow)" opacity=".8"/></g></svg>
