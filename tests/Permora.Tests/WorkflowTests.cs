@@ -116,6 +116,9 @@ public sealed class WorkflowTests
         var service = new ChangeService(store, f.Admins, f.Clock); await service.RequestAsync(f.App.Id, f.Owner, new Change { Kind = ChangeKind.Reconcile, Reason = "Inspect drift" }, 1, "reconcile-request", Ct);
         await new OperationProcessor(store, new FakeConnector { Findings = [new("role.reader", "untracked_direct_assignment", "Unexpected grant")] }, f.Admins, f.Clock).ProcessAsync(f.App.Id, Ct);
         Assert.Equal(OperationStatus.Failed, store.Operations[failed.Id].Status); Assert.Contains(store.Audit, a => a.Action == "drift.detected");
+        var reconcile = store.Operations.Values.Single(o => o.Change.Kind == ChangeKind.Reconcile);
+        Assert.Equal(OperationStatus.Conflict, reconcile.Status);
+        Assert.Equal("drift_detected", reconcile.ErrorCode);
     }
     [Fact] public async Task Expiration_queues_one_revocation_and_survives_unrelated_revision()
     {
