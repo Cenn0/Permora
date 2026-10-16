@@ -34,3 +34,10 @@ Hashketten und Append-only-Trigger schützen nicht gegen privilegierte DB-/Infra
 ## IAM-Freigabe und Entzugspriorität
 
 Ein neuer oder neu gebundener Client bleibt bis zur zentralen IAM-Prüfung gesperrt. FGAP, die Connector-Profile und die Token-Audience müssen außerhalb des Portals geprüft und mit einer Nachweisreferenz attestiert werden. Danach führt der Worker einen separaten Remote-Abgleich aus. Fehlgeschlagene Entzüge und nicht bestätigte Schreibvorgänge benötigen aktive Alarmierung und manuelle Klärung; automatische Entzugspriorisierung allein garantiert keine maximale Reaktionszeit.
+
+
+## Zentrale Warteschlangen-Diagnostik (P6)
+
+Zentrale IAM-Administratoren können `GET /api/v1/admin/operations-health` abfragen. Die Antwort enthält nur globale Summen für `Queued`, `AwaitingApproval`, `Failed`, `Conflict`, fällige systemseitige Entzüge und das Alter des ältesten fälligen Entzugs in Sekunden. Andere Teams haben keinen Zugriff. Werte sind **kein** Ersatz für vollständige Keycloak-Soll-/Ist-Verifikation, keine Aussage über noch gültige JWTs und ohne Lasttest keine zugesagte Entzugs-SLA.
+
+Alarmierung auf die neuen Kennzahlen sollte insbesondere blockierte Aufträge und überfällige automatische Entzüge betrachten; Schwellenwerte müssen im Pilotbetrieb anhand gemessener Last bestätigt werden. Für Prometheus/OpenTelemetry ist noch kein Exporter konfiguriert.

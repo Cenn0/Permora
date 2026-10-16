@@ -132,6 +132,12 @@ def main():
 
                 status, apps = request_http(5080, "GET", "/api/v1/applications", jar)
                 assert_status(status, 200, "Owned applications are visible to the seeded owner")
+                status, monitoring = request_http(5080, "GET", "/api/v1/admin/operations-health", jar)
+                assert_status(status, 200, "Central IAM can query aggregate queue and revocation diagnostics")
+                if not isinstance(monitoring, dict) or not all(field in monitoring for field in (
+                    "queued", "awaitingApproval", "failed", "conflict", "dueRevocations", "oldestDueRevocationSeconds"
+                )):
+                    raise AssertionError("Operational health is missing expected aggregate fields")
                 if len(apps) < 4:
                     raise AssertionError("Demo data did not initialize applications")
                 status, _ = request_http(5080, "GET", "/api/v1/applications/" + str(uuid.uuid4()), jar)
@@ -178,6 +184,8 @@ def main():
                     raise AssertionError("A foreign principal unexpectedly sees team applications")
                 status, _ = request_http(5081, "GET", "/api/v1/applications/" + app_id, foreign_jar)
                 assert_status(status, 404, "Foreign actor cannot discover protected app by direct ID")
+                status, _ = request_http(5081, "GET", "/api/v1/admin/operations-health", foreign_jar)
+                assert_status(status, 403, "Foreign team cannot query central operational telemetry")
                 status, _ = request_http(5081, "POST", "/api/v1/admin/teams", foreign_jar,
                                  body={"name": "Forbidden", "members": [], "expectedRevision": 0},
                                  xsrf=foreign_csrf)
