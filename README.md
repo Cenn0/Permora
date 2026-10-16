@@ -1,4 +1,7 @@
-<p align="center"><img src="web/public/brand/permora.svg" width="78" alt="Permora logo: colorful flowing ribbon forming a P"></p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/branding/banner-dark.svg">
+  <img src="docs/branding/banner-light.svg" alt="Permora — Organize today. Build tomorrow. Applications, roles and approvals." width="1200">
+</picture>
 
 # Permora
 
