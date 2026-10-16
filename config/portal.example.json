@@ -17,7 +17,9 @@
       ]
     },
     "EnableDevelopmentLogin": false,
-    "AllowHttpInDevelopment": false
+    "AllowHttpInDevelopment": false,
+    "PrivilegedAcr": "2",
+    "PrivilegedAuthenticationMaxAgeMinutes": 10
   },
   "Keycloak": {
     "AllowHttpInDevelopment": false,
