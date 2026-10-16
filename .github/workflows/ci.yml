@@ -73,6 +73,8 @@ jobs:
       - name: Check that PostgreSQL integration was not silently skipped
         if: success()
         run: python3 scripts/ci-verify-trx.py tests/Permora.Tests/TestResults
+      - name: Exercise ASP.NET API over HTTP with two scoped test identities
+        run: python3 scripts/ci-api-smoke.py
       - name: Upload TRX and generated NuGet lockfiles
         if: always()
         uses: actions/upload-artifact@v7
