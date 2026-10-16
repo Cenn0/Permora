@@ -1,0 +1,26 @@
+# Local dependencies only. Not a production deployment and not CI.
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: permora
+      POSTGRES_DB: permora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/init-local.py first}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["portal-db:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U permora -d permora"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: ["start-dev"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: local-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Run scripts/init-local.py first}
+    ports: ["127.0.0.1:8080:8080"]
+    volumes: ["keycloak-dev:/opt/keycloak/data"]
+volumes:
+  portal-db:
+  keycloak-dev:

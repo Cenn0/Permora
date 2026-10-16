@@ -1,0 +1,63 @@
+<a class="breadcrumb" routerLink="/applications">← Meine Anwendungen</a>
+@if(error()){<div class="alert danger" role="alert">{{error()}}</div>}
+@if(notice()){<div class="alert neutral" role="status">{{notice()}}</div>}
+@if(loading()&&!detail()){<p role="status">Anwendung wird geladen …</p>}
+@if(detail();as d){
+<div class="page-heading"><div><span class="eyebrow">{{label(d.application.environment)}} · {{label(d.managementRole)}}</span><h1>{{d.application.name}}</h1><p>{{d.application.description}}</p></div><div class="inline-actions"><span [class]="'badge '+tone(d.application.status)">{{label(d.application.status)}}</span><button (click)="reload()" [disabled]="busy()||loading()" aria-label="Anwendung aktualisieren"><p-icon name="refresh" /></button></div></div>
+@if(!active()){<div class="alert warning">Neue Rechte und Zugriffsvergaben sind gesperrt, bis die Anbindung geprüft und die Anwendung aktiv ist. Bereits ausgestellte Tokens werden durch diesen Verwaltungsstatus nicht automatisch ungültig.</div>}
+<nav class="tabs" aria-label="Anwendungsbereiche">@for(item of tabs;track item.id){<button [class.active]="tab()===item.id" [attr.aria-current]="tab()===item.id?'page':null" (click)="selectTab(item.id)">{{item.name}}</button>}</nav>
+<section class="panel">
+@switch(tab()){
+@case('roles'){
+ <div class="section-heading"><div><h2>Rollen</h2><p class="muted small">Fasse einzelne Berechtigungen zu fachlichen Rollen zusammen.</p></div>@if(define()){<button class="primary" [disabled]="!active()||busy()" (click)="open('role')"><p-icon name="plus" /> Neue Rolle</button>}</div>
+ <div class="table-scroll"><table><thead><tr><th>Rolle</th><th>Berechtigungen</th><th>Aktionen</th></tr></thead><tbody>@for(role of d.application.roles;track role.id){<tr><td><strong>{{role.name}}</strong><code>role.{{role.key}}</code><small>{{role.description}}</small></td><td><div class="tags">@for(id of role.permissionIds;track id){<span class="badge purple">{{permissionName(id)}}</span>}@empty{<span class="muted">Keine Berechtigungen</span>}</div></td><td>@if(define()){<div class="inline-actions"><button [disabled]="!active()||busy()" (click)="open('role',role)" [attr.aria-label]="'Rolle '+role.name+' bearbeiten'"><p-icon name="edit" /></button><button [disabled]="!active()||busy()" (click)="remove('DeleteRole',role.id,role.name)" [attr.aria-label]="'Rolle '+role.name+' löschen'"><p-icon name="trash" /></button></div>}</td></tr>}@empty{<tr><td colspan="3" class="empty">Noch keine Rollen vorhanden.</td></tr>}</tbody></table></div>
+}
+@case('permissions'){
+ <div class="section-heading"><div><h2>Berechtigungen</h2><p class="muted small">Diese Rechte muss die Anwendung selbst durchsetzen. Neue Rechte starten mit erhöhtem Risiko.</p></div>@if(define()){<button class="primary" [disabled]="!active()||busy()" (click)="open('permission')"><p-icon name="plus" /> Neue Berechtigung</button>}</div>
+ <div class="table-scroll"><table><thead><tr><th>Berechtigung</th><th>Risiko</th><th>Aktionen</th></tr></thead><tbody>@for(p of d.application.permissions;track p.id){<tr><td><strong>{{p.name}}</strong><code>perm.{{p.key}}</code><small>{{p.description}}</small></td><td><span [class]="'badge '+(p.risk==='High'?'warning':'neutral')">{{label(p.risk)}}</span></td><td>@if(define()){<div class="inline-actions"><button [disabled]="!active()||busy()" (click)="open('permission',p)" [attr.aria-label]="'Berechtigung '+p.name+' bearbeiten'"><p-icon name="edit" /></button><button [disabled]="!active()||busy()" (click)="remove('DeletePermission',p.id,p.name)" [attr.aria-label]="'Berechtigung '+p.name+' löschen'"><p-icon name="trash" /></button></div>}</td></tr>}@empty{<tr><td colspan="3" class="empty">Noch keine Berechtigungen vorhanden.</td></tr>}</tbody></table></div>
+}
+@case('access'){
+ <div class="section-heading"><div><h2>Zugriffe</h2><p class="muted small">Bestätigte, durch Permora verwaltete Zuweisungen. Externe und geerbte Zugriffe können zusätzlich bestehen.</p></div>@if(assign()){<button class="primary" [disabled]="!active()||busy()||!d.application.roles.length" (click)="open('grant')"><p-icon name="plus" /> Zugriff vergeben</button>}</div>
+ <div class="table-scroll"><table><thead><tr><th>Person / Gruppe</th><th>Rolle</th><th>Gültig bis</th><th>Aktion</th></tr></thead><tbody>@for(a of d.application.assignments;track a.id){<tr><td>{{principalName(a.principalId)}}</td><td>{{roleName(a.roleId)}}</td><td>{{a.expiresAt?(a.expiresAt|date:'dd.MM.yyyy HH:mm'):'Ohne Ablauf'}}</td><td>@if(assign()){<button [disabled]="busy()" (click)="remove('RevokeAccess',a.id,roleName(a.roleId))">Entzug anfordern</button>}</td></tr>}@empty{<tr><td colspan="4" class="empty">Keine bestätigten Zuweisungen.</td></tr>}</tbody></table></div>
+}
+@case('requests'){
+ <div class="section-heading"><div><h2>Änderungsaufträge</h2><p class="muted small">Die letzten 200 Aufträge. „In Keycloak bestätigt“ bezeichnet einen verifizierten Ist-Zustand.</p></div><button (click)="reload()" [disabled]="loading()||busy()"><p-icon name="refresh" /> Aktualisieren</button></div>
+ <div class="table-scroll"><table><thead><tr><th>Änderung</th><th>Person</th><th>Status</th><th>Aktionen</th></tr></thead><tbody>@for(op of operations();track op.id){<tr><td><strong>{{label(op.change.kind)}}</strong><small>{{op.change.name||op.change.key||op.change.reason}}</small><small>{{op.createdAt|date:'dd.MM.yyyy HH:mm'}}</small></td><td>{{op.requestedBy.name}}</td><td><span [class]="'badge '+tone(op.status)">{{label(op.status)}}</span>@if(op.errorCode){<code>{{op.errorCode}}</code>}</td><td><div class="inline-actions">@if(canDecide(op)){<button class="primary" [disabled]="busy()" (click)="decide(op,true)">Freigeben</button><button [disabled]="busy()" (click)="decide(op,false)">Ablehnen</button>}@if((op.status==='Failed'||op.status==='Conflict')&&op.attempts>0&&d.managementRole==='Owner'){<button [disabled]="busy()" (click)="retry(op)">Wiederholen</button>}</div></td></tr>}@empty{<tr><td colspan="4" class="empty">Noch keine Änderungsaufträge.</td></tr>}</tbody></table></div>
+}
+@case('reviews'){
+ <h2>Rezertifizierung</h2><p class="muted">Prüfe bestehende Zugriffe. Nicht rechtzeitig bestätigte Einträge werden zum Entzug vorgemerkt.</p>
+ @if(d.managementRole==='Owner'){<form class="compact-form" (ngSubmit)="startReview()"><label>Name<input name="reviewName" [(ngModel)]="reviewName" required minlength="3" maxlength="120" /></label><label>Fällig am<input name="reviewDue" type="datetime-local" [(ngModel)]="reviewDue" required /></label><button type="submit" class="primary" [disabled]="busy()">Prüfung starten</button></form>}
+ @for(reviewItem of reviews();track reviewItem.id){<article class="review-card"><h3>{{reviewItem.name}}</h3><p class="muted small">Fällig {{reviewItem.dueAt|date:'dd.MM.yyyy HH:mm'}} · {{reviewItem.closed?'Abgeschlossen':'Offen'}}</p>@for(item of reviewItem.items;track item.assignmentId){<div class="review-line"><code>{{item.assignmentId}}</code><span class="badge">{{label(item.decision)}}</span>@if(!reviewItem.closed&&item.decision==='Pending'&&approve()){<button [disabled]="busy()" (click)="review(reviewItem,item.assignmentId,true)">Beibehalten</button><button [disabled]="busy()" (click)="review(reviewItem,item.assignmentId,false)">Entziehen</button>}</div>}</article>}@empty{<p class="empty">Noch keine Rezertifizierungen.</p>}
+}
+@case('audit'){
+ <h2>Änderungsprotokoll</h2><p class="muted small">Fortlaufende Ereignisse mit Hash-Verkettung. Ein externer manipulationsgeschützter Export ist für erhöhte Audit-Anforderungen erforderlich.</p>
+ <div class="table-scroll"><table><thead><tr><th>Nr.</th><th>Zeit</th><th>Aktion</th><th>Details</th></tr></thead><tbody>@for(event of events();track event.id){<tr><td>{{event.sequence}}</td><td>{{event.at|date:'dd.MM.yyyy HH:mm'}}</td><td>{{event.action}}</td><td><code class="wrap">{{event.detail}}</code></td></tr>}@empty{<tr><td colspan="4" class="empty">Noch keine Ereignisse.</td></tr>}</tbody></table></div>
+ @if(nextSequence()!==null){<button [disabled]="busy()" (click)="moreAudit()">Weitere Ereignisse laden</button>}
+}
+@case('settings'){
+ <h2>Keycloak-Anbindung</h2><dl class="details"><dt>Realm</dt><dd>{{d.application.realmKey}}</dd><dt>Client</dt><dd>{{d.application.keycloakClientId||'Noch nicht angebunden'}}</dd><dt>Interne Client-UUID</dt><dd><code>{{d.application.keycloakClientUuid||'—'}}</code></dd><dt>Maximale Zugriffsdauer</dt><dd>{{d.application.policy.maxGrantDays}} Tage</dd><dt>Vier-Augen-Prinzip</dt><dd>{{d.application.policy.requireApproval?'Für Änderungen aktiviert':'Risikobasiert'}}</dd><dt>Versionsstand</dt><dd>{{d.application.revision}}</dd></dl>
+ @if(define()){<button (click)="reconcile()" [disabled]="busy()||!d.application.keycloakClientUuid"><p-icon name="refresh" /> Soll-Ist-Abgleich anfordern</button>}
+ @if(api.session()?.administrator){<div class="divider"></div><h3>Freigabe durch zentrale IAM-Verwaltung</h3><p class="muted small">Die Clients müssen zuvor nach dem IAM-Runbook abgesichert und mit der Permora-Anwendungs-ID markiert werden. Hier werden keine beliebigen Keycloak-Einstellungen weitergereicht.</p><form class="form-panel" (ngSubmit)="binding()"><label>Ressourcen-Client-UUID<input name="clientUuid" [(ngModel)]="clientUuid" required /></label><label>Ressourcen-Client-ID<input name="clientId" [(ngModel)]="clientId" required /></label><label>Optional: Login-Client-UUID<input name="loginClientUuid" [(ngModel)]="loginClientUuid" /></label><button class="primary" type="submit" [disabled]="busy()">Anbindung prüfen lassen</button></form>}
+}
+}
+</section>
+@if(editor();as mode){
+<section class="panel editor-panel" aria-labelledby="editor-title"><div class="section-heading"><h2 id="editor-title">{{mode==='grant'?'Zugriff vergeben':mode==='role'?(editId?'Rolle bearbeiten':'Neue Rolle'):(editId?'Berechtigung bearbeiten':'Neue Berechtigung')}}</h2><button (click)="editor.set(null)" aria-label="Bearbeitung schließen"><p-icon name="close" /></button></div>
+<form (ngSubmit)="save()" class="form-panel">
+@if(mode!=='grant'){
+ <label>Name<input name="name" [(ngModel)]="name" required minlength="2" maxlength="120" /></label>
+ <label>Technischer Schlüssel<input name="key" [(ngModel)]="key" [readonly]="!!editId" required minlength="2" maxlength="80" placeholder="orders.approve" /><small>Nach der Erstellung unveränderlich.</small></label>
+ <label>Beschreibung<textarea name="description" [(ngModel)]="description" maxlength="2000"></textarea></label>
+ @if(mode==='permission'){<label>Risiko<select name="risk" [(ngModel)]="risk" [disabled]="!editId||!api.session()?.administrator"><option value="High">Erhöht</option><option value="Standard">Standard</option></select><small>Herabstufung nur durch zentrale IAM-Verwaltung.</small></label>}
+ @if(mode==='role'){<fieldset><legend>Berechtigungen dieser Anwendung</legend>@for(p of d.application.permissions;track p.id){<label class="checkbox"><input type="checkbox" [name]="'perm-'+p.id" [checked]="permissionIds.includes(p.id)" (change)="toggle(p.id,$any($event.target).checked)" /><span>{{p.name}} <code>{{p.key}}</code></span><span class="badge">{{label(p.risk)}}</span></label>}@empty{<p>Noch keine Berechtigungen vorhanden.</p>}</fieldset>}
+} @else {
+ <label>Rolle<select name="roleId" [(ngModel)]="roleId" required><option value="">Bitte auswählen</option>@for(role of d.application.roles;track role.id){<option [value]="role.id">{{role.name}}</option>}</select></label>
+ <label>Person oder Gruppe suchen<div class="search-inline"><input name="query" [(ngModel)]="query" minlength="3" placeholder="Mindestens drei Zeichen" /><button type="button" [disabled]="searching()" (click)="search()">Suchen</button></div></label>
+ <label>Ergebnis<select name="principalId" [(ngModel)]="principalId" required><option value="">Bitte auswählen</option>@for(p of principals();track p.id){<option [value]="p.id">{{p.name}} · {{label(p.kind)}}</option>}</select><small>Verzeichnisdaten müssen zum Zeitpunkt der Verarbeitung aktuell sein.</small></label>
+ <label>Gültig bis<input name="expiry" type="datetime-local" [(ngModel)]="expiry" required /><small>Maximal {{d.application.policy.maxGrantDays}} Tage. Ein Token kann nach dem Entzug bis zu seinem Ablauf weiter gültig sein.</small></label>
+}
+<label>Begründung<textarea name="reason" [(ngModel)]="reason" required minlength="3" maxlength="1000"></textarea></label>
+<div class="form-actions"><button type="button" (click)="editor.set(null)">Abbrechen</button><button class="primary" type="submit" [disabled]="busy()">{{busy()?'Wird übermittelt …':'Änderung anfordern'}}</button></div>
+</form></section>
+}
+}
