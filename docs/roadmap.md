@@ -61,3 +61,16 @@ Stand: 16. Oktober 2026. Ausgangspunkt war ein Repository mit ausschließlich Ap
 ## Release-Definition
 
 Ein Release ist erst abgenommen, wenn Quelle, Build, Integration, Sicherheitsgrenzen, Abhängigkeiten und Betriebsanleitung zusammen nachgewiesen sind. **Diesen Zustand erreicht der vorliegende Stand noch nicht.** Eine CI-Pipeline ist dabei ausdrücklich nicht Teil dieses Arbeitsauftrags; alle vorbereiteten Prüfungen sind lokal/manual ausführbar.
+
+
+## Nachtrag: Integrations- und Sicherheitshärtung (16.10.2026)
+
+| ID | Ergänzung | Quellcode | Abnahme |
+|---|---|---|---|
+| M3.6 | Explizite zentrale IAM-Attestierung vor Aktivierung, gebunden an Keycloak-Client-UUID und Client-ID | API, Modell, Worker, Angular | .NET-Testquellen vorhanden; echte Keycloak-/FGAP-Prüfung offen |
+| M4.6 | Fällige automatische Entzüge überholen andere Entzüge im Backoff; normale Mutationen bleiben geordnet | PostgreSQL, Test-Store, Worker | echte PostgreSQL-Concurrency-Tests offen |
+| M2.6 | Rollenlöschung trotz unbekannter Keycloak-Benutzer-/Gruppenzuweisungen verhindern | Connector | HTTP-Mock-Testquelle vorhanden; echter Keycloak-Test offen |
+| M3.7 | OIDC-Callback-Routen im Angular-Entwicklungsproxy | Proxy-Konfiguration | echter Browser-/OIDC-Login offen |
+| M7.7 | Manuelle Locked-Restore-/Test-Gates und separates Lockfile-Bootstrap | scripts | abhängig von .NET-SDK, Node-/Paketnetzwerk und PostgreSQL |
+
+**Keine Freigabe:** .NET-Build, Angular-Build, echte PostgreSQL-/Keycloak-Tests und automatisches FGAP-Provisioning wurden mangels ausführbarer Umgebung nicht abgeschlossen. 32 Frontend-Logiktests und 251 Strukturprüfungen wurden lokal bestanden; diese beweisen keine Integrationsfähigkeit. CI bleibt absichtlich ausgeschaltet.

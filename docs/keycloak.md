@@ -61,3 +61,12 @@ Diese Matrix wurde hier **nicht** gegen eine laufende Keycloak-Instanz ausgefüh
 - [Server Administration / delegierte Administration](https://www.keycloak.org/docs/latest/server_admin/)
 - [Admin REST API](https://www.keycloak.org/docs-api/latest/rest-api/index.html)
 - [Authorization Services: separates erweitertes Modell](https://www.keycloak.org/docs/latest/authorization_services/)
+
+
+## Auditierte zentrale IAM-Aktivierung (nachgehärtet)
+
+Vor dem erstmaligen Wechsel von `AwaitingIam` nach `Active` muss ein `PlatformAdmin` **tatsächlich** folgende vier Punkte geprüft haben: FGAP-Isolation fremder Anwendungen, Rollen-Connector mit Minimalrechten, Assignment-/Directory-Zugriffe auf zulässige Zielkonten sowie ein Access Token mit korrekter Audience und Scope-Mappings.
+
+Die zentrale Administration bestätigt dies über `POST /api/v1/admin/applications/{id}/iam-approval` mit `expectedRevision`, den vier Prüfflags und `evidenceReference`. Das Portal speichert Prüfer, Zeitpunkt und betroffene Keycloak-Client-UUID/ID, protokolliert ein Audit und erzeugt einen Reconcile-Auftrag. Ohne passenden Nachweis verweigert der Worker die Aktivierung mit `iam_approval_required`. Änderung der Bindung beziehungsweise erneutes Zurückstellen nach `AwaitingIam` entwertet die Bestätigung.
+
+**Ein Häkchen ist kein automatischer FGAP-Nachweis.** Das Portal legt Keycloak-FGAP-Policies derzeit nicht selbst an. Die negative Zwei-Team-Testmatrix muss im echten Zielsystem ausgeführt werden. Der Angular-Dev-Proxy enthält jetzt auch `/signin-oidc` und `/signout-callback-oidc`; die Demo-Anmeldung ist weiterhin kein echter OIDC-Test.

@@ -159,13 +159,43 @@ public static class ApiEndpoints
                     throw new DomainException("invalid_client_uuid", "Use Keycloak internal UUIDs, not display client IDs.");
                 Policy.Text(input.ClientId, "Client ID", 2, 120);
                 tx.Application = tx.Application with { KeycloakClientUuid = input.ClientUuid, KeycloakClientId = input.ClientId,
-                    LoginClientUuid = input.LoginClientUuid, Status = ApplicationStatus.AwaitingIam, Revision = tx.Application.Revision + 1 };
+                    LoginClientUuid = input.LoginClientUuid, IamApproval = null,
+                    Status = ApplicationStatus.AwaitingIam, Revision = tx.Application.Revision + 1 };
                 var actor = Actor(user, options); var now = DateTimeOffset.UtcNow;
                 var command = new Change { Kind = ChangeKind.Reconcile, Reason = "Central IAM approved the client binding" };
                 var op = new Operation(Guid.NewGuid(), id, actor, command, tx.Application.Revision,
                     $"binding:{Guid.NewGuid()}", Wire.Hash(Wire.Serialize(command)), OperationStatus.Queued, now, now, 0);
                 await tx.SaveOperationAsync(op, ct);
                 await tx.AppendAuditAsync(actor, "binding.approved", input.ClientId, now, ct);
+                return tx.Application;
+            }, ct));
+        admin.MapPost("/applications/{id:guid}/iam-approval", async (Guid id, ConfirmIamApproval input,
+            ClaimsPrincipal user, IPortalStore store, CancellationToken ct) =>
+            await store.InApplicationAsync(id, async tx =>
+            {
+                if (tx.Application.Revision != input.ExpectedRevision)
+                    throw new DomainException("revision_conflict", "Reload before confirming IAM controls.", 412);
+                if (tx.Application.Status != ApplicationStatus.AwaitingIam
+                    || string.IsNullOrWhiteSpace(tx.Application.KeycloakClientUuid)
+                    || string.IsNullOrWhiteSpace(tx.Application.KeycloakClientId))
+                    throw new DomainException("invalid_state", "Only a bound, pending application can be approved.", 409);
+                if (!input.FgapVerified || !input.RolePermissionsVerified || !input.AssignmentPermissionsVerified
+                    || !input.TokenAudienceVerified)
+                    throw new DomainException("incomplete_iam_review", "All four IAM security checks must be completed.", 409);
+                Policy.Text(input.EvidenceReference, "IAM evidence reference", 6, 400);
+                var actor = Actor(user, options);
+                var now = DateTimeOffset.UtcNow;
+                tx.Application = tx.Application with
+                {
+                    IamApproval = new(actor.Key, now, tx.Application.KeycloakClientUuid, tx.Application.KeycloakClientId,
+                        input.EvidenceReference.Trim()),
+                    Revision = tx.Application.Revision + 1
+                };
+                var change = new Change { Kind = ChangeKind.Reconcile, Reason = "Central IAM attestation: verify binding" };
+                var operation = new Operation(Guid.NewGuid(), id, actor, change, tx.Application.Revision,
+                    $"iam-approval:{Guid.NewGuid()}", Wire.Hash(Wire.Serialize(change)), OperationStatus.Queued, now, now, 0);
+                await tx.SaveOperationAsync(operation, ct);
+                await tx.AppendAuditAsync(actor, "iam.approved", $"{tx.Application.KeycloakClientId}: {input.EvidenceReference.Trim()}", now, ct);
                 return tx.Application;
             }, ct));
         admin.MapPut("/applications/{id:guid}/policy", async (Guid id, UpdatePolicy input, ClaimsPrincipal user, IPortalStore store, CancellationToken ct) =>
@@ -190,7 +220,9 @@ public static class ApiEndpoints
                 if (input.ExpectedRevision != tx.Application.Revision) throw new DomainException("revision_conflict", "Reload before editing.", 412);
                 if (input.Status is not (ApplicationStatus.Suspended or ApplicationStatus.AwaitingIam))
                     throw new DomainException("invalid_state", "Only suspend or request re-verification here.");
-                tx.Application = tx.Application with { Status = input.Status, Revision = tx.Application.Revision + 1 };
+                tx.Application = tx.Application with { Status = input.Status,
+                    IamApproval = input.Status == ApplicationStatus.AwaitingIam ? null : tx.Application.IamApproval,
+                    Revision = tx.Application.Revision + 1 };
                 await tx.AppendAuditAsync(Actor(user, options), "application.state_changed", input.Status.ToString(), DateTimeOffset.UtcNow, ct);
                 return tx.Application;
             }, ct));
@@ -220,6 +252,9 @@ public static class ApiEndpoints
     public sealed record ReviewDecision(bool Retain);
     public sealed record SaveTeam(string Name, IReadOnlyList<TeamMember> Members, long ExpectedRevision);
     public sealed record Binding(string ClientUuid, string ClientId, string? LoginClientUuid, long ExpectedRevision);
+    public sealed record ConfirmIamApproval(long ExpectedRevision, bool FgapVerified,
+        bool RolePermissionsVerified, bool AssignmentPermissionsVerified, bool TokenAudienceVerified,
+        string EvidenceReference);
     public sealed record UpdatePolicy(AppPolicy Policy, long ExpectedRevision);
     public sealed record UpdateState(ApplicationStatus Status, long ExpectedRevision);
 }

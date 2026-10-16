@@ -29,3 +29,8 @@ Portal-PostgreSQL, Keycloak-Datenbank und BFF-Data-Protection-Schlüssel getrenn
 Nach Restore: Worker und Provisioner zunächst anhalten, Verzeichnis frisch synchronisieren, Soll-/Ist-Abgleich jeder App, offene/mehrdeutige Aufträge prüfen, abgelaufene Rechte entziehen, erst danach wieder Erweiterungen zulassen. Ein älterer Portal-Backupstand darf nicht automatisch alle alten Rollen neu vergeben. Dafür existiert noch kein vollautomatisiertes Disaster-Recovery-Orchestrierungswerkzeug.
 
 Hashketten und Append-only-Trigger schützen nicht gegen privilegierte DB-/Infrastruktur-Administratoren. Für belastbare unveränderliche Audit-Aufbewahrung externe Systeme und definierte Retention ergänzen. Protokolle können personenbezogene Kennungen und Begründungen enthalten; Zugriffe und Aufbewahrung organisatorisch begrenzen.
+
+
+## IAM-Freigabe und Entzugspriorität
+
+Ein neuer oder neu gebundener Client bleibt bis zur zentralen IAM-Prüfung gesperrt. FGAP, die Connector-Profile und die Token-Audience müssen außerhalb des Portals geprüft und mit einer Nachweisreferenz attestiert werden. Danach führt der Worker einen separaten Remote-Abgleich aus. Fehlgeschlagene Entzüge und nicht bestätigte Schreibvorgänge benötigen aktive Alarmierung und manuelle Klärung; automatische Entzugspriorisierung allein garantiert keine maximale Reaktionszeit.

@@ -25,3 +25,10 @@ Die API benutzt handgeschriebene typisierte Angular-Verträge; automatische Open
 Das Frontend verwendet Standalone Components, Signals, Lazy Routes und native Formulare mit Angular Forms. Es wurde nicht fälschlich eine ungenutzte Material-/NgRx-Abhängigkeit ergänzt. Sicherheitsentscheidungen treffen immer API/Worker, nie ein Route Guard.
 
 Es existiert absichtlich **keine CI**. Lokale Prüfskripte sind keine GitHub-Actions-Konfiguration.
+
+
+## OIDC im lokalen Development-Proxy
+
+Neben `/api` und `/bff` leitet `web/proxy.conf.json` die Callback-Routen `/signin-oidc` und `/signout-callback-oidc` an das ASP.NET-Backend weiter. Echte SSO-Tests setzen einen konfigurierten Keycloak-Realm, den vertraulichen Portal-Client, explizite Redirect-URIs und Client Secret voraus. Die Demoanmeldung ist dafür kein Ersatz.
+
+Die neuen manuellen Prüfskripte trennen ein einmaliges Lockfile-Bootstrap von reproduzierbaren Testläufen mit `npm ci` und `dotnet restore --locked-mode`. Lockfile-Integritäten dürfen nicht erfunden werden.

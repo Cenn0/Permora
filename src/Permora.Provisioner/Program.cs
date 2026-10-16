@@ -118,12 +118,14 @@ public sealed class ClientPreparer(HttpClient http, ProvisioningOptions options)
         var client = existing[0];
         if (client.ClientId != clientId || client.Attributes?.GetValueOrDefault("permora.application") != app.Id.ToString()
             || client.Enabled != false || client.FullScopeAllowed != false || client.ServiceAccountsEnabled != false
-            || client.DirectAccessGrantsEnabled != false || client.ImplicitFlowEnabled != false)
+            || client.DirectAccessGrantsEnabled != false || client.ImplicitFlowEnabled != false
+            || client.StandardFlowEnabled != false || client.Protocol != "openid-connect")
             throw new DomainException("provisioning_ownership_conflict", "Never adopt an existing foreign or already-enabled client.", 409);
         if (!Guid.TryParse(client.Id, out _)) throw new InvalidDataException("Invalid client UUID.");
         return new PreparedClient(client.Id, client.ClientId);
     }
     public sealed record PreparedClient(string Id, string ClientId);
     private sealed record ClientDocument(string Id, string ClientId, bool? Enabled, bool? FullScopeAllowed,
-        bool? ServiceAccountsEnabled, bool? DirectAccessGrantsEnabled, bool? ImplicitFlowEnabled, Dictionary<string, string>? Attributes);
+        bool? ServiceAccountsEnabled, bool? DirectAccessGrantsEnabled, bool? ImplicitFlowEnabled,
+        bool? StandardFlowEnabled, string? Protocol, Dictionary<string, string>? Attributes);
 }

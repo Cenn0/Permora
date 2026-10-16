@@ -34,16 +34,18 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
             ?? throw new DomainException("client_missing", "The configured Keycloak client does not exist.", 409);
         if (client.ClientId != app.KeycloakClientId || client.Attributes?.GetValueOrDefault(OwnerAttribute) != app.Id.ToString()
             || client.Enabled != true || client.Protocol != "openid-connect"
-            || client.FullScopeAllowed != false || client.ServiceAccountsEnabled == true
-            || client.DirectAccessGrantsEnabled == true || client.ImplicitFlowEnabled == true)
+            || client.FullScopeAllowed != false || client.ServiceAccountsEnabled != false
+            || client.DirectAccessGrantsEnabled != false || client.ImplicitFlowEnabled != false
+            || client.StandardFlowEnabled != false)
             throw new DomainException("unsafe_client", "Client identity, ownership or security configuration is invalid.", 409);
         if (app.LoginClientUuid is { } loginId)
         {
             var login = await GetAsync<Client>(app.RealmKey, "roles", $"clients/{E(loginId)}", ct)
                 ?? throw new DomainException("login_client_missing", "The login client does not exist.", 409);
             if (login.Attributes?.GetValueOrDefault(OwnerAttribute) != app.Id.ToString() || login.FullScopeAllowed != false
-                || login.Enabled != true || login.Protocol != "openid-connect" || login.ServiceAccountsEnabled == true
-                || login.DirectAccessGrantsEnabled == true || login.ImplicitFlowEnabled == true
+                || login.Enabled != true || login.Protocol != "openid-connect" || login.ServiceAccountsEnabled != false
+                || login.DirectAccessGrantsEnabled != false || login.ImplicitFlowEnabled != false
+                || login.StandardFlowEnabled != true
                 || login.Attributes?.GetValueOrDefault("pkce.code.challenge.method") != "S256")
                 throw new DomainException("unsafe_login_client", "The login client does not meet the application's security template.", 409);
         }
@@ -134,6 +136,13 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
         var role = await GetAsync<Role>(app.RealmKey, "roles", path, ct);
         if (role is null) return; // A previous attempt may already have completed remotely.
         VerifyRole(app, role, entity);
+        // Never delete a role that Keycloak still reports as assigned, including out-of-band grants.
+        // A local empty assignment catalog is NOT proof that no user or group is affected.
+        var users = await PagesAsync<User>(app.RealmKey, "assignments", path + "/users", ct);
+        var groups = await PagesAsync<Group>(app.RealmKey, "assignments", path + "/groups", ct);
+        if (users.Count > 0 || groups.Count > 0)
+            throw new DomainException("role_still_assigned",
+                "Keycloak reports role assignments outside the verified empty catalog; reconcile first.", 409);
         await SendAsync(app.RealmKey, "roles", HttpMethod.Delete, path, null, ct);
         if (await GetAsync<Role>(app.RealmKey, "roles", path, ct) is not null)
             throw new HttpRequestException("Role deletion was not confirmed.");
@@ -410,7 +419,7 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
     private sealed record Role(string? Id, string Name, string? Description, bool ClientRole, string? ContainerId,
         bool Composite, Dictionary<string, string[]>? Attributes);
     private sealed record Client(string Id, string ClientId, bool? Enabled, string? Protocol, bool? FullScopeAllowed, bool? ServiceAccountsEnabled,
-        bool? DirectAccessGrantsEnabled, bool? ImplicitFlowEnabled, Dictionary<string, string>? Attributes);
+        bool? DirectAccessGrantsEnabled, bool? ImplicitFlowEnabled, bool? StandardFlowEnabled, Dictionary<string, string>? Attributes);
     private sealed record User(string Id, string Username, string? FirstName, string? LastName, bool Enabled, string? ServiceAccountClientId);
     private sealed record Group(string Id, string Name);
 }

@@ -42,9 +42,33 @@ public sealed class ConnectorTests
         await fixture.Connector.ApplyAsync(f.App, f.App with { Roles = [f.Supervisor] }, new Change { Kind = ChangeKind.DeleteRole, TargetId = f.Reader.Id, Reason = "Delete" }, f.Directory, TestContext.Current.CancellationToken);
         Assert.DoesNotContain(fixture.Handler.Paths, p => p.Method == HttpMethod.Delete);
     }
+    [Fact] public async Task Deleting_a_role_with_out_of_band_mappings_is_denied()
+    {
+        var f = new Fixture(); var roleId = Guid.NewGuid().ToString();
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)) return SafeClient(f);
+            if (path.EndsWith("/role.reader/users", StringComparison.Ordinal))
+                return Json(new[] { new { id = "foreign-user", username = "foreign", enabled = true } });
+            if (path.EndsWith("/role.reader", StringComparison.Ordinal))
+                return Json(new { id = roleId, name = "role.reader", clientRole = true,
+                    containerId = f.App.KeycloakClientUuid, composite = false,
+                    attributes = new Dictionary<string, string[]> {
+                        ["permora.application"] = [f.App.Id.ToString()],
+                        ["permora.entity"] = [f.Reader.Id.ToString()] } });
+            return Json(Array.Empty<object>());
+        });
+        var change = new Change { Kind = ChangeKind.DeleteRole, TargetId = f.Reader.Id, Reason = "Retire role" };
+        var error = await Assert.ThrowsAsync<DomainException>(() => fixture.Connector.ApplyAsync(f.App,
+            f.App with { Roles = [f.Supervisor] }, change, f.Directory, TestContext.Current.CancellationToken));
+        Assert.Equal("role_still_assigned", error.Code);
+        Assert.DoesNotContain(fixture.Handler.Paths, p => p.Method == HttpMethod.Delete);
+    }
     [Fact] public void Stable_directory_identifiers_separate_realm_and_kind()
     { Assert.NotEqual(KeycloakConnector.StableId("one", "user", "123"), KeycloakConnector.StableId("two", "user", "123")); Assert.NotEqual(KeycloakConnector.StableId("one", "user", "123"), KeycloakConnector.StableId("one", "group", "123")); }
-    private static HttpResponseMessage SafeClient(Fixture f) => Json(new { id = f.App.KeycloakClientUuid, clientId = f.App.KeycloakClientId, protocol = "openid-connect", enabled = true, fullScopeAllowed = false, serviceAccountsEnabled = false, implicitFlowEnabled = false, directAccessGrantsEnabled = false, attributes = new Dictionary<string,string> { ["permora.application"] = f.App.Id.ToString() } });
+    private static HttpResponseMessage SafeClient(Fixture f) => Json(new { id = f.App.KeycloakClientUuid, clientId = f.App.KeycloakClientId, protocol = "openid-connect", enabled = true, fullScopeAllowed = false, serviceAccountsEnabled = false, implicitFlowEnabled = false,
+        directAccessGrantsEnabled = false, standardFlowEnabled = false, attributes = new Dictionary<string,string> { ["permora.application"] = f.App.Id.ToString() } });
     private static HttpResponseMessage Json(object value) => new(HttpStatusCode.OK) { Content = JsonContent.Create(value) };
     private sealed class ConnectorFixture : IDisposable
     {

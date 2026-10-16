@@ -46,9 +46,15 @@ public sealed class OperationProcessor(IPortalStore store, IAccessConnector conn
                 }
                 using var connectorBudget = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 connectorBudget.CancelAfter(TimeSpan.FromSeconds(40));
-                externalStarted = true;
                 if (operation.Change.Kind == ChangeKind.Reconcile)
                 {
+                    if (tx.Application.Status == ApplicationStatus.AwaitingIam
+                        && (tx.Application.IamApproval is not { } approval
+                            || approval.ClientUuid != tx.Application.KeycloakClientUuid
+                            || approval.ClientId != tx.Application.KeycloakClientId))
+                        throw new DomainException("iam_approval_required",
+                            "Central IAM must attest FGAP, credentials and token audience before activation.", 409);
+                    externalStarted = true;
                     var findings = await connector.InspectAsync(tx.Application, directory, connectorBudget.Token);
                     if (tx.Application.Status == ApplicationStatus.AwaitingIam && findings.Count == 0)
                         tx.Application = plan.Next with { Status = ApplicationStatus.Active };
@@ -63,6 +69,7 @@ public sealed class OperationProcessor(IPortalStore store, IAccessConnector conn
                 }
                 else
                 {
+                    externalStarted = true;
                     await connector.ApplyAsync(tx.Application, plan.Next, operation.Change, directory, connectorBudget.Token);
                     tx.Application = plan.Next;
                 }

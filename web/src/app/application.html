@@ -35,9 +35,21 @@
  @if(nextSequence()!==null){<button [disabled]="busy()" (click)="moreAudit()">Weitere Ereignisse laden</button>}
 }
 @case('settings'){
- <h2>Keycloak-Anbindung</h2><dl class="details"><dt>Realm</dt><dd>{{d.application.realmKey}}</dd><dt>Client</dt><dd>{{d.application.keycloakClientId||'Noch nicht angebunden'}}</dd><dt>Interne Client-UUID</dt><dd><code>{{d.application.keycloakClientUuid||'—'}}</code></dd><dt>Maximale Zugriffsdauer</dt><dd>{{d.application.policy.maxGrantDays}} Tage</dd><dt>Vier-Augen-Prinzip</dt><dd>{{d.application.policy.requireApproval?'Für Änderungen aktiviert':'Risikobasiert'}}</dd><dt>Versionsstand</dt><dd>{{d.application.revision}}</dd></dl>
+ <h2>Keycloak-Anbindung</h2><dl class="details"><dt>Realm</dt><dd>{{d.application.realmKey}}</dd><dt>Client</dt><dd>{{d.application.keycloakClientId||'Noch nicht angebunden'}}</dd><dt>Interne Client-UUID</dt><dd><code>{{d.application.keycloakClientUuid||'—'}}</code></dd><dt>Maximale Zugriffsdauer</dt><dd>{{d.application.policy.maxGrantDays}} Tage</dd><dt>Vier-Augen-Prinzip</dt><dd>{{d.application.policy.requireApproval?'Für Änderungen aktiviert':'Risikobasiert'}}</dd><dt>IAM-Freigabe</dt><dd>@if(d.application.iamApproval;as approval){<span class="badge good">Dokumentiert am {{approval.approvedAt|date:'dd.MM.yyyy HH:mm'}}</span><small>Nachweis: {{approval.evidenceReference}}</small>}@else{<span class="badge warning">Nicht attestiert</span>}</dd><dt>Versionsstand</dt><dd>{{d.application.revision}}</dd></dl>
  @if(define()){<button (click)="reconcile()" [disabled]="busy()||!d.application.keycloakClientUuid"><p-icon name="refresh" /> Soll-Ist-Abgleich anfordern</button>}
- @if(api.session()?.administrator){<div class="divider"></div><h3>Freigabe durch zentrale IAM-Verwaltung</h3><p class="muted small">Die Clients müssen zuvor nach dem IAM-Runbook abgesichert und mit der Permora-Anwendungs-ID markiert werden. Hier werden keine beliebigen Keycloak-Einstellungen weitergereicht.</p><form class="form-panel" (ngSubmit)="binding()"><label>Ressourcen-Client-UUID<input name="clientUuid" [(ngModel)]="clientUuid" required /></label><label>Ressourcen-Client-ID<input name="clientId" [(ngModel)]="clientId" required /></label><label>Optional: Login-Client-UUID<input name="loginClientUuid" [(ngModel)]="loginClientUuid" /></label><button class="primary" type="submit" [disabled]="busy()">Anbindung prüfen lassen</button></form>}
+ @if(api.session()?.administrator){<div class="divider"></div><h3>Freigabe durch zentrale IAM-Verwaltung</h3><p class="muted small">Die Clients müssen zuvor nach dem IAM-Runbook abgesichert und mit der Permora-Anwendungs-ID markiert werden. Hier werden keine beliebigen Keycloak-Einstellungen weitergereicht.</p><form class="form-panel" (ngSubmit)="binding()"><label>Ressourcen-Client-UUID<input name="clientUuid" [(ngModel)]="clientUuid" required /></label><label>Ressourcen-Client-ID<input name="clientId" [(ngModel)]="clientId" required /></label><label>Optional: Login-Client-UUID<input name="loginClientUuid" [(ngModel)]="loginClientUuid" /></label><button class="primary" type="submit" [disabled]="busy()">Anbindung prüfen lassen</button></form>
+@if(d.application.status==='AwaitingIam' && d.application.keycloakClientUuid){
+ <div class="divider"></div><h3>Zentrale IAM-Sicherheitsfreigabe</h3><p class="muted small">Diese Bestätigung ersetzt keinen Keycloak-Test: Ein IAM-Administrator muss die vier Kontrollen tatsächlich geprüft und ihren Nachweis hinterlegt haben. Erst danach kann der Worker den Client aktivieren.</p>
+ <form class="form-panel" (ngSubmit)="approveIam()">
+  <label class="checkbox"><input type="checkbox" name="iamFgap" [(ngModel)]="iamFgap" required /><span>FGAP v2 und Sperre fremder Anwendungen nachgewiesen</span></label>
+  <label class="checkbox"><input type="checkbox" name="iamRole" [(ngModel)]="iamRoleProfile" required /><span>Rollen-Connector auf zulässige Keycloak-Operationen geprüft</span></label>
+  <label class="checkbox"><input type="checkbox" name="iamAssignment" [(ngModel)]="iamAssignmentProfile" required /><span>Zielbenutzer- und Gruppenzugriffe mit Minimalrechten geprüft</span></label>
+  <label class="checkbox"><input type="checkbox" name="iamAudience" [(ngModel)]="iamAudience" required /><span>Testtoken mit erwarteter Audience und Scope-Mappings verifiziert</span></label>
+  <label>Nachweisreferenz<input name="iamEvidence" [(ngModel)]="iamEvidence" required minlength="6" maxlength="400" placeholder="IAM-Ticket / internes Testprotokoll" /></label>
+  <button class="primary" type="submit" [disabled]="busy()||!iamFgap||!iamRoleProfile||!iamAssignmentProfile||!iamAudience||iamEvidence.length<6">Sicherheitsfreigabe dokumentieren</button>
+ </form>
+ }
+}
 }
 }
 </section>
