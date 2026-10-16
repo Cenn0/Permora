@@ -33,8 +33,15 @@ public sealed class PortalWorker(IServiceProvider services, KeycloakOptions opti
                             foreach (var app in (await store.ApplicationsAsync([], true, budget.Token)).Where(a => a.RealmKey == realm))
                                 await store.InApplicationAsync(app.Id, async tx =>
                                 {
+                                    var now = DateTimeOffset.UtcNow;
                                     foreach (var assignment in tx.Application.Assignments.Where(a => disabled.Contains(a.PrincipalId)))
-                                        await ChangeService.QueueRevocationAsync(tx, assignment.Id, "Identity explicitly disabled in the source", DateTimeOffset.UtcNow, budget.Token);
+                                        await ChangeService.QueueRevocationAsync(tx, assignment.Id, "Identity explicitly disabled in the source", now, budget.Token);
+                                    // External Keycloak/LDAP group membership can change after an
+                                    // approval. Revoke affected group grants, not unrelated direct
+                                    // individual assignments, when current complete membership
+                                    // makes a newly conflicting SoD pair effective.
+                                    foreach (var assignmentId in DirectoryGovernance.GroupRevocationsForSeparation(tx.Application, snapshot))
+                                        await ChangeService.QueueRevocationAsync(tx, assignmentId, "External group membership violates separation of duties", now, budget.Token);
                                     return true;
                                 }, budget.Token);
                         }

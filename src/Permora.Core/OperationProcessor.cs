@@ -66,6 +66,18 @@ public sealed class OperationProcessor(IPortalStore store, IAccessConnector conn
                         }
                     foreach (var finding in findings)
                         await tx.AppendAuditAsync(operation.RequestedBy, "drift.detected", Wire.Serialize(finding), now, ct);
+                    if (findings.Count > 0)
+                    {
+                        // A successful HTTP read with detected drift must never be displayed as
+                        // an "Applied" reconciliation or mistaken for an effective permission.
+                        await tx.SaveOperationAsync(operation with
+                        {
+                            Status = OperationStatus.Conflict,
+                            Attempts = operation.Attempts + 1,
+                            ErrorCode = "drift_detected"
+                        }, ct);
+                        return true;
+                    }
                 }
                 else
                 {
