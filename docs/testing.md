@@ -1,5 +1,7 @@
 # Teststrategie und Ausführung
 
+**Container-Test:** Die CI baut das tatsächliche Multi-Stage-Image (`deploy/Dockerfile`) ausschließlich aus gesperrten NuGet-/npm-Abhängigkeiten und prüft, dass die API-DLL, die Angular-Startseite und ein Nicht-Root-Runtime-User vorhanden sind. Das ist keine Docker-/Kubernetes-Betriebsabnahme.
+
 ## Reproduzierbarkeit ab diesem Stand
 
 Die tatsächlich aufgelösten NuGet- und npm-Lockfiles sind eingecheckt. In der Standard-CI laufen `dotnet restore Permora.slnx --locked-mode` und `npm ci`. Fehlende, inkonsistente oder nicht zur Manifestversion passende Locks brechen ab. Der zuvor rote Diagnoselauf bleibt als historischer Nachweis erhalten, und der neue Lockfile-Stand muss noch gegen vollständige Release-Builds geprüft werden.

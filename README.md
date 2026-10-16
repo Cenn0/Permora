@@ -12,6 +12,8 @@
 
 > **Dependency-Locks jetzt vorhanden:** Die erstmals auf einem isolierten GitHub-Runner tatsächlich aufgelösten npm- und NuGet-Lockfiles sind in diesem Branch eingecheckt. Der reguläre CI-Workflow verwendet ausschließlich `npm ci` und `dotnet restore --locked-mode`. Ein **erneuter vollständiger CI-Durchlauf** auf dem neuen Stand muss noch erfolgreich abgeschlossen werden, bevor die Gesamt-CI als grün gilt. Der nur für die Erstübernahme verwendete Workflow mit Schreibrechten wurde entfernt. Keine Produktionsfreigabe oder automatische Veröffentlichung.
 
+**Zusätzlicher CI-Gate:** Die CI baut das finale Angular-/ASP.NET-Docker-Image mit gesperrten Abhängigkeiten, überprüft die enthaltenen Dateien und den Nicht-Root-Benutzer, ohne Images zu veröffentlichen. Ein abschließender Sammel-Gate schlägt bei jedem fehlgeschlagenen, abgebrochenen oder übersprungenen Pflichtjob fehl.
+
 ## Was enthalten ist
 
 - Teambezogener Anwendungskatalog, kontrollierte Registrierung, explizite Owner/Maintainer/AccessManager/Approver/Auditor-Mandate.

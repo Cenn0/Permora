@@ -157,6 +157,23 @@ jobs:
         if: always()
         run: docker rm -f permora-keycloak-ci 2>/dev/null || true
 
+  container:
+    name: Docker production image (build only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build actual frontend and backend in the locked Docker image
+        run: docker build --pull -f deploy/Dockerfile --build-arg PROJECT=Permora.Api -t permora-ci:local .
+      - name: Verify frontend/backend packaging and non-root runtime user
+        shell: bash
+        run: |
+          docker run --rm --entrypoint /bin/sh permora-ci:local -ec 'test -f /app/Permora.Api.dll && test -f /app/wwwroot/index.html'
+          image_user="$(docker image inspect --format '{{.Config.User}}' permora-ci:local)"
+          test -n "$image_user" && test "$image_user" != "root" && test "$image_user" != "0"
+
   dependency-locks:
     name: Release gate - committed NuGet and npm lockfiles
     runs-on: ubuntu-24.04
@@ -171,7 +188,7 @@ jobs:
   scope-summary:
     name: Explicit CI coverage boundaries
     if: always()
-    needs: [structure, dotnet, angular, keycloak, dependency-locks]
+    needs: [structure, dotnet, angular, keycloak, container, dependency-locks]
     runs-on: ubuntu-24.04
     permissions: {}
     steps:
@@ -181,6 +198,7 @@ jobs:
           DOTNET_RESULT: ${{ needs.dotnet.result }}
           ANGULAR_RESULT: ${{ needs.angular.result }}
           KEYCLOAK_RESULT: ${{ needs.keycloak.result }}
+          CONTAINER_RESULT: ${{ needs.container.result }}
           LOCKS_RESULT: ${{ needs.dependency-locks.result }}
         run: |
           {
@@ -192,6 +210,7 @@ jobs:
             echo "| C# build, xUnit, PostgreSQL | $DOTNET_RESULT |"
             echo "| Angular build and Playwright | $ANGULAR_RESULT |"
             echo "| Keycloak roles and OIDC token scope | $KEYCLOAK_RESULT |"
+            echo "| Docker production image (no registry push) | $CONTAINER_RESULT |"
             echo "| Committed, reproducible dependency locks | $LOCKS_RESULT |"
             echo
             echo "**Not covered by a green workflow:** full delegated FGAP user/group mapping,"
@@ -200,3 +219,9 @@ jobs:
             echo "load/HA/restore/penetration testing, and production deployment."
             echo "No production secrets, deployments, or publishing are used."
           } >> "$GITHUB_STEP_SUMMARY"
+          for result in "$STRUCTURE_RESULT" "$DOTNET_RESULT" "$ANGULAR_RESULT" "$KEYCLOAK_RESULT" "$CONTAINER_RESULT" "$LOCKS_RESULT"; do
+            if [[ "$result" != "success" ]]; then
+              echo "::error::A mandatory Permora CI job failed, was cancelled, or was skipped. See the per-job results above."
+              exit 1
+            fi
+          done

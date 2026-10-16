@@ -69,7 +69,7 @@ check(workflow.exists(), 'CI workflow must exist')
 if workflow.exists():
     ci = workflow.read_text(encoding='utf-8')
     for marker in ('pull_request:', 'push:', 'workflow_dispatch:', 'contents: read',
-                   'structure:', 'dotnet:', 'angular:', 'keycloak:',
+                   'structure:', 'dotnet:', 'angular:', 'keycloak:', 'container:',
                    'dependency-locks:', 'scope-summary:', 'PERMORA_TEST_POSTGRES:'):
         check(marker in ci, 'Missing CI verification contract: ' + marker)
     check('pull_request_target:' not in ci and 'permissions: write' not in ci,
