@@ -13,7 +13,7 @@ def check(condition, description):
 files = [p for p in root.rglob('*') if p.is_file() and not any(part in {'.git','node_modules','bin','obj','.angular','.local','test-results','playwright-report'} for part in p.relative_to(root).parts) and p.name not in {'local.json','local.env'}]
 for f in files:
     rel = f.relative_to(root).as_posix()
-    check(not rel.startswith('.github/workflows/') and f.name not in {'.gitlab-ci.yml','azure-pipelines.yml','Jenkinsfile'}, 'CI file forbidden: '+rel)
+    check(f.name not in {'.gitlab-ci.yml','azure-pipelines.yml','Jenkinsfile'}, 'Unexpected secondary CI system: '+rel)
     if f.suffix == '.json':
         try: json.loads(f.read_text())
         except (ValueError, UnicodeError) as e: failures.append(rel+': invalid JSON: '+str(e))
@@ -64,6 +64,18 @@ check('role_still_assigned' in (root/'src/Permora.Infrastructure/KeycloakConnect
 check('prior.created_at' in (root/'src/Permora.Infrastructure/PostgresStore.cs').read_text(), 'Ordered mutation queue gate missing')
 check('/signin-oidc' in (root/'web/proxy.conf.json').read_text(), 'Development OIDC callback proxy missing')
 check('--locked-mode' in (root/'scripts/check.sh').read_text(), 'Locked manual restore missing')
-check(not (root/'.github/workflows').exists(),'CI workflow directory must not exist')
+workflow = root/'.github/workflows/ci.yml'
+check(workflow.exists(), 'CI workflow must exist')
+if workflow.exists():
+    ci = workflow.read_text(encoding='utf-8')
+    for marker in ('pull_request:', 'push:', 'workflow_dispatch:', 'contents: read',
+                   'structure:', 'dotnet:', 'angular:', 'keycloak:',
+                   'dependency-locks:', 'scope-summary:', 'PERMORA_TEST_POSTGRES:'):
+        check(marker in ci, 'Missing CI verification contract: ' + marker)
+    check('pull_request_target:' not in ci and 'permissions: write' not in ci,
+          'Unsafe privileged CI trigger or permissions')
+check((root/'scripts/ci-keycloak-contract.py').is_file(), 'Missing live Keycloak contract')
+check((root/'scripts/ci-verify-trx.py').is_file(), 'Missing TRX evidence checker')
+check((root/'scripts/ci-require-locks.py').is_file(), 'Missing dependency lock gate')
 print(json.dumps({'kind':'structural-only','checks':checks,'failed':len(failures),'failures':failures},indent=2))
 sys.exit(1 if failures else 0)

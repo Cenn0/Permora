@@ -32,7 +32,7 @@ Aus dem initialen Lizenz-Repository wurde eine zusammenhängende erste Implement
 ## Tatsächlich ausgeführte Prüfungen
 
 - **32 Node-Tests der puren TypeScript-Frontend-Logik: bestanden.** TAP unter [evidence/frontend-logic.tap](evidence/frontend-logic.tap).
-- Strukturprüfung: JSON/XML, Projektverweise, interne Dokumentlinks, Original-Lizenzhash und keine CI-Dateien. Ergebnis unter [evidence/repository-checks.json](evidence/repository-checks.json).
+- Strukturprüfung zum damaligen Stand: JSON/XML, Projektverweise, interne Dokumentlinks, Original-Lizenzhash und noch keine CI-Dateien. Ergebnis unter [evidence/repository-checks.json](evidence/repository-checks.json).
 - TypeScript-Syntaxtranspilation und isolierte Typprüfung von Models/View-Model mit dem vorhandenen TypeScript 5.8.3. Das ist **kein Angular-22-/Template-Build**. Siehe [evidence/typescript-checks.txt](evidence/typescript-checks.txt).
 
 ## Nicht ausgeführt / nicht nachgewiesen
@@ -48,7 +48,7 @@ Keine echten Lockfiles/SBOMs konnten aus einem Restore gewonnen werden. Die enth
 3. Shared Realm-Profile sind keine unabhängige per-App-Containment-Garantie bei kompromittiertem Worker.
 4. Cross-Issuer-Personenkorrelation, kontinuierliche externe Gruppen-SoD, Step-up-Gate, vollständige IGA/ABAC-Connectoren und externe unveränderliche Audit-Ablage sind offen.
 5. Last-/HA-/Fairness-/Recovery-Abnahme, Datenschutz-Retention und unabhängiger Pentest fehlen.
-6. Das ursprüngliche Repository bleibt privat; Veröffentlichung, History-Bereinigung und CI wurden nicht durchgeführt.
+6. Das ursprüngliche Repository bleibt privat; Veröffentlichung und History-Bereinigung wurden nicht durchgeführt; CI wurde erst in einem späteren Durchlauf hinzugefügt.
 
 **Nächster fachlich notwendiger Schritt ist die vollständige Build-/Integrationsabnahme, nicht die Behauptung einer fertigen Enterprise-Plattform.** Die [Roadmap](roadmap.md) enthält jede verbleibende Anforderung und ihr Abnahmekriterium.
 
@@ -58,3 +58,7 @@ Keine echten Lockfiles/SBOMs konnten aus einem Restore gewonnen werden. Die enth
 Im Quellcode zusätzlich korrigiert: Aktivierung vor zentraler, auditierter IAM-Freigabe; ein älterer Entzug im Retry-Backoff blockiert keine fälligen weiteren automatischen Entzüge; Rollen mit tatsächlich vorhandenen Keycloak-Zuweisungen können nicht blind gelöscht werden; fehlende Keycloak-Flow-Angaben gelten nicht mehr als sichere Konfiguration; OIDC-Callback-Routen werden im lokalen Angular-Proxy weitergeleitet. Passende C#-Regressionstestquellen sind ergänzt.
 
 **Ausgeführte Tests:** 32/32 isolierte Node-Tests erfolgreich, 243/251 statische Strukturprüfungen erfolgreich, isolierte TypeScript-Typprüfung von Models/View-Model erfolgreich. **Nicht ausgeführt:** .NET-Build, xUnit, PostgreSQL, Angular-Template-Build, Playwright, echtes Keycloak/FGAP, Integration und Security-/Recovery-Abnahme. Keine erfundenen Lockdateien, Testergebnisse oder Sicherheitszusagen. Vor einem Pilot müssen die vorhandenen Testquellen erst mit echten SDKs und Diensten ausgeführt und Fehler korrigiert werden.
+
+## CI-Konfiguration (nachträglicher Änderungsstand)
+
+Die Workflows und Testhilfen sind neu im Repository. Siehe [CI-Testmatrix](ci.md). Ein GitHub-Workflow, der vorhandene Testquellen ausführt, ist **noch kein bestandenes Testergebnis**. Die historische Teiltestevidenz oben bleibt als damaliger Stand erhalten. Insbesondere FGAP-Minimalrechte und vollständige Produkt-/Betriebssicherheit werden nicht durch Admin-API-Smoke-Tests belegt.

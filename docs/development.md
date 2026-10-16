@@ -24,7 +24,7 @@ Die API benutzt handgeschriebene typisierte Angular-Verträge; automatische Open
 
 Das Frontend verwendet Standalone Components, Signals, Lazy Routes und native Formulare mit Angular Forms. Es wurde nicht fälschlich eine ungenutzte Material-/NgRx-Abhängigkeit ergänzt. Sicherheitsentscheidungen treffen immer API/Worker, nie ein Route Guard.
 
-Es existiert absichtlich **keine CI**. Lokale Prüfskripte sind keine GitHub-Actions-Konfiguration.
+Die GitHub-Actions-CI befindet sich unter `.github/workflows/ci.yml`; der manuelle Ablauf bleibt unter `scripts/check.sh`. Bis Lockfiles eingecheckt sind und Builds tatsächlich grün laufen, besteht keine Release-Abnahme.
 
 
 ## OIDC im lokalen Development-Proxy

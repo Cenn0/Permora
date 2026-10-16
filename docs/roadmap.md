@@ -9,7 +9,7 @@ Stand: 16. Oktober 2026. Ausgangspunkt war ein Repository mit ausschließlich Ap
 | M0.1 | C#-/Angular-Struktur, getrennte Prozesse | S | `src/`, `web/`, `Permora.slnx` | vollständiger Restore und Release-Build |
 | M0.2 | Logo und ausgewählte Designvariante 3 | S | `web/public/brand/`, Dashboard/CSS | Angular-Build, Desktop/Mobile-Vergleich, Accessibility |
 | M0.3 | README, Architektur, Betrieb, Tests | S | `README.md`, `docs/` | Anleitung auf frischer Maschine erfolgreich |
-| M0.4 | Keine CI | T | strukturelle Repository-Prüfung | keine Workflow-/Pipeline-Dateien |
+| M0.4 | GitHub Actions für Builds, Tests und Integration | S | `.github/workflows/ci.yml` | Ausgeführte Runs und auswertbare Artefakte, echte FGAP-Grenzen gesondert |
 | M1.1 | Teams, eindeutige Ownership, Verwaltungsrollen | S | Policy, ApiEndpoints, Store | zwei Teams können gegenseitig weder lesen noch schreiben |
 | M1.2 | Registrierung nur durch tatsächliche Team-Owner | S | API + Transaktionsprüfung | konkurrierender Mandatsentzug vor Erstellung blockiert |
 | M1.3 | Serverautorisierung jeder App-Ressource | S | `Policy.RequireVisible`, App-Transaktionen | IDOR/API-Negativtests gegen echten Server |
@@ -60,7 +60,7 @@ Stand: 16. Oktober 2026. Ausgangspunkt war ein Repository mit ausschließlich Ap
 
 ## Release-Definition
 
-Ein Release ist erst abgenommen, wenn Quelle, Build, Integration, Sicherheitsgrenzen, Abhängigkeiten und Betriebsanleitung zusammen nachgewiesen sind. **Diesen Zustand erreicht der vorliegende Stand noch nicht.** Eine CI-Pipeline ist dabei ausdrücklich nicht Teil dieses Arbeitsauftrags; alle vorbereiteten Prüfungen sind lokal/manual ausführbar.
+Ein Release ist erst abgenommen, wenn Quelle, Build, Integration, Sicherheitsgrenzen, Abhängigkeiten und Betriebsanleitung zusammen nachgewiesen sind. **Diesen Zustand erreicht der vorliegende Stand noch nicht.** Die GitHub-Actions-CI wurde auf späteren ausdrücklichen Wunsch ergänzt. Ihre Ergebnisse ersetzen weder das FGAP-Minimalrechte-Audit noch die produktive Betriebsabnahme.
 
 
 ## Nachtrag: Integrations- und Sicherheitshärtung (16.10.2026)
@@ -74,3 +74,9 @@ Ein Release ist erst abgenommen, wenn Quelle, Build, Integration, Sicherheitsgre
 | M7.7 | Manuelle Locked-Restore-/Test-Gates und separates Lockfile-Bootstrap | scripts | abhängig von .NET-SDK, Node-/Paketnetzwerk und PostgreSQL |
 
 **Keine Freigabe:** .NET-Build, Angular-Build, echte PostgreSQL-/Keycloak-Tests und automatisches FGAP-Provisioning wurden mangels ausführbarer Umgebung nicht abgeschlossen. 32 Frontend-Logiktests und 251 Strukturprüfungen wurden lokal bestanden; diese beweisen keine Integrationsfähigkeit. CI bleibt absichtlich ausgeschaltet.
+
+## CI-Erweiterung (16. Oktober 2026)
+
+Die zuvor offene CI-Einrichtung ist nun als **Quellcode** vorhanden. Geplante Prüfpunkte: vollständiger .NET-Build/xUnit + echte PostgreSQL-Testinstanz, Angular-Release-Build/Node-Unit-Tests/Playwright auf Desktop und Mobil, Keycloak 26.8.1 Client-Rollen-/Composite-/Mapping-/OIDC-Token-Vertrag, verpflichtende Lockfile-Gates und getrennte Testartefakte. Siehe [CI-Handbuch](ci.md).
+
+Die Tests sind nach dem ersten GitHub-Run auszuwerten; bereits vorhandene Evidenz aus einem früheren Teiltest darf nicht zu einem bestandenen vollständigen CI-Lauf umetikettiert werden. FGAP-v2-Delegation mit minimalen Keycloak-Privilegien, echtes Portal-SSO/MFA, externe Directory-Gruppenänderungen, Last/HA/Recovery und Penetrationstests bleiben **nicht automatisiert abgenommen**.

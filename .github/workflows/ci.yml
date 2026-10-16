@@ -1,0 +1,206 @@
+name: Permora CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: permora-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  structure:
+    name: Structure and frontend logic
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Validate repository and CI contract
+        run: python3 scripts/check-repository.py
+      - name: Check shell and Python syntax
+        run: |
+          bash -n scripts/check.sh scripts/bootstrap-locks.sh
+          python3 -m compileall -q scripts
+      - name: Execute standalone TypeScript tests
+        working-directory: web
+        run: npm run test:logic
+
+  dotnet:
+    name: .NET build, xUnit and PostgreSQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: permora_ci
+          POSTGRES_PASSWORD: permora_ci_isolated
+          POSTGRES_DB: permora_test_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U permora_ci -d permora_test_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      PERMORA_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=permora_test_ci;Username=permora_ci;Password=permora_ci_isolated
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Restore and materialize dependency locks
+        run: dotnet restore Permora.slnx --use-lock-file --verbosity minimal
+      - name: Build all .NET projects (warnings are errors)
+        run: dotnet build Permora.slnx -c Release --no-restore
+      - name: xUnit including real PostgreSQL integration
+        run: dotnet test tests/Permora.Tests/Permora.Tests.csproj -c Release --no-build --logger "trx;LogFileName=permora.trx"
+      - name: Check that PostgreSQL integration was not silently skipped
+        if: success()
+        run: python3 scripts/ci-verify-trx.py tests/Permora.Tests/TestResults
+      - name: Upload TRX and generated NuGet lockfiles
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dotnet-test-and-dependencies
+          path: |
+            tests/Permora.Tests/TestResults/**/*.trx
+            **/packages.lock.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  angular:
+    name: Angular 22, frontend logic and Playwright
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install from a lockfile (bootstrap a diagnostic one if missing)
+        working-directory: web
+        run: |
+          if [[ ! -f package-lock.json ]]; then
+            echo "::warning::web/package-lock.json is not yet committed. CI-generated dependencies are diagnostic only."
+            npm install --package-lock-only --ignore-scripts
+          fi
+          npm ci
+      - name: Unit tests without a browser
+        working-directory: web
+        run: npm run test:logic
+      - name: Compile production Angular templates
+        working-directory: web
+        run: npm run build
+      - name: Install Chromium and OS dependencies
+        working-directory: web
+        run: npx playwright install chromium --with-deps
+      - name: Desktop and mobile Playwright
+        working-directory: web
+        run: npm run test:e2e
+        env:
+          CI: 'true'
+      - name: Audit production npm dependencies
+        working-directory: web
+        run: npm audit --omit=dev --audit-level=high
+      - name: Upload browser traces and generated npm lock
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: angular-browser-and-dependencies
+          path: |
+            web/playwright-report/
+            web/test-results/
+            web/package-lock.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  keycloak:
+    name: Keycloak 26.8.1 roles, assignments and token contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PERMORA_TEST_KC_URL: http://127.0.0.1:18080
+      PERMORA_TEST_KC_USERNAME: ci-admin
+      PERMORA_TEST_KC_PASSWORD: permora-ci-ephemeral-only
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Launch isolated Keycloak without external credentials
+        run: |
+          docker run --detach --rm --name permora-keycloak-ci \
+            -p 127.0.0.1:18080:8080 \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME="$PERMORA_TEST_KC_USERNAME" \
+            -e KC_BOOTSTRAP_ADMIN_PASSWORD="$PERMORA_TEST_KC_PASSWORD" \
+            quay.io/keycloak/keycloak:26.8.1 start-dev
+      - name: Verify live Keycloak Admin REST and OIDC semantics
+        run: python3 scripts/ci-keycloak-contract.py
+      - name: Collect isolated Keycloak diagnostic logs
+        if: failure()
+        run: docker logs --tail 150 permora-keycloak-ci 2>&1 | sed -E 's/(access_token|refresh_token|client_secret)[^[:space:]]*/[REDACTED]/g' || true
+      - name: Stop isolated test server
+        if: always()
+        run: docker rm -f permora-keycloak-ci 2>/dev/null || true
+
+  dependency-locks:
+    name: Release gate - committed NuGet and npm lockfiles
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Require reproducible committed dependency locks
+        run: python3 scripts/ci-require-locks.py
+
+  scope-summary:
+    name: Explicit CI coverage boundaries
+    if: always()
+    needs: [structure, dotnet, angular, keycloak, dependency-locks]
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Explain covered and uncovered verification
+        env:
+          STRUCTURE_RESULT: ${{ needs.structure.result }}
+          DOTNET_RESULT: ${{ needs.dotnet.result }}
+          ANGULAR_RESULT: ${{ needs.angular.result }}
+          KEYCLOAK_RESULT: ${{ needs.keycloak.result }}
+          LOCKS_RESULT: ${{ needs.dependency-locks.result }}
+        run: |
+          {
+            echo "## Permora CI verification"
+            echo
+            echo "| Gate | Result |"
+            echo "|---|---|"
+            echo "| Repository and isolated TypeScript | $STRUCTURE_RESULT |"
+            echo "| C# build, xUnit, PostgreSQL | $DOTNET_RESULT |"
+            echo "| Angular build and Playwright | $ANGULAR_RESULT |"
+            echo "| Keycloak roles and OIDC token scope | $KEYCLOAK_RESULT |"
+            echo "| Committed, reproducible dependency locks | $LOCKS_RESULT |"
+            echo
+            echo "**Not covered by a green workflow:** FGAP v2 least-privilege"
+            echo "isolation between delegated service accounts, full OIDC BFF login/MFA,"
+            echo "external directory/HR writeback, SoD drift under changing external groups,"
+            echo "load/HA/restore/penetration testing, and production deployment."
+            echo "No production secrets, deployments, or publishing are used."
+          } >> "$GITHUB_STEP_SUMMARY"

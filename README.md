@@ -8,7 +8,7 @@
 
 > **Nachgehärtet, noch nicht abgenommen:** Eine zentrale IAM-Attestierung mit Nachweis ist nun zwingende Voraussetzung vor der ersten Anwendung-Aktivierung. Dringende automatische Entzüge überholen verzögerte andere automatische Entzüge. Nicht vom Portal verwaltete Keycloak-Zuweisungen verhindern eine Rollenlöschung. Die dazugehörigen C#-Testquellen sind noch **nicht ausgeführt**.
 
-**Manuelle Lockfile-Erstellung:** `bash scripts/bootstrap-locks.sh` in einer netzwerkfähigen .NET-10-/Node-Umgebung ausführen, erzeugte `packages.lock.json` und `web/package-lock.json` auflösen, prüfen und einchecken. Danach verlangt `bash scripts/check.sh` einen gesperrten Restore und eine isolierte `PERMORA_TEST_POSTGRES`-Datenbank. `--lightweight` bleibt ohne Backend-/Angular-/Keycloak-Abnahme nutzbar. **Keine CI eingerichtet.**
+**Manuelle Lockfile-Erstellung:** `bash scripts/bootstrap-locks.sh` in einer netzwerkfähigen .NET-10-/Node-Umgebung ausführen, erzeugte `packages.lock.json` und `web/package-lock.json` auflösen, prüfen und einchecken. Danach verlangt `bash scripts/check.sh` einen gesperrten Restore und eine isolierte `PERMORA_TEST_POSTGRES`-Datenbank. `--lightweight` bleibt ohne Backend-/Angular-/Keycloak-Abnahme nutzbar. **GitHub Actions CI ist nun konfiguriert; ein erfolgreicher Gesamtlauf steht noch aus.**
 
 ## Was enthalten ist
 
@@ -23,7 +23,7 @@
 
 ## Was ausdrücklich noch fehlt
 
-Die vollständige ursprüngliche Enterprise-Roadmap ist **nicht** erledigt. Offen sind unter anderem die echte End-to-End-Abnahme, automatisch provisionierte FGAP-Policies, fortlaufende SoD-Auswertung externer Gruppenänderungen, unabhängige Identitätskorrelation über mehrere Issuer, ABAC/Authorization Services, AD-/HR-Schreibkonnektoren, Benachrichtigungen, manipulationsresistenter externer Audit-Speicher sowie Last-, Wiederanlauf- und Penetrationstests. Siehe [Roadmap](docs/roadmap.md). **CI ist nicht eingerichtet.**
+Die vollständige ursprüngliche Enterprise-Roadmap ist **nicht** erledigt. Offen sind unter anderem die echte End-to-End-Abnahme, automatisch provisionierte FGAP-Policies, fortlaufende SoD-Auswertung externer Gruppenänderungen, unabhängige Identitätskorrelation über mehrere Issuer, ABAC/Authorization Services, AD-/HR-Schreibkonnektoren, Benachrichtigungen, manipulationsresistenter externer Audit-Speicher sowie Last-, Wiederanlauf- und Penetrationstests. Siehe [Roadmap](docs/roadmap.md). **Die CI deckt Build, Test und Keycloak-Vertragstests ab; FGAP-Minimalrechte, BFF-SSO und Betriebsfreigabe bleiben eigenständige offene Prüfungen.**
 
 ## Technische Grundlage
 
@@ -81,6 +81,11 @@ Echte `package-lock.json`- und NuGet-Lockdateien konnten ohne Restore nicht erze
 
 ## Dokumentation
 
-[Architektur](docs/architecture.md) · [Roadmap](docs/roadmap.md) · [API](docs/api.md) · [Keycloak](docs/keycloak.md) · [Betrieb](docs/operations.md) · [Sicherheitsmodell](docs/security.md) · [Design](docs/design.md) · [Tests](docs/testing.md) · [Review](docs/review.md) · [Beiträge](CONTRIBUTING.md)
+[CI und Prüfumfang](docs/ci.md) · [Architektur](docs/architecture.md) · [Roadmap](docs/roadmap.md) · [API](docs/api.md) · [Keycloak](docs/keycloak.md) · [Betrieb](docs/operations.md) · [Sicherheitsmodell](docs/security.md) · [Design](docs/design.md) · [Tests](docs/testing.md) · [Review](docs/review.md) · [Beiträge](CONTRIBUTING.md)
 
 Permora ist keine offizielle Keycloak-Komponente. Die Verwendung dokumentierter Keycloak-Schnittstellen ist nicht gleichbedeutend mit Hersteller-Support für dieses Portal. Projektname und Logo sind noch nicht markenrechtlich freigegeben.
+
+## GitHub Actions
+
+Der Workflow [Permora CI](.github/workflows/ci.yml) startet bei Pull Requests gegen `main`, nach Pushes auf `main` und manuell per **Run workflow**. Er umfasst .NET-Release-Build/xUnit mit einer temporären PostgreSQL-Datenbank, Angular-Build/Playwright, Keycloak 26.8.1 REST-/Token-Vertragstests und getrennte Sicherheits-/Reproduzierbarkeitsprüfungen. Fehlgeschlagene Jobs erhalten Diagnoseartefakte. Ein eigener Gate schlägt fehl, solange die tatsächlichen NuGet- und npm-Lockfiles noch fehlen; andere Jobs laufen für die Fehlerdiagnose weiter. **Grünes CI bedeutet keine automatische FGAP- oder Produktionsfreigabe.** Details: [docs/ci.md](docs/ci.md).
+
