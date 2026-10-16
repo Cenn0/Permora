@@ -1,0 +1,52 @@
+# Sicherheitsmodell und Grenzen
+
+## Vier getrennte Aussagen
+
+**Funktioniert grundsätzlich:** dokumentierte Keycloak-Admin-APIs können anwendungsspezifische Rollen und Mappings bearbeiten; der Connector implementiert diesen Weg. Die tatsächliche Laufzeitkompatibilität dieses Codes ist noch nicht vollständig geprüft.
+
+**Offiziell unterstützt:** Keycloak dokumentiert Admin REST, Client Roles/Composites und FGAP. Das bedeutet keinen offiziellen Keycloak-Support für Permora oder für jede Kombination unserer drei Service-Account-Profile.
+
+**Architektonische Empfehlung:** Benutzerverwaltung über ein begrenztes BFF, Default Deny, appbezogene Ressourcenauflösung, versionierte Aufträge und getrennte Provisioning-Geheimnisse statt freier Admin-API-Weiterleitung.
+
+**Sicherheitsseitig empfehlenswert:** erst nach echtem Minimalrechte-Nachweis, MFA/Step-up-Konzept, Abhängigkeitenprüfung, Betriebsabnahme und unabhängiger Sicherheitsprüfung produktiv einsetzen. Diese Freigabe liegt nicht vor.
+
+## Threat Model
+
+| Angreifer / Fehler | Kontrolle | Restgrenze |
+|---|---|---|
+| Team manipuliert fremde App-/Rollen-ID | Owner-Auflösung im Backend, eigene Permission-IDs, Markerprüfung | API-Negativtests noch nicht ausgeführt |
+| Browser injiziert Realm-/Client-Konfiguration | typisierte Commands, unbekannte JSON-Felder verboten, kein Admin-Proxy | Backend-Kompro­mittierung bleibt hochkritisch |
+| Owner fügt eigene High-Risk-Rechte hinzu | aktuelle Rollen-/Gruppenprüfung, vier Augen | Gruppenänderungen nach Prüfung sind kein atomarer IAM-Vorgang |
+| Leere Gruppe erhält zwei SoD-Rollen | direkte Gruppenrechte zusätzlich zu heutigen Mitgliedern prüfen | zukünftige externe Gruppenänderungen brauchen kontinuierliche SoD-Prüfung |
+| Veraltete oder deaktivierte Entscheider | Mandate und frische, aktivierte Directory-Identitäten vor Verarbeitung prüfen | Synchronisationsintervall und bestehende Sessions begrenzen Reaktionszeit |
+| Nach Remote-Write bricht Verbindung ab | Idempotenz, Read-after-write, Backoff, Blockierung unklarer Mutationen | keine atomare DB-/Keycloak-Transaktion |
+| FGAP blendet Teile des Bestands aus | IAM-Abnahmematrix muss vollständige Sicht bestätigen | HTTP 200/leer beweist keine vollständige Sicht |
+| Zugriff auf Browser-Storage | keine Keycloak-Service-Tokens oder Refresh Tokens im Angular-Code | XSS kann weiterhin Aktionen in einer aktiven Sitzung auslösen |
+| Datenbank-Angreifer | append-only Audit-Trigger und Hashkette | DB-/Infrastruktur-Admins können beides umgehen; kein WORM-Nachweis |
+| Ausfall des Portals | Anwendungs-Login bleibt bei Keycloak | Entzüge/Freigaben können verspätet sein; keine harte Widerrufs-SLA |
+
+## Privilegienprofile
+
+`roles`, `assignments`, `directory` haben getrennte Zugangsdaten. Der zusätzliche Provisioner verwendet eine vierte, separat bereitgestellte Identität. Die aktuelle Konfiguration ist **pro Realm/Vertrauensdomäne**, nicht automatisch ein Service Account pro Anwendung. Ein kompromittierter Rollen-Connector kann daher einen größeren Bereich als eine einzelne App treffen. Diese Grenze nicht als unabhängige Tenant-Isolation ausgeben.
+
+Client-`manage` kann mehr als Rollen-CRUD erlauben; FGAP ersetzt die feste Backend-Operationsliste nicht. Keine pauschalen `realm-admin`-/`manage-users`-Zuweisungen an Anwendungsteams. Admin API nur aus internen Diensten erreichbar, TLS ohne Zertifikatsumgehung, keine automatischen Redirects des Connectors.
+
+## Sitzungen und Browser
+
+BFF-Cookie HttpOnly/Secure, OIDC Code + PKCE, CSRF für alle schreibenden API-/BFF-Aufrufe, 30 Minuten absolute lokale Sitzung. Logout beendet die **Permora-Sitzung**, nicht die gemeinsame Keycloak-SSO-Sitzung. Entwicklungsauthentifizierung ist explizit und nur auf Loopback in Development zulässig. Nicht hinter einem öffentlich erreichbaren Proxy weiterleiten.
+
+CSP erlaubt für Angular derzeit Inline-Styles, aber kein `unsafe-inline` für Skripte. Nonce-basierte Styles, Trust-Proxy-Konfiguration und eine vollständige browsergestützte CSP-Prüfung stehen aus. Die HTTPS-Terminierung muss gesichert erfolgen; `PublicOrigin` ist eine feste vertrauenswürdige Deployment-Einstellung, keine User-Eingabe.
+
+MFA wird als Anforderung an den Keycloak-Flow dokumentiert, derzeit jedoch nicht über einen separaten ACR-/AMR-Handler im Portal erzwungen. Step-up darf deshalb nicht als implementiert bezeichnet werden.
+
+## Identitäten, Gruppen und Entzug
+
+Directory-Suche liefert minimale Felder, mindestens drei Zeichen und maximal 25 Ergebnisse. Ein fehlender Eintrag wird nicht als Löschsignal behandelt. Er behält seinen alten Synchronisationszeitpunkt und ist später nicht mehr frisch genug für Erweiterungen. Explizite Deaktivierung löst Entzüge aus. Vollständiger HR-Lifecycle und revisionssichere personenbezogene Suchprotokollierung sind offen.
+
+Gruppenrechte können durch spätere externe Mitgliedschaftsänderung wirksam werden. Das Portal verwaltet keine AD-Gruppenmitgliedschaften. Referenzierte Gruppen müssen vollständig lesbar sein; verschachtelte oder sehr große Gruppen können an Sicherheitslimits scheitern. Es gibt noch keine laufende Garantie gegen neu entstehende gruppenübergreifende SoD-Konflikte.
+
+Bereits ausgegebene JWTs können nach einem Rollenentzug weiter Rechte transportieren. Kurze Laufzeiten und appseitige Widerrufsstrategien festlegen; „Keycloak-Mapping entfernt“ ist nicht „alle verteilten Zugriffe sofort ungültig“.
+
+## Produktfreigabe
+
+Kein „Enterprise-ready“, keine Zertifizierung, kein Pentest-Erfolg und keine vollständige Roadmap-Abnahme behauptet. Offene Freigabepunkte stehen in [Roadmap](roadmap.md) und [Prüfbericht](review.md). Bei diesem neuen Projekt bestehen noch keine zugesagten Reaktionszeiten oder unterstützten Produktionsversionen.

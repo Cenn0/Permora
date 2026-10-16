@@ -1,0 +1,16 @@
+{
+  "ConnectionStrings": {
+    "Portal": "Host=postgres.internal;Database=permora;Username=permora_provisioner;Password=REPLACE_LOCALLY"
+  },
+  "Provisioning": {
+    "AllowHttpInDevelopment": false,
+    "Realms": {
+      "enterprise": {
+        "BaseUrl": "https://sso-admin.example.org",
+        "Realm": "enterprise",
+        "ClientId": "permora-client-preparer",
+        "SecretFile": "/run/secrets/client-preparer"
+      }
+    }
+  }
+}

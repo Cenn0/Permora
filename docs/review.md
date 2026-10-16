@@ -1,0 +1,53 @@
+# Review und Prüfergebnis
+
+Stand: 16. Oktober 2026. Dieser Bericht trennt Quellcode-Review, tatsächlich ausgeführte Prüfungen und ausstehende Laufzeitabnahme.
+
+## Ergebnis
+
+Aus dem initialen Lizenz-Repository wurde eine zusammenhängende erste Implementierung mit C#-Core/API/Worker/Connector/Provisioner/SDK, Angular-Oberfläche, Tests und Dokumentation erstellt. Das Dashboard folgt der ausgewählten Variante 3. **Die gesamte Enterprise-Roadmap ist nicht abgeschlossen und die Plattform ist nicht produktiv abgenommen.**
+
+## Im Quellcode gefunden und korrigiert
+
+| Befund | Korrektur | Absicherung |
+|---|---|---|
+| Dashboard-Gesamtzahlen aus begrenzter Vorschau ableitbar | SQL zählt den gesamten zugänglichen Bestand separat | PostgreSQL-Test mit 35 Anträgen/20 Vorschau; Test noch nicht ausgeführt |
+| Fehlender Directory-Eintrag könnte als gelöscht interpretiert werden | fehlende Einträge behalten ihren alten Zeitstempel; nur explizit deaktivierte Identitäten lösen Entzug aus | PostgreSQL-Regressionstestquelle |
+| Späterer Auftrag könnte ältere Remote-Unklarheit überholen | Queue-Reihenfolge, Backoff und Blockierung nach Failed/Conflict | Workflow-Testquellen |
+| Sauberer Abgleich könnte fälschlich einen alten Grant als erfolgreich kennzeichnen | unklare, nicht übernommene Aufträge werden ausdrücklich verworfen | Workflow-Testquelle |
+| Fremde Composite-Rollen oder privilegierte Leaf-Composites | tatsächliche Client-/Entity-/Composite-Prüfung vor Vergabe | Policy-/Connector-Testquellen |
+| Leere Gruppe umgeht SoD durch fehlende aktuelle Mitglieder | zusätzlich direkte Gruppenrollen auf Konflikt prüfen | spezifischer Policy-Regressionstest |
+| Veraltete Gruppenmitgliedschaft bei Rollenänderung | frische und vollständige Snapshots erforderlich | Policy-Testquelle |
+| HTTP 200 mit JSON null könnte als Abwesenheit gelten | nur echtes 404 bedeutet fehlende Ressource; null-Erfolg wird Fehler | Connector-Quellcode-Review; echter Server-Test offen |
+| Entfernte/deaktivierte Entscheider könnten alten Auftrag ausführen | aktuelle Mandate plus aktive frische Operator-Identität vor Remote-Schritt | Workflow-Regressionstestquelle |
+| Import/Rebinding trotz bereits vorhandener Permissions | Rebinding auch bei Permissions gesperrt | API-Quellcode-Review |
+| Team-Owner zwischen Prüfung und App-Erstellung entzogen | Teamzeile in Erstellungstransaktion sperren und Mandat erneut prüfen | PostgreSQL-Concurrency-Abnahme noch offen |
+| Unterschiedliche Schreibweise kanonischer Subject-Hashes | normalisieren, case-insensitive Duplikate ablehnen | API-Quellcode-Review |
+| OIDC-Sitzung lieferte andere Admin-Eigenschaft als das Frontend erwartet | Vertrag auf `administrator` vereinheitlicht | statischer Vertragsabgleich |
+| Logout-XHR würde zu externer SSO-Seite umgeleitet | bewusster lokaler BFF-Logout | Browser-/SSO-Abnahme offen |
+| Alte Suchantwort kann nach App-Wechsel erscheinen | versionsgebundene Such-/Ladeergebnisse und Reset beim Wechsel | Quellcode-Review, Browser-Regression noch auszuführen |
+| Readiness prüfte nur Verbindungsaufbau | Datenpool wiederverwenden und Migration prüfen | echte DB-Abnahme offen |
+| Teilweise Demo-Erstellung nicht wiederholbar | vorhandene Teams/Apps getrennt erkennen | Quellcode-Review |
+| Fehlerhaft maskierte Quotes im Docker-Entrypoint | Exec-Form als gültiges JSON mit zitiertem Assembly-Pfad korrigiert | tatsächlich ausgeführte JSON-/Entrypoint-Strukturprüfung; Container-Build weiterhin offen |
+
+## Tatsächlich ausgeführte Prüfungen
+
+- **32 Node-Tests der puren TypeScript-Frontend-Logik: bestanden.** TAP unter [evidence/frontend-logic.tap](evidence/frontend-logic.tap).
+- Strukturprüfung: JSON/XML, Projektverweise, interne Dokumentlinks, Original-Lizenzhash und keine CI-Dateien. Ergebnis unter [evidence/repository-checks.json](evidence/repository-checks.json).
+- TypeScript-Syntaxtranspilation und isolierte Typprüfung von Models/View-Model mit dem vorhandenen TypeScript 5.8.3. Das ist **kein Angular-22-/Template-Build**. Siehe [evidence/typescript-checks.txt](evidence/typescript-checks.txt).
+
+## Nicht ausgeführt / nicht nachgewiesen
+
+.NET-SDK, Docker und PostgreSQL-Server fehlten in der Arbeitsumgebung; Paketdownload war nicht möglich. Installiert waren Node 22.16.0 und TypeScript 5.8.3, nicht die für Angular 22 benötigte Buildkombination. Deshalb wurden C#-Build, xUnit, echte PostgreSQL-Tests, Angular-Build, Playwright, echte Keycloak-FGAP-/Token-Integration und Container-Build **nicht** ausgeführt. Es wird weder „0 Fehler im Backend“ noch ein erfundener Coverage-Wert behauptet.
+
+Keine echten Lockfiles/SBOMs konnten aus einem Restore gewonnen werden. Die enthaltenen Tests sind umfangreiche Testquellen, aber nicht automatisch grüne Nachweise. Mögliche Compiler-, Analyzer-, Dependency- oder Integrationsfehler müssen beim ersten vollständigen Lauf noch korrigiert werden.
+
+## Verbleibende Architektur-/Betriebsgrenzen
+
+1. FGAP-Aktivierung und relevante vollständige Listensicht werden zentral manuell abgenommen; Filterung kann sonst falsche Driftfreiheit vortäuschen.
+2. Rolle/Gruppe und Portal-DB bilden keine gemeinsame atomare Transaktion. Bestehende JWTs widerrufen sich nicht allein durch Entfernen eines Mappings.
+3. Shared Realm-Profile sind keine unabhängige per-App-Containment-Garantie bei kompromittiertem Worker.
+4. Cross-Issuer-Personenkorrelation, kontinuierliche externe Gruppen-SoD, Step-up-Gate, vollständige IGA/ABAC-Connectoren und externe unveränderliche Audit-Ablage sind offen.
+5. Last-/HA-/Fairness-/Recovery-Abnahme, Datenschutz-Retention und unabhängiger Pentest fehlen.
+6. Das ursprüngliche Repository bleibt privat; Veröffentlichung, History-Bereinigung und CI wurden nicht durchgeführt.
+
+**Nächster fachlich notwendiger Schritt ist die vollständige Build-/Integrationsabnahme, nicht die Behauptung einer fertigen Enterprise-Plattform.** Die [Roadmap](roadmap.md) enthält jede verbleibende Anforderung und ihr Abnahmekriterium.
