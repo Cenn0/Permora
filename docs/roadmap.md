@@ -162,6 +162,10 @@ Permora ermöglicht **delegierte, anwendungsspezifische Rechteverwaltung in Keyc
 
 **Abnahme:** Jeder öffentliche Release hat einen unveränderlichen Commit/Tag, verifizierbare Build-/Testnachweise, Changelog, klaren Supportumfang und eine dokumentierte Risikofreigabe.
 
+### Zuordnung zur bisherigen M0–M8-Matrix
+
+Die historischen M-IDs bleiben in den früheren Git-Versionen nachvollziehbar: M0/M7 (Fundament, Tests, Lockfiles) → P0/P7; M1/M2 (Teams, Rechte) → P2/P5; M3 (BFF, Provisioning) → P1/P2; M4 (Aufträge) → P3; M5 (Governance) → P4; M6 (UI) → P5; M8 (Betrieb) → P6. Der frühere Punkt M7.6 (SBOM, transitive Lizenzen/Sicherheitsprüfung) wird in P6/P7 weitergeführt.
+
 ## 4. Release-Ziele und harte Gates
 
 | Release / Planungskorridor | Umfang | Harte Freigabe |
@@ -173,7 +177,7 @@ Permora ermöglicht **delegierte, anwendungsspezifische Rechteverwaltung in Keyc
 | **0.9 – Release Candidate** (Q2/2027, geplant) | P6-Härtung, P7-Releasepaket | Restore-, Last-, Upgrade-, SBOM-/Lizenz-/Sicherheitsnachweise vorhanden; kritische Findings behoben |
 | **1.0 – Supported Community Scope** (nach bestandener Abnahme) | Delegierte Verwaltung in ausdrücklich getesteter Keycloak-/Deploymentmatrix | Security-, Betriebs-, Recovery- und Dokumentations-Gates bestanden; keinerlei impliziter Hersteller-Support |
 
-**Die Zeitfenster sind Planungsannahmen, keine Lieferzusage.** Ein nicht bestandener Gate verschiebt den Release. Die bloße Anzahl implementierter Funktionen ist kein Releasekriterium.
+**Die Zeitfenster sind Planungsannahmen, keine Lieferzusage.** Ein nicht bestandenes Gate verschiebt den Release. Die bloße Anzahl implementierter Funktionen ist kein Releasekriterium.
 
 ## 5. Verbindliche End-to-End-Testmatrix
 
@@ -229,7 +233,7 @@ Anschließend P5–P7 ausbauen. PRs enthalten jeweils Quellcode **plus** reprodu
 Ein Punkt ist erst `ABGESCHLOSSEN`, wenn:
 - die Fachanforderung implementiert und mit eindeutigem Besitzer/Scope dokumentiert ist;
 - positive und relevante negative Unit-/API-/Integrationsfälle nachweislich bestanden sind;
-- bei Rechteänderungen der echte Keycloak-Betrag **und** seine Verifikation geprüft sind;
+- bei Rechteänderungen der tatsächliche Keycloak-Istzustand **und** seine Verifikation geprüft sind;
 - öffentliche Dokumentation, Threat Model/ADR und Migration bei Bedarf aktualisiert sind;
 - CI im vorgesehenen Scope grün ist; bei Betriebs-/Security-Gates die zusätzliche **separate** Abnahme dokumentiert ist.
 
