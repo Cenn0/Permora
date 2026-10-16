@@ -14,7 +14,7 @@ public sealed class PostgresTests
         Assert.StartsWith("permora_test_", options.Database ?? "");
         var schema = "test_" + Guid.NewGuid().ToString("N");
         await using var admin = NpgsqlDataSource.Create(value!);
-        await using (var create = admin.CreateCommand($"CREATE SCHEMA {schema}")) await create.ExecuteNonQueryAsync();
+        await using (var create = admin.CreateCommand($"CREATE SCHEMA {schema}")) await create.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         try
         {
             options.SearchPath = schema;
@@ -50,8 +50,8 @@ public sealed class PostgresTests
             Assert.Equal(0, (await store.DashboardAsync([], TestContext.Current.CancellationToken)).AwaitingApproval);
             var audit = await store.AuditAsync(f.App.Id, 0, 100, TestContext.Current.CancellationToken); Assert.True(AuditChain.Verify(audit));
             await using var mutate = source.CreateCommand("UPDATE audit_events SET sequence=sequence+1");
-            await Assert.ThrowsAsync<PostgresException>(() => mutate.ExecuteNonQueryAsync());
+            await Assert.ThrowsAsync<PostgresException>(() => mutate.ExecuteNonQueryAsync(TestContext.Current.CancellationToken));
         }
-        finally { await using var drop = admin.CreateCommand($"DROP SCHEMA {schema} CASCADE"); await drop.ExecuteNonQueryAsync(); }
+        finally { await using var drop = admin.CreateCommand($"DROP SCHEMA {schema} CASCADE"); await drop.ExecuteNonQueryAsync(TestContext.Current.CancellationToken); }
     }
 }

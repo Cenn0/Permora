@@ -4,11 +4,11 @@
 
 **Permora ist ein eigenständiges C#-/Angular-Portal für delegierte Keycloak-Verwaltung.** Ein Anwendungsteam verwaltet seine eigenen Rollen, Einzelberechtigungen und Zugriffe. Realm-Konfiguration, fremde Anwendungen, Verwaltungsmandate und Sicherheitsrichtlinien bleiben außerhalb dieses Self-Service-Bereichs.
 
-> **Entwicklungsstand: erste Implementierung, keine Produktionsfreigabe.** Der Quellcode umfasst die zentrale Verwaltungskette einschließlich Oberfläche, Worker und Connector. Ein vollständiger .NET-/Angular-Build und die Abnahme gegen echtes Keycloak/PostgreSQL stehen noch aus. 32 eigenständig ausführbare Frontend-Logiktests wurden tatsächlich erfolgreich ausgeführt; dies ersetzt keine Backend- oder Sicherheitstests. Details: [Prüfbericht](docs/review.md), [Roadmap mit Abnahmekriterien](docs/roadmap.md).
+> **Entwicklungsstand: CI erstmals erfolgreich in den Funktionsprüfungen, noch keine Produktionsfreigabe.** [GitHub-Lauf #38912134224](https://github.com/Cenn0/Permora/actions/runs/38912134224): .NET-/Angular-Release-Builds bestanden; **102/102 xUnit** einschließlich echter PostgreSQL-Integration, **32/32 Frontend-Logiktests**, **8/8 Playwright** auf Desktop/Mobil, echter Keycloak-REST-/OIDC-Token-Vertrag und ASP.NET-HTTP-Sicherheitstests bestanden. **Gesamt-CI weiterhin rot**, weil echte NuGet-/npm-Lockfiles noch nicht eingecheckt sind. Eine begrenzte clientbezogene FGAP-v2-Minimalrechte-Isolation mit zwei Servicekonten ist nachgewiesen; vollständige Zielbenutzer-/Gruppenrollen-Mappings, produktiver OIDC-/MFA-Login und Betriebs-/Sicherheitsfreigabe bleiben offen. [Evidenz](docs/evidence/ci-2026-10-16.md).
 
-> **Nachgehärtet, noch nicht abgenommen:** Eine zentrale IAM-Attestierung mit Nachweis ist nun zwingende Voraussetzung vor der ersten Anwendung-Aktivierung. Dringende automatische Entzüge überholen verzögerte andere automatische Entzüge. Nicht vom Portal verwaltete Keycloak-Zuweisungen verhindern eine Rollenlöschung. Die dazugehörigen C#-Testquellen sind noch **nicht ausgeführt**.
+> **Härtung überprüft:** Eine zentrale IAM-Attestierung ist vor der erstmaligen Aktivierung vorgeschrieben, dringende automatische Entzüge werden priorisiert und Keycloak-Rollen mit bestehenden Zuweisungen können nicht blind gelöscht werden. Die dazugehörigen C#-Testfälle sind im GitHub-Lauf bestanden; clientbezogene Zwei-Team-FGAP-v2-Isolation ist erfolgreich getestet, vollständige Zielbenutzer-/Gruppen-FGAP-Regeln stehen noch aus.
 
-**Manuelle Lockfile-Erstellung:** `bash scripts/bootstrap-locks.sh` in einer netzwerkfähigen .NET-10-/Node-Umgebung ausführen, erzeugte `packages.lock.json` und `web/package-lock.json` auflösen, prüfen und einchecken. Danach verlangt `bash scripts/check.sh` einen gesperrten Restore und eine isolierte `PERMORA_TEST_POSTGRES`-Datenbank. `--lightweight` bleibt ohne Backend-/Angular-/Keycloak-Abnahme nutzbar. **Keine CI eingerichtet.**
+**Manuelle Lockfile-Erstellung:** `bash scripts/bootstrap-locks.sh` in einer netzwerkfähigen .NET-10-/Node-Umgebung ausführen, erzeugte `packages.lock.json` und `web/package-lock.json` auflösen, prüfen und einchecken. Danach verlangt `bash scripts/check.sh` einen gesperrten Restore und eine isolierte `PERMORA_TEST_POSTGRES`-Datenbank. `--lightweight` bleibt ohne Backend-/Angular-/Keycloak-Abnahme nutzbar. **GitHub Actions CI führt die Funktionsprüfungen erfolgreich aus; der Lockfile-Release-Gate ist bewusst noch rot.**
 
 ## Was enthalten ist
 
@@ -23,7 +23,7 @@
 
 ## Was ausdrücklich noch fehlt
 
-Die vollständige ursprüngliche Enterprise-Roadmap ist **nicht** erledigt. Offen sind unter anderem die echte End-to-End-Abnahme, automatisch provisionierte FGAP-Policies, fortlaufende SoD-Auswertung externer Gruppenänderungen, unabhängige Identitätskorrelation über mehrere Issuer, ABAC/Authorization Services, AD-/HR-Schreibkonnektoren, Benachrichtigungen, manipulationsresistenter externer Audit-Speicher sowie Last-, Wiederanlauf- und Penetrationstests. Siehe [Roadmap](docs/roadmap.md). **CI ist nicht eingerichtet.**
+Die vollständige ursprüngliche Enterprise-Roadmap ist **nicht** erledigt. Offen sind unter anderem die echte End-to-End-Abnahme, automatisch provisionierte FGAP-Policies, fortlaufende SoD-Auswertung externer Gruppenänderungen, unabhängige Identitätskorrelation über mehrere Issuer, ABAC/Authorization Services, AD-/HR-Schreibkonnektoren, Benachrichtigungen, manipulationsresistenter externer Audit-Speicher sowie Last-, Wiederanlauf- und Penetrationstests. Siehe [Roadmap](docs/roadmap.md). **Die CI deckt Build, Test und Keycloak-Vertragstests ab; Die clientbezogene FGAP-Isolation ist getestet; Benutzer-/Gruppenzuweisung über delegierte FGAP-Profile, BFF-SSO und Betriebsfreigabe bleiben offen.**
 
 ## Technische Grundlage
 
@@ -75,12 +75,19 @@ bash scripts/check.sh --lightweight  # Struktur + 32 reine Frontend-Logiktests
 bash scripts/check.sh                # zusätzlich Restore, C#-Build/Tests, Angular-Build und Browser-Tests
 ```
 
-Die PostgreSQL-Tests benötigen eine separate Testdatenbank über `PERMORA_TEST_POSTGRES`; ohne diese Variable werden sie ausdrücklich übersprungen. Die Browser-Tests verwenden API-Fixtures und beweisen keine serverseitige Autorisierung. [Testanleitung](docs/testing.md) und [tatsächliche Ergebnisse](docs/review.md) trennen diese Ebenen.
+Die PostgreSQL-Tests benötigen eine separate Testdatenbank über `PERMORA_TEST_POSTGRES`; ohne diese Variable werden sie ausdrücklich übersprungen. **Im GitHub-Lauf wurde der echte PostgreSQL-Test ohne Skip erfolgreich ausgeführt.** Die Browser-Tests verwenden API-Fixtures; die ergänzte ASP.NET-HTTP-Prüfung weist die serverseitige Anwendungsisolation für ausgewählte Negativfälle mit zwei Testidentitäten nach. [Testanleitung](docs/testing.md) und [tatsächliche Ergebnisse](docs/review.md) trennen diese Ebenen.
 
 Echte `package-lock.json`- und NuGet-Lockdateien konnten ohne Restore nicht erzeugt werden. Der erste erfolgreiche Restore muss sie erzeugen, prüfen und einchecken. Bis dahin gibt es **keinen reproduzierbar freigegebenen Release-Build**.
 
 ## Dokumentation
 
-[Architektur](docs/architecture.md) · [Roadmap](docs/roadmap.md) · [API](docs/api.md) · [Keycloak](docs/keycloak.md) · [Betrieb](docs/operations.md) · [Sicherheitsmodell](docs/security.md) · [Design](docs/design.md) · [Tests](docs/testing.md) · [Review](docs/review.md) · [Beiträge](CONTRIBUTING.md)
+[CI und Prüfumfang](docs/ci.md) · [Architektur](docs/architecture.md) · [Roadmap](docs/roadmap.md) · [API](docs/api.md) · [Keycloak](docs/keycloak.md) · [Betrieb](docs/operations.md) · [Sicherheitsmodell](docs/security.md) · [Design](docs/design.md) · [Tests](docs/testing.md) · [Review](docs/review.md) · [Beiträge](CONTRIBUTING.md)
 
 Permora ist keine offizielle Keycloak-Komponente. Die Verwendung dokumentierter Keycloak-Schnittstellen ist nicht gleichbedeutend mit Hersteller-Support für dieses Portal. Projektname und Logo sind noch nicht markenrechtlich freigegeben.
+
+## GitHub Actions
+
+Der Workflow [Permora CI](.github/workflows/ci.yml) startet bei Pull Requests gegen `main`, nach Pushes auf `main` und manuell per **Run workflow**. Er umfasst .NET-Release-Build/xUnit mit einer temporären PostgreSQL-Datenbank, Angular-Build/Playwright, Keycloak 26.8.1 FGAP-v2-Client-Isolations- und REST-/Token-Vertragstests und getrennte Sicherheits-/Reproduzierbarkeitsprüfungen. Fehlgeschlagene Jobs erhalten Diagnoseartefakte. Ein eigener Gate schlägt fehl, solange die tatsächlichen NuGet- und npm-Lockfiles noch fehlen; andere Jobs laufen für die Fehlerdiagnose weiter. **Grünes CI bedeutet keine Freigabe der gesamten FGAP-Berechtigungsmatrix oder der Produktion.** Details: [docs/ci.md](docs/ci.md).
+
+
+Letzter dokumentierter CI-Funktionslauf: [#38912134224](https://github.com/Cenn0/Permora/actions/runs/38912134224) · [Ergebnisse und Grenzen](docs/evidence/ci-2026-10-16.md).

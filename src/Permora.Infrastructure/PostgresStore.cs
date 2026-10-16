@@ -259,24 +259,25 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
 
     private sealed class Session(NpgsqlConnection connection, NpgsqlTransaction transaction, ApplicationDocument app, Team team) : IApplicationTransaction
     {
+        private readonly Guid applicationId = app.Id;
         public ApplicationDocument Application { get; set; } = app;
         public Team Team { get; } = team;
         public async Task<Operation?> OperationAsync(Guid id, CancellationToken ct)
         {
             await using var command = new NpgsqlCommand("SELECT document::text FROM operations WHERE id=@id AND application_id=@app", connection, transaction);
-            command.Parameters.AddWithValue("id", id); command.Parameters.AddWithValue("app", app.Id);
+            command.Parameters.AddWithValue("id", id); command.Parameters.AddWithValue("app", applicationId);
             return await OneAsync<Operation>(command, ct);
         }
         public async Task<Operation?> IdempotentAsync(string actorKey, string idempotencyKey, CancellationToken ct)
         {
             await using var command = new NpgsqlCommand("SELECT document::text FROM operations WHERE application_id=@app AND actor_key=@actor AND idempotency_key=@key", connection, transaction);
-            command.Parameters.AddWithValue("app", app.Id); command.Parameters.AddWithValue("actor", actorKey); command.Parameters.AddWithValue("key", idempotencyKey);
+            command.Parameters.AddWithValue("app", applicationId); command.Parameters.AddWithValue("actor", actorKey); command.Parameters.AddWithValue("key", idempotencyKey);
             return await OneAsync<Operation>(command, ct);
         }
         public async Task<IReadOnlyList<Operation>> UnresolvedMutationsAsync(CancellationToken ct)
         {
             var command = new NpgsqlCommand("SELECT document::text FROM operations WHERE application_id=@app AND status IN ('Failed','Conflict') AND (document->>'attempts')::integer>0 AND document->'change'->>'kind'<>'Reconcile' ORDER BY created_at", connection, transaction);
-            command.Parameters.AddWithValue("app", app.Id);
+            command.Parameters.AddWithValue("app", applicationId);
             return await DocumentsAsync<Operation>(command, ct);
         }
         public async Task<Operation?> NextOperationAsync(DateTimeOffset now, CancellationToken ct)
@@ -293,41 +294,41 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
                 ORDER BY COALESCE((o.document->>'systemRevocation')::boolean, false) DESC,
                     o.created_at, o.id LIMIT 1 FOR UPDATE OF o
                 """, connection, transaction);
-            command.Parameters.AddWithValue("app", app.Id);
+            command.Parameters.AddWithValue("app", applicationId);
             command.Parameters.AddWithValue("now", now);
             return await OneAsync<Operation>(command, ct);
         }
         public async Task SaveOperationAsync(Operation operation, CancellationToken ct)
         {
-            if (operation.ApplicationId != app.Id) throw new InvalidOperationException("Cross-application operation.");
+            if (operation.ApplicationId != applicationId) throw new InvalidOperationException("Cross-application operation.");
             await using var command = new NpgsqlCommand("""
                 INSERT INTO operations(id, application_id, actor_key, idempotency_key, status, created_at, next_at, document)
                 VALUES (@id, @app, @actor, @key, @status, @created, @next, @document)
                 ON CONFLICT(id) DO UPDATE SET status=@status, next_at=@next, document=@document
                 WHERE operations.application_id=@app
                 """, connection, transaction);
-            command.Parameters.AddWithValue("id", operation.Id); command.Parameters.AddWithValue("app", app.Id);
+            command.Parameters.AddWithValue("id", operation.Id); command.Parameters.AddWithValue("app", applicationId);
             command.Parameters.AddWithValue("actor", operation.RequestedBy.Key); command.Parameters.AddWithValue("key", operation.IdempotencyKey);
             command.Parameters.AddWithValue("status", operation.Status.ToString()); command.Parameters.AddWithValue("created", operation.CreatedAt);
             command.Parameters.AddWithValue("next", operation.NextAttemptAt); Json(command, "document", operation);
             if (await command.ExecuteNonQueryAsync(ct) != 1) throw new InvalidOperationException("Operation identity conflict.");
         }
         public Task AppendAuditAsync(Actor actor, string action, string detail, DateTimeOffset now, CancellationToken ct) =>
-            PostgresStore.AppendAuditAsync(connection, transaction, app.Id, actor, action, detail, now, ct);
+            PostgresStore.AppendAuditAsync(connection, transaction, applicationId, actor, action, detail, now, ct);
         public async Task<IReadOnlyList<AccessReview>> ReviewsAsync(CancellationToken ct)
         {
             var command = new NpgsqlCommand("SELECT document::text FROM access_reviews WHERE application_id=@app AND NOT closed ORDER BY due_at", connection, transaction);
-            command.Parameters.AddWithValue("app", app.Id);
+            command.Parameters.AddWithValue("app", applicationId);
             return await DocumentsAsync<AccessReview>(command, ct);
         }
         public async Task SaveReviewAsync(AccessReview review, CancellationToken ct)
         {
-            if (review.ApplicationId != app.Id) throw new InvalidOperationException("Cross-application review.");
+            if (review.ApplicationId != applicationId) throw new InvalidOperationException("Cross-application review.");
             await using var command = new NpgsqlCommand("""
                 INSERT INTO access_reviews(id, application_id, closed, due_at, document) VALUES (@id, @app, @closed, @due, @document)
                 ON CONFLICT(id) DO UPDATE SET closed=@closed, document=@document WHERE access_reviews.application_id=@app
                 """, connection, transaction);
-            command.Parameters.AddWithValue("id", review.Id); command.Parameters.AddWithValue("app", app.Id);
+            command.Parameters.AddWithValue("id", review.Id); command.Parameters.AddWithValue("app", applicationId);
             command.Parameters.AddWithValue("closed", review.Closed); command.Parameters.AddWithValue("due", review.DueAt);
             Json(command, "document", review);
             if (await command.ExecuteNonQueryAsync(ct) != 1) throw new InvalidOperationException("Review identity conflict.");
