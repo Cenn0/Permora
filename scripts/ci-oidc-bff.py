@@ -76,6 +76,14 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+class ObservedRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, url):
+        parsed = urllib.parse.urlsplit(url)
+        print("OIDC route:", code, parsed.netloc + parsed.path,
+              "parameter names:", sorted(urllib.parse.parse_qs(parsed.query).keys()), flush=True)
+        return super().redirect_request(request, fp, code, msg, headers, url)
+
+
 def browser(opener, method, path, body=None, headers=None):
     url = path if path.startswith("http") else APP_URL + path
     req = urllib.request.Request(url, data=body, headers=headers or {}, method=method)
@@ -185,7 +193,7 @@ def run():
                 try:
                     wait_for_bff(proc)
                     jar = http.cookiejar.CookieJar()
-                    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+                    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar), ObservedRedirect())
                     status, final_url, _, page = browser(opener, "GET", "/bff/login")
                     if status != 200:
                         # Only emit static hints and the route path. Never print codes, cookies or credentials.
@@ -193,7 +201,13 @@ def run():
                         hints = [s for s in ("Invalid parameter: redirect_uri", "Invalid redirect_uri",
                                             "HTTPS required", "Client not found", "Invalid client",
                                             "invalid_scope", "Invalid Request") if s.lower() in page.decode("utf-8", "replace").lower()]
-                        print("OIDC initial response:", status, route.netloc + route.path, "hints:", hints)
+                        additional_hints = [s for s in ("Cookie not found", "Missing cookie", "Invalid code", "Page has expired",
+                                            "Authentication session", "Invalid request", "Invalid session",
+                                            "Restart login", "Something went wrong", "expired", "bad request")
+                                            if s.lower() in page.decode("utf-8", "replace").lower()]
+                        print("OIDC initial response:", status, route.netloc + route.path,
+                              "hints:", hints + additional_hints,
+                              "cookie names:", sorted({cookie.name for cookie in jar}), flush=True)
                     assert_status(status, 200, "OIDC redirects through Keycloak to the actual login form")
                     form = LoginForm()
                     form.feed(page.decode("utf-8"))
