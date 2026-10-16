@@ -1,56 +1,48 @@
-<p align="center"><img src="web/public/brand/permora.svg" width="78" alt="Permora: fünf farbige Module als P"></p>
-<h1 align="center">Permora</h1>
-<p align="center">Anwendungen im Team verwalten. Rechte gezielt delegieren.</p>
+<p align="center"><img src="web/public/brand/permora.svg" width="78" alt="Permora logo: colorful modules forming a P"></p>
 
-**Permora ist ein eigenständiges C#-/Angular-Portal für delegierte Keycloak-Verwaltung.** Ein Anwendungsteam verwaltet seine eigenen Rollen, Einzelberechtigungen und Zugriffe. Realm-Konfiguration, fremde Anwendungen, Verwaltungsmandate und Sicherheitsrichtlinien bleiben außerhalb dieses Self-Service-Bereichs.
+# Permora
 
-> **Entwicklungsstand: Vollständige technische CI erfolgreich, noch keine Produktionsfreigabe.** [GitHub-Lauf #38946163282](https://github.com/Cenn0/Permora/actions/runs/38946163282) auf dem geprüften CI-Branch: sieben von sieben Pflichtjobs bestanden, **102/102 xUnit** inklusive echter PostgreSQL-18-Integration ohne Skips, **32/32 Frontend-Logiktests**, **8/8 Playwright** auf Desktop/Mobil, Angular- und .NET-Release-Build, API-HTTP-Tests, reales Keycloak 26.8.1 mit FGAP-v2-Client- sowie expliziten Benutzer-/Gruppenrollengrenzen, gesperrte npm-/NuGet-Restores und lokaler Docker-Image-Build (ohne Veröffentlichung). **Nicht geprüft:** produktiver Keycloak-OIDC-BFF-Login mit MFA, echtes AD/LDAP, vollständige externe SoD-/Lifecycle-Prozesse, Last/HA/Restore/Pentest. [Aktueller Nachweis](docs/evidence/ci-2026-10-16-final.md).
+**Language:** **English** · [Deutsch](README.de.md)
 
-> **Sicherheitsgrenzen:** Die IAM-Aktivierung bleibt an eine zentrale, auditierte Attestierung gebunden. Zwei delegierte Keycloak-Servicekonten haben nachweislich beschränkte Client-Rechte; zusätzlich wurden konkrete Zielbenutzer-/Gruppenfreigaben mit positiven und negativen Zuweisungen geprüft. Das **Gruppen-`manage`-Recht ist weiter als bloßes Rollenmapping**: Permoras serverseitige Operation-Allowlist ist weiterhin eine notwendige Sicherheitsbarriere.
+**Delegate application and access management in Keycloak without handing over realm administration.**
 
-**Manuelle Verifikation:** `bash scripts/check.sh --lightweight` für schnelle Struktur-/Frontend-Logiktests. Mit .NET 10, Node 24, Netzwerk und isolierter Test-PostgreSQL-Datenbank führt `bash scripts/check.sh` die gesperrten Restores und die vollständigen lokalen Tests aus. `bash scripts/bootstrap-locks.sh` ist ausschließlich für **bewusste Dependency-Updates** gedacht. Alle acht Lockfiles sind committed; der Lockfile-Gate ist im vollständigen CI-Lauf bestanden.
+Permora is an independent open-source **C# / Angular portal** designed to let application teams manage their own roles, fine-grained permissions, and access requests. Central IAM administrators retain control over the realm and cross-application security policies.
 
-> **Abhängigkeiten und CI-Sicherheit:** Exakt aufgelöste NuGet-/npm-Lockfiles sind eingecheckt und in GitHub Actions erfolgreich durch `dotnet restore --locked-mode` bzw. `npm ci` verifiziert. Die regulären GitHub-Actions haben ausschließlich lesende Rechte, keine produktiven Secrets und kein Deployment. Der einmalige schreibende Lockfile-Bootstrap wurde entfernt.
+> **Status: CI-tested development version, not approved for production.** The documented technical acceptance run completed seven required GitHub Actions jobs, including .NET/Angular builds, 102 xUnit tests with PostgreSQL, 32 frontend-logic tests, 8 Playwright tests, selected Keycloak 26.8.1 FGAP permission tests, and a local Docker build. **Production OIDC/MFA, LDAP/AD, full authorization-policy coverage, recovery and penetration testing remain open.** See [CI scope and evidence](docs/ci.md) and the [roadmap](docs/roadmap.md).
 
-**Zusätzlicher CI-Gate:** Die CI baut das finale Angular-/ASP.NET-Docker-Image mit gesperrten Abhängigkeiten, überprüft die enthaltenen Dateien und den Nicht-Root-Benutzer, ohne Images zu veröffentlichen. Ein abschließender Sammel-Gate schlägt bei jedem fehlgeschlagenen, abgebrochenen oder übersprungenen Pflichtjob fehl.
+## Scope
 
-**Erweiterte Keycloak-Sicherheitsprüfung:** Die CI testet jetzt positive und negative Client-, Benutzer- und Gruppengrenzen in FGAP v2 bis zum delegierten Entzug. Diese Tests belegen isolierte Servicekonten, keine vollständige Unternehmens-AD- oder MFA-/BFF-Abnahme. GitHub-Actions-Abhängigkeiten sind auf verifizierte Commit-SHAs fixiert; npm-Installationen erhalten einen Lockfile-Cache und begrenzte Download-Retries.
+- **Applications and teams:** Application catalog, registration, and explicit Owner, Maintainer, AccessManager, Approver, and Auditor mandates.
+- **Permissions:** Application-scoped `perm.*` permissions and composite `role.*` business roles; user/group grants.
+- **Governance:** Four-eyes approval, separation of duties (SoD), expiring access, recertification, and an application-scoped change log.
+- **Provisioning:** Persistent change requests, retries, desired/actual reconciliation, and verification of effective Keycloak assignments.
+- **Dashboard:** Responsive Angular UI with application cards, task queues, and activity feeds.
 
-## Was enthalten ist
+The critical security boundary remains **centralized**: realm settings, cross-application privileges, IAM policy, and approval of newly prepared clients/delegation rights are outside team self-service. Prepared clients remain disabled until the documented IAM approval. An HTTP `202 Accepted` response **does not** prove a change has taken effect in Keycloak.
 
-- Teambezogener Anwendungskatalog, kontrollierte Registrierung, explizite Owner/Maintainer/AccessManager/Approver/Auditor-Mandate.
-- Eigene Berechtigungen als `perm.*`-Client-Rollen; fachliche `role.*`-Rollen enthalten ausschließlich Einzelberechtigungen derselben Anwendung.
-- Benutzer- und Gruppenzuweisungen, Ablaufdaten, Vier-Augen-Freigaben, Selbsteskalationsschutz, statische Funktionstrennung (SoD).
-- Persistente Änderungsaufträge mit Idempotenz, Versionsprüfung, kontrollierten Wiederholungen und Rückprüfung in Keycloak. `202 Accepted` ist **kein** Wirksamkeitsnachweis.
-- Rezertifizierung, ablaufbedingter Entzug, Soll-/Ist-Abgleich, anwendungsbezogenes Änderungsprotokoll mit Hashkette.
-- BFF-Anmeldung per OIDC Code + PKCE, serverseitige Sessions, CSRF-Schutz, begrenzte API, getrennte Connector-Profile.
-- Isolierter Provisioner bereitet **deaktivierte** Clients vor. Die zentrale IAM-Freigabe für FGAP und Aktivierung bleibt absichtlich ein eigener Schritt.
-- Helles, responsives Angular-Dashboard nach Designvariante 3: farbiges P, Anwendungskarten, Kennzahlen und rechte Aktivitäten-/Aufgabenspalte. Keine fiktiven Erfolgs- oder Wachstumszahlen.
+**Not yet implemented or accepted:** Automatic FGAP provisioning, complete cross-issuer identity correlation, ABAC, full HR/AD integration, externally immutable audit storage, and load, recovery, and penetration testing. The [roadmap](docs/roadmap.md) distinguishes implemented source code, executed tests, and outstanding acceptance criteria.
 
-## Was ausdrücklich noch fehlt
+## Technology
 
-Die vollständige ursprüngliche Enterprise-Roadmap ist **nicht** erledigt. Offen sind unter anderem die echte End-to-End-Abnahme, automatisch provisionierte FGAP-Policies, fortlaufende SoD-Auswertung externer Gruppenänderungen, unabhängige Identitätskorrelation über mehrere Issuer, ABAC/Authorization Services, AD-/HR-Schreibkonnektoren, Benachrichtigungen, manipulationsresistenter externer Audit-Speicher sowie Last-, Wiederanlauf- und Penetrationstests. Siehe [Roadmap](docs/roadmap.md). **Die CI deckt Build, Test und Keycloak-Vertragstests ab; Die clientbezogene FGAP-Isolation ist getestet; Benutzer-/Gruppenzuweisung über delegierte FGAP-Profile, BFF-SSO und Betriebsfreigabe bleiben offen.**
+| Component | Stack |
+| --- | --- |
+| Backend and workers | C# / .NET 10 (ASP.NET Core) |
+| Frontend | Angular 22 / TypeScript |
+| Database | PostgreSQL |
+| Identity provider | Keycloak (validate the intended version and FGAP behavior) |
+| Authentication | OIDC backend-for-frontend with server-side sessions and separated connector privileges |
+| License | [Apache-2.0](LICENSE) |
 
-## Technische Grundlage
+Permora is **not an official Keycloak component**. An integration that works technically is not necessarily vendor-supported, an operational best practice, or security-certified.
 
-| Bereich | Festlegung |
-|---|---|
-| Backend | C# / .NET 10; SDK 10.0.402, ASP.NET Core 10.0.13 |
-| Frontend | Angular 22.2.3, TypeScript 6.0.x, RxJS |
-| Datenhaltung | PostgreSQL, Npgsql 10.0.3; keine direkte Keycloak-Datenbankanbindung |
-| IAM-Zielversion | Keycloak 26.8.1; FGAP-Konfiguration versionsbezogen abnehmen |
-| Tests | xUnit v3, PostgreSQL-Integrationstests, Node-Test-Runner, Playwright |
-| Lizenz | [Apache-2.0](LICENSE) |
+## Local development
 
-Angular 22 benötigt eine passende Node-/TypeScript-Kombination. Verwende **Node 24.15.0 oder eine kompatible neuere 24.x-Version** und TypeScript `~6.0.0`; ein beliebiges „neuestes TypeScript“ ist nicht automatisch kompatibel. Versionsquellen und Wartungshinweise: [Entwicklung](docs/development.md).
-
-## Lokal starten
-
-Voraussetzungen: .NET SDK laut `global.json`, kompatibles Node.js, Python 3, Docker mit Compose, Netzwerkzugang für Restore/Install. Die folgenden Befehle sind für Bash; sie verändern keine GitHub-Einstellungen.
+Requires the SDK selected in [global.json](global.json), a compatible Node.js version for Angular 22, Python 3, and Docker Compose. The following Bash commands start **local development dependencies only**:
 
 ```bash
 python3 scripts/init-local.py
 docker compose --env-file deploy/local.env -f deploy/compose.local.yml up -d --wait
+
 export PERMORA_CONFIG="$PWD/config/local.json"
 export DOTNET_ENVIRONMENT=Development
 export ASPNETCORE_ENVIRONMENT=Development
@@ -59,41 +51,37 @@ dotnet run --project src/Permora.Worker -- --migrate
 dotnet run --project src/Permora.Worker -- --seed-demo
 ```
 
-In getrennten Terminals dieselben drei Umgebungsvariablen setzen und anschließend starten:
+From separate terminals at the repository root, use the same three environment variables and then start the API and worker:
 
 ```bash
-# API: nur Loopback, nicht öffentlich exponieren
 ASPNETCORE_URLS=http://127.0.0.1:5080 dotnet run --project src/Permora.Api
-# Frontend: Terminal 2
-cd web && npm install && npm start
-# Worker: Terminal 3, aus dem Repository-Verzeichnis
+# In another terminal:
 dotnet run --project src/Permora.Worker
 ```
 
-Öffne `http://localhost:4200`. Die lokalen Beispieldaten zeigen vier Anwendungen mit Status **IAM-Freigabe ausstehend**, nicht erfundene produktive Rechte. Die explizit aktivierte lokale Entwicklungsanmeldung verwendet `demo-owner`, ist kein echtes SSO und ist außerhalb der Development-Umgebung verboten. Für tatsächliche Keycloak-Änderungen zuerst [IAM-Anbindung](docs/keycloak.md) durchführen. Ein gestarteter Keycloak-Container allein konfiguriert noch keinen Realm, keine Rollen und keine Delegationsrechte.
-
-Konfigurationen und Zufallspasswörter werden nur lokal erzeugt und sind ignoriert. Das Repository enthält keine echten Zugangsgeheimnisse. Das initiale private Repository wird durch diese Implementierung nicht automatisch öffentlich.
-
-## Manuell prüfen
+Start the frontend in a third terminal:
 
 ```bash
-bash scripts/check.sh --lightweight  # Struktur + 32 reine Frontend-Logiktests
-bash scripts/check.sh                # zusätzlich Restore, C#-Build/Tests, Angular-Build und Browser-Tests
+cd web
+npm ci
+npm start
 ```
 
-Die PostgreSQL-Tests benötigen eine separate Testdatenbank über `PERMORA_TEST_POSTGRES`; ohne diese Variable werden sie ausdrücklich übersprungen. **Im GitHub-Lauf wurde der echte PostgreSQL-Test ohne Skip erfolgreich ausgeführt.** Die Browser-Tests verwenden API-Fixtures; die ergänzte ASP.NET-HTTP-Prüfung weist die serverseitige Anwendungsisolation für ausgewählte Negativfälle mit zwei Testidentitäten nach. [Testanleitung](docs/testing.md) und [tatsächliche Ergebnisse](docs/review.md) trennen diese Ebenen.
+Open **http://localhost:4200**. The local `demo-owner` login is enabled **for development only**; it is not production SSO. The Keycloak development container does not configure a production realm or fine-grained permissions on its own. Follow the separate [Keycloak integration guide](docs/keycloak.md) before testing actual remote changes.
 
-Echte Lockfiles aus einem GitHub-Runner sind nun vorhanden. Die erfolgreiche Ausführung des vollständigen gesperrten Restore-/Build-/Testablaufs auf diesem Stand ist der nächste Nachweis; eine Produktionsfreigabe wird daraus nicht automatisch abgeleitet.
+## Tests and readiness
 
-## Dokumentation
+```bash
+bash scripts/check.sh --lightweight
+bash scripts/check.sh
+```
 
-[CI und Prüfumfang](docs/ci.md) · [Architektur](docs/architecture.md) · [Roadmap](docs/roadmap.md) · [API](docs/api.md) · [Keycloak](docs/keycloak.md) · [Betrieb](docs/operations.md) · [Sicherheitsmodell](docs/security.md) · [Design](docs/design.md) · [Tests](docs/testing.md) · [Review](docs/review.md) · [Beiträge](CONTRIBUTING.md)
+`--lightweight` checks repository structure and isolated frontend logic. Dependency lockfiles are committed and validated in CI; the full local check additionally requires the correct SDKs and a **dedicated** PostgreSQL test database configured through `PERMORA_TEST_POSTGRES`. The [GitHub Actions CI](.github/workflows/ci.yml) runs locked restores, .NET/Angular tests, selected real Keycloak FGAP integration cases and a Docker image build **without publishing or deploying**. Passing these checks does not constitute production acceptance.
 
-Permora ist keine offizielle Keycloak-Komponente. Die Verwendung dokumentierter Keycloak-Schnittstellen ist nicht gleichbedeutend mit Hersteller-Support für dieses Portal. Projektname und Logo sind noch nicht markenrechtlich freigegeben.
+[Development guide](docs/development.md) · [CI coverage](docs/ci.md) · [Test requirements](docs/testing.md) · [Evidence and outstanding checks](docs/review.md)
 
-## GitHub Actions
+## Documentation and contributions
 
-Der Workflow [Permora CI](.github/workflows/ci.yml) startet bei Pull Requests gegen `main`, nach Pushes auf `main` und manuell per **Run workflow**. Er umfasst .NET-Release-Build/xUnit mit einer temporären PostgreSQL-Datenbank, Angular-Build/Playwright, Keycloak 26.8.1 FGAP-v2-Client-Isolations- und REST-/Token-Vertragstests und getrennte Sicherheits-/Reproduzierbarkeitsprüfungen. Fehlgeschlagene Jobs erhalten Diagnoseartefakte. Ein eigener Gate kontrolliert die acht eingecheckten NuGet-/npm-Lockfiles; bei Unvollständigkeit oder Inkonsistenz scheitert die CI. **Grünes CI bedeutet keine Freigabe der gesamten FGAP-Berechtigungsmatrix oder der Produktion.** Details: [docs/ci.md](docs/ci.md).
+[Architecture](docs/architecture.md) · [Keycloak delegation](docs/keycloak.md) · [Security model](docs/security.md) · [Operations](docs/operations.md) · [Roadmap](docs/roadmap.md) · [API](docs/api.md) · [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md)
 
-
-Letzter vollständig erfolgreicher CI-Prüflauf: [#38946163282](https://github.com/Cenn0/Permora/actions/runs/38946163282) · [Aktuelle Evidenz](docs/evidence/ci-2026-10-16-final.md). Der ältere [Diagnoselauf #38912134224](https://github.com/Cenn0/Permora/actions/runs/38912134224) bleibt als historischer Nachweis dokumentiert.
+Licensed under the [Apache License 2.0](LICENSE). Report vulnerabilities through the private procedure in [SECURITY.md](SECURITY.md), not in public issues containing credentials or internal deployment details.
