@@ -1,0 +1,204 @@
+TAP version 13
+# (node:2332) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: status label: Applied
+ok 1 - status label: Applied
+  ---
+  duration_ms: 1.515756
+  type: 'test'
+  ...
+# Subtest: status label: Queued
+ok 2 - status label: Queued
+  ---
+  duration_ms: 0.092367
+  type: 'test'
+  ...
+# Subtest: status label: AwaitingApproval
+ok 3 - status label: AwaitingApproval
+  ---
+  duration_ms: 0.170482
+  type: 'test'
+  ...
+# Subtest: status label: AwaitingIam
+ok 4 - status label: AwaitingIam
+  ---
+  duration_ms: 0.07413
+  type: 'test'
+  ...
+# Subtest: status label: Unknown
+ok 5 - status label: Unknown
+  ---
+  duration_ms: 0.068812
+  type: 'test'
+  ...
+# Subtest: chart width 0 / 
+ok 6 - chart width 0 / 
+  ---
+  duration_ms: 0.259595
+  type: 'test'
+  ...
+# Subtest: chart width 0 / 0,0
+ok 7 - chart width 0 / 0,0
+  ---
+  duration_ms: 0.903198
+  type: 'test'
+  ...
+# Subtest: chart width 5 / 10,5
+ok 8 - chart width 5 / 10,5
+  ---
+  duration_ms: 0.068742
+  type: 'test'
+  ...
+# Subtest: chart width 30 / 10
+ok 9 - chart width 30 / 10
+  ---
+  duration_ms: 0.253936
+  type: 'test'
+  ...
+# Subtest: chart width -5 / 10
+ok 10 - chart width -5 / 10
+  ---
+  duration_ms: 0.259785
+  type: 'test'
+  ...
+# Subtest: chart width NaN / 10
+ok 11 - chart width NaN / 10
+  ---
+  duration_ms: 0.106407
+  type: 'test'
+  ...
+# Subtest: chart width 5 / NaN,10
+ok 12 - chart width 5 / NaN,10
+  ---
+  duration_ms: 0.048862
+  type: 'test'
+  ...
+# Subtest: percentage 0/0
+ok 13 - percentage 0/0
+  ---
+  duration_ms: 0.172596
+  type: 'test'
+  ...
+# Subtest: percentage 5/10
+ok 14 - percentage 5/10
+  ---
+  duration_ms: 0.046298
+  type: 'test'
+  ...
+# Subtest: percentage 20/10
+ok 15 - percentage 20/10
+  ---
+  duration_ms: 0.258523
+  type: 'test'
+  ...
+# Subtest: percentage -1/10
+ok 16 - percentage -1/10
+  ---
+  duration_ms: 0.06042
+  type: 'test'
+  ...
+# Subtest: percentage NaN/10
+ok 17 - percentage NaN/10
+  ---
+  duration_ms: 0.034231
+  type: 'test'
+  ...
+# Subtest: percentage 5/Infinity
+ok 18 - percentage 5/Infinity
+  ---
+  duration_ms: 0.030856
+  type: 'test'
+  ...
+# Subtest: color cycle is deterministic
+ok 19 - color cycle is deterministic
+  ---
+  duration_ms: 0.247016
+  type: 'test'
+  ...
+# Subtest: negative color index is normalized
+ok 20 - negative color index is normalized
+  ---
+  duration_ms: 0.063824
+  type: 'test'
+  ...
+# Subtest: invalid expiry is not serialized
+ok 21 - invalid expiry is not serialized
+  ---
+  duration_ms: 0.172616
+  type: 'test'
+  ...
+# Subtest: valid expiry has an explicit timezone
+ok 22 - valid expiry has an explicit timezone
+  ---
+  duration_ms: 0.502043
+  type: 'test'
+  ...
+# Subtest: network errors never claim an effective change
+ok 23 - network errors never claim an effective change
+  ---
+  duration_ms: 0.251492
+  type: 'test'
+  ...
+# Subtest: stale revision instructs a reload
+ok 24 - stale revision instructs a reload
+  ---
+  duration_ms: 0.068832
+  type: 'test'
+  ...
+# Subtest: expired session requests login
+ok 25 - expired session requests login
+  ---
+  duration_ms: 0.052888
+  type: 'test'
+  ...
+# Subtest: server problem detail is displayed as text
+ok 26 - server problem detail is displayed as text
+  ---
+  duration_ms: 0.185434
+  type: 'test'
+  ...
+# Subtest: unknown errors have a safe fallback
+ok 27 - unknown errors have a safe fallback
+  ---
+  duration_ms: 0.065407
+  type: 'test'
+  ...
+# Subtest: success and failure tones are distinct
+ok 28 - success and failure tones are distinct
+  ---
+  duration_ms: 0.099638
+  type: 'test'
+  ...
+# Subtest: same command reuses the same idempotency key
+ok 29 - same command reuses the same idempotency key
+  ---
+  duration_ms: 0.141008
+  type: 'test'
+  ...
+# Subtest: edited command gets a fresh idempotency key
+ok 30 - edited command gets a fresh idempotency key
+  ---
+  duration_ms: 0.074881
+  type: 'test'
+  ...
+# Subtest: revision change gets a fresh idempotency key
+ok 31 - revision change gets a fresh idempotency key
+  ---
+  duration_ms: 0.081881
+  type: 'test'
+  ...
+# Subtest: success clears the previous key
+ok 32 - success clears the previous key
+  ---
+  duration_ms: 0.165695
+  type: 'test'
+  ...
+1..32
+# tests 32
+# suites 0
+# pass 32
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 135.16207
