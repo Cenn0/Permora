@@ -21,7 +21,7 @@ if "Database=permora_test_" not in DB:
 TEAM = "10000000-0000-4000-8000-000000000001"
 
 
-def http(port, method, path, jar, body=None, xsrf=None, extra_headers=None):
+def request_http(port, method, path, jar, body=None, xsrf=None, extra_headers=None):
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
     headers = {"Accept": "application/json"}
     if body is not None:
@@ -59,7 +59,7 @@ def wait(port, process):
         if process.poll() is not None:
             raise RuntimeError(f"API process exited prematurely with code {process.returncode}")
         try:
-            status, _ = http(port, "GET", "/health/live", http.cookiejar.CookieJar())
+            status, _ = request_http(port, "GET", "/health/live", http.cookiejar.CookieJar())
             if status == 200:
                 return
         except OSError:
@@ -124,30 +124,30 @@ def main():
                 owner = launch(env, 5080, owner_log)
                 processes.append(owner)
                 jar = http.cookiejar.CookieJar()
-                status, session = http(5080, "GET", "/bff/session", jar)
+                status, session = request_http(5080, "GET", "/bff/session", jar)
                 assert_status(status, 200, "BFF session endpoint starts with a real HTTP response")
                 if not session.get("authenticated") or not session.get("development"):
                     raise AssertionError("Expected explicit Development identity, not anonymous mode")
                 token = csrf(jar)
 
-                status, apps = http(5080, "GET", "/api/v1/applications", jar)
+                status, apps = request_http(5080, "GET", "/api/v1/applications", jar)
                 assert_status(status, 200, "Owned applications are visible to the seeded owner")
                 if len(apps) < 4:
                     raise AssertionError("Demo data did not initialize applications")
-                status, _ = http(5080, "GET", "/api/v1/applications/" + str(uuid.uuid4()), jar)
+                status, _ = request_http(5080, "GET", "/api/v1/applications/" + str(uuid.uuid4()), jar)
                 assert_status(status, 404, "Unknown application ID is not exposed")
 
                 entity = {"teamId": TEAM, "realmKey": "enterprise", "slug": "ci-smoke",
                           "name": "CI Smoke Application", "description": "Isolated HTTP contract",
                           "environment": "Test"}
-                status, _ = http(5080, "POST", "/api/v1/applications", jar, body=entity)
+                status, _ = request_http(5080, "POST", "/api/v1/applications", jar, body=entity)
                 assert_status(status, 400, "Mutating API rejects missing CSRF token")
-                status, created = http(5080, "POST", "/api/v1/applications", jar, body=entity, xsrf=token)
+                status, created = request_http(5080, "POST", "/api/v1/applications", jar, body=entity, xsrf=token)
                 assert_status(status, 201, "Valid owner can register an application with CSRF")
                 app_id = created.get("id")
                 if not app_id:
                     raise AssertionError("Registered application has no stable identifier")
-                status, details = http(5080, "GET", "/api/v1/applications/" + app_id, jar)
+                status, details = request_http(5080, "GET", "/api/v1/applications/" + app_id, jar)
                 assert_status(status, 200, "Registered application can be read by owner")
                 if details["application"]["status"] != "AwaitingIam":
                     raise AssertionError("New applications must be disabled pending central IAM")
@@ -155,10 +155,10 @@ def main():
                 request = {"expectedRevision": 1,
                            "change": {"kind": "CreatePermission", "key": "orders.approve",
                                       "name": "Approve orders", "reason": "Test only"}}
-                status, _ = http(5080, "POST", "/api/v1/applications/" + app_id + "/changes",
+                status, _ = request_http(5080, "POST", "/api/v1/applications/" + app_id + "/changes",
                                  jar, body=request, xsrf=token)
                 assert_status(status, 400, "Change request requires an idempotency key")
-                status, _ = http(5080, "POST", "/api/v1/applications/" + app_id + "/changes",
+                status, _ = request_http(5080, "POST", "/api/v1/applications/" + app_id + "/changes",
                                  jar, body=request, xsrf=token,
                                  extra_headers={"Idempotency-Key": "ci-smoke-request-0001"})
                 assert_status(status, 409, "Pending IAM application refuses a new permission")
@@ -169,16 +169,16 @@ def main():
                 outsider = launch(foreign_env, 5081, foreign_log)
                 processes.append(outsider)
                 foreign_jar = http.cookiejar.CookieJar()
-                status, _ = http(5081, "GET", "/bff/session", foreign_jar)
+                status, _ = request_http(5081, "GET", "/bff/session", foreign_jar)
                 assert_status(status, 200, "Foreign actor session initialized")
                 foreign_csrf = csrf(foreign_jar)
-                status, foreign_apps = http(5081, "GET", "/api/v1/applications", foreign_jar)
+                status, foreign_apps = request_http(5081, "GET", "/api/v1/applications", foreign_jar)
                 assert_status(status, 200, "Application list remains scoped for foreign actor")
                 if foreign_apps:
                     raise AssertionError("A foreign principal unexpectedly sees team applications")
-                status, _ = http(5081, "GET", "/api/v1/applications/" + app_id, foreign_jar)
+                status, _ = request_http(5081, "GET", "/api/v1/applications/" + app_id, foreign_jar)
                 assert_status(status, 404, "Foreign actor cannot discover protected app by direct ID")
-                status, _ = http(5081, "POST", "/api/v1/admin/teams", foreign_jar,
+                status, _ = request_http(5081, "POST", "/api/v1/admin/teams", foreign_jar,
                                  body={"name": "Forbidden", "members": [], "expectedRevision": 0},
                                  xsrf=foreign_csrf)
                 assert_status(status, 403, "Foreign actor cannot enter central administrative endpoint")
