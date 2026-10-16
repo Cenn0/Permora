@@ -4,6 +4,9 @@
 
 **Language:** **English** · [Deutsch](README.de.md)
 
+[![CI](https://github.com/Cenn0/Permora/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Cenn0/Permora/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+
 **Delegate application and access management in Keycloak without handing over realm administration.**
 
 Permora is an independent open-source **C# / Angular portal** designed to let application teams manage their own roles, fine-grained permissions, and access requests. Central IAM administrators retain control over the realm and cross-application security policies.
