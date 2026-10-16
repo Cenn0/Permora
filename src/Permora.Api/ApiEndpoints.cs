@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Npgsql;
 using Permora.Core;
 using Permora.Infrastructure;
 
@@ -135,6 +136,9 @@ public static class ApiEndpoints
             await changes.ReviewAsync(id, reviewId, assignmentId, Actor(user, options), input.Retain, ct));
 
         var admin = api.MapGroup("/admin").RequireAuthorization("PlatformAdmin");
+        // Aggregate health only: never expose per-user grants, client secrets, or realm identifiers.
+        admin.MapGet("/operations-health", async (NpgsqlDataSource database, CancellationToken ct) =>
+            await OperationsHealth.ReadAsync(database, DateTimeOffset.UtcNow, ct));
         admin.MapPost("/teams", async (SaveTeam input, ClaimsPrincipal user, IPortalStore store, CancellationToken ct) =>
         {
             ValidateTeam(input);

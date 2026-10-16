@@ -67,3 +67,10 @@ Die Laufzeit-OpenAPI-Beschreibung unter `/openapi/v1.json` ist auf zentrale Admi
 ```
 
 Alle vier Prüfungen und ein Nachweis mit mindestens sechs Zeichen sind Pflicht. Zulässig ist nur eine gebundene Anwendung im Status `AwaitingIam`. Der Backend-Auftrag erzeugt eine erneute Remote-Prüfung; eine positive Antwort allein ist kein erfolgreicher FGAP- oder Token-Test.
+
+
+## Central IAM operations health
+
+`GET /api/v1/admin/operations-health` returns aggregate queue counters (`queued`, `awaitingApproval`, `failed`, `conflict`, `dueRevocations`, `oldestDueRevocationSeconds`) from PostgreSQL. Only principals with the central `PlatformAdmin` mandate may call it; a foreign team receives `403`. Fields contain **no** user, group, role, application or realm identifiers. They are intended for alerting and incident response, not for making write/restore decisions without Keycloak readback.
+
+The endpoint measures PostgreSQL queue state only. It does **not** prove that Keycloak has applied an operation, does not measure revoked JWT validity, and is not an SLO commitment. A safe operator alarm baseline is `failed > 0`, `conflict > 0` or `dueRevocations > 0` for a sustained period. Verify actual thresholds with load and recovery tests before production.
