@@ -1,5 +1,11 @@
 # Permora CI: Tests, Belege und Grenzen
 
+## Erweiterte FGAP-v2-Zielbenutzer- und Gruppentests
+
+Ein echter Keycloak-26.8.1-Test bestätigt jetzt zusätzlich: Client-`map-roles` allein berechtigt nicht zur Zuweisung an beliebige Benutzer oder Gruppen. Bei expliziter FGAP-Freigabe für einen Zielbenutzer bzw. eine Zielgruppe lassen sich Rollen des eigenen Clients zuweisen und wieder entziehen. Fremde Clients und nicht freigegebene Zielidentitäten bleiben gesperrt, ebenso allgemeine Änderungen am Benutzerkonto. Alle Tests laufen mit isolierten Servicekonten ohne breite Realm-Adminrollen. Externe LDAP-/AD-Federation, vollständiges produktives OIDC-BFF/MFA und betriebliche Abnahme bleiben offen.
+
+Vier Actions sind auf bei GitHub offiziell verifizierte Release-Commit-SHAs fixiert. Für Angular wird ein npm-Cache mit `web/package-lock.json` als Cache-Key und eine begrenzte zusätzliche Retry-Konfiguration für Registry-Netzwerkunterbrechungen verwendet. Ein vorheriger `ECONNRESET` beim Download war kein Lockfile-Konflikt.
+
 ## Neuer Stand: echte Locks, ausschließlich lesende Standard-CI
 
 Alle sieben C#-Projekte besitzen ein auf dem isolierten GitHub-Runner erzeugtes `packages.lock.json`; das Angular-Frontend besitzt `web/package-lock.json`. Der reguläre Workflow führt nun `dotnet restore --locked-mode` und `npm ci` aus. Es existiert **kein** dauerhafter CI-Job mit Schreibberechtigungen, Push/Deploy oder Zugriff auf produktive Secrets. Die temporäre One-shot-Lockfile-Übernahme wurde danach entfernt. Ein anschließender vollständiger PR-Run muss den grünen Status erneut nachweisen. Die in dieser Datei erwähnten roten Lockfile-Gates gehören zu den **historischen** Läufen vor der Lockfile-Übernahme.

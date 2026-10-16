@@ -14,6 +14,8 @@
 
 **Zusätzlicher CI-Gate:** Die CI baut das finale Angular-/ASP.NET-Docker-Image mit gesperrten Abhängigkeiten, überprüft die enthaltenen Dateien und den Nicht-Root-Benutzer, ohne Images zu veröffentlichen. Ein abschließender Sammel-Gate schlägt bei jedem fehlgeschlagenen, abgebrochenen oder übersprungenen Pflichtjob fehl.
 
+**Erweiterte Keycloak-Sicherheitsprüfung:** Die CI testet jetzt positive und negative Client-, Benutzer- und Gruppengrenzen in FGAP v2 bis zum delegierten Entzug. Diese Tests belegen isolierte Servicekonten, keine vollständige Unternehmens-AD- oder MFA-/BFF-Abnahme. GitHub-Actions-Abhängigkeiten sind auf verifizierte Commit-SHAs fixiert; npm-Installationen erhalten einen Lockfile-Cache und begrenzte Download-Retries.
+
 ## Was enthalten ist
 
 - Teambezogener Anwendungskatalog, kontrollierte Registrierung, explizite Owner/Maintainer/AccessManager/Approver/Auditor-Mandate.

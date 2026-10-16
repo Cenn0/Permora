@@ -2,6 +2,10 @@
 
 **Container-Test:** Die CI baut das tatsächliche Multi-Stage-Image (`deploy/Dockerfile`) ausschließlich aus gesperrten NuGet-/npm-Abhängigkeiten und prüft, dass die API-DLL, die Angular-Startseite und ein Nicht-Root-Runtime-User vorhanden sind. Das ist keine Docker-/Kubernetes-Betriebsabnahme.
 
+## FGAP-Negativtests mit echten Zielidentitäten
+
+Die Keycloak-26.8.1-Integration prüft zusätzlich user- und group-spezifische FGAP-Rechte, positive und negative Zuweisungen, fremde Clients sowie den tatsächlichen Rollenerzug. Eine bewusst eingesetzte Zielgruppen-`manage`-Berechtigung ist weiter gefasst als reine Rollenzuweisung; sie darf nicht als unabhängig minimaler Gruppen-Mapping-Scope ausgegeben werden. Die Permora-API muss solche administrativen Operationen serverseitig weiter beschränken. Produktives AD-/LDAP, BFF-OIDC/MFA und Load/Recovery bleiben eigene Gates.
+
 ## Reproduzierbarkeit ab diesem Stand
 
 Die tatsächlich aufgelösten NuGet- und npm-Lockfiles sind eingecheckt. In der Standard-CI laufen `dotnet restore Permora.slnx --locked-mode` und `npm ci`. Fehlende, inkonsistente oder nicht zur Manifestversion passende Locks brechen ab. Der zuvor rote Diagnoselauf bleibt als historischer Nachweis erhalten, und der neue Lockfile-Stand muss noch gegen vollständige Release-Builds geprüft werden.
