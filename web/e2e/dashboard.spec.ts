@@ -43,6 +43,8 @@ test('sidebar identifies the currently active route for assistive technology',as
  await page.goto('/');
  const nav=page.getByRole('navigation',{name:'Hauptnavigation'});
  await expect(nav.getByRole('link',{name:'Dashboard'})).toHaveAttribute('aria-current','page');
+ const mobileToggle = page.getByRole('button',{name:'Navigation öffnen'});
+ if (await mobileToggle.isVisible()) await mobileToggle.click();
  await nav.getByRole('link',{name:'Meine Anwendungen'}).click();
  await expect(nav.getByRole('link',{name:'Meine Anwendungen'})).toHaveAttribute('aria-current','page');
  await expect(nav.getByRole('link',{name:'Dashboard'})).not.toHaveAttribute('aria-current','page');
