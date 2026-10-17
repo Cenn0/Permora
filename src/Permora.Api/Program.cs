@@ -68,6 +68,16 @@ else
         o.ExpireTimeSpan = TimeSpan.FromMinutes(30); o.SlidingExpiration = false;
         o.Events.OnRedirectToLogin = c => { c.Response.StatusCode = 401; return Task.CompletedTask; };
         o.Events.OnRedirectToAccessDenied = c => { c.Response.StatusCode = 403; return Task.CompletedTask; };
+        o.Events.OnSigningIn = context =>
+        {
+            if (builder.Environment.IsDevelopment()
+                && Environment.GetEnvironmentVariable("PERMORA_CI_DIAG_ASSURANCE") == "1")
+                context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>()
+                    .LogInformation("PERMORA-CI-ASSURANCE: cookie_signin_privileged={Privileged} cookie_signin_acr_2={Acr2}",
+                        SessionAssurance.IsPrivileged(context.Principal, options, DateTimeOffset.UtcNow),
+                        context.Principal?.FindAll("acr").Any(c => c.Value == options.PrivilegedAcr));
+            return Task.CompletedTask;
+        };
     })
     .AddOpenIdConnect(o =>
     {
@@ -98,6 +108,16 @@ else
                             authTime.Length, SessionAssurance.IsPrivileged(context.Principal, options, DateTimeOffset.UtcNow));
                 }
             }
+            return Task.CompletedTask;
+        };
+        o.Events.OnTicketReceived = context =>
+        {
+            if (builder.Environment.IsDevelopment()
+                && Environment.GetEnvironmentVariable("PERMORA_CI_DIAG_ASSURANCE") == "1")
+                context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>()
+                    .LogInformation("PERMORA-CI-ASSURANCE: oidc_ticket_privileged={Privileged} oidc_ticket_acr_2={Acr2}",
+                        SessionAssurance.IsPrivileged(context.Principal, options, DateTimeOffset.UtcNow),
+                        context.Principal?.FindAll("acr").Any(c => c.Value == options.PrivilegedAcr));
             return Task.CompletedTask;
         };
         o.Events.OnRedirectToIdentityProvider = context =>
