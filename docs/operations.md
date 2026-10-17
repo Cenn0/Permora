@@ -65,3 +65,18 @@ Die API veröffentlicht keine personenbezogenen Identifikatoren oder
 Realm-/Clientnamen. Schwellwerte und ein verbindlicher Entzugs-SLO
 dürfen erst nach Last-/Recovery-Messung für die konkrete Installation
 festgelegt werden.
+
+### Warteschlangen-Fairness bei mehr als 100 fälligen Anwendungen
+
+Der Worker verarbeitet pro Poll maximal 100 fällige Anwendungen. Eine lokale
+UUID-Cursor-Rotation wählt in der nächsten Runde zunächst die Anwendungen
+**nach** der zuletzt bearbeiteten ID und springt am Ende wieder zum Anfang.
+Damit verdrängen die 100 niedrigsten UUIDs nicht dauerhaft andere
+Anwendungen, deren Aufträge ebenfalls ununterbrochen fällig sind.
+
+Die Regression verwendet sieben gleichzeitig fällige Anwendungen und ein
+Testlimit von zwei Anwendungen je Runde gegen **echtes PostgreSQL**. Die
+Rotation ist **keine** Garantie einer maximalen Entzugsdauer: Eine
+langlebige Remote-Sperre, ein ausgefallener Worker, mehrere voneinander
+unabhängige Worker-Instanzen oder Backlog oberhalb der tatsächlich gemessenen
+Kapazität benötigen weiterhin Monitoring, Lasttests und Betriebsmaßnahmen.
