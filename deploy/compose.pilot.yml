@@ -1,18 +1,15 @@
 # NON-PRODUCTION PILOT REFERENCE ONLY.
 # Requires administrator-provisioned files under .local/permora-pilot/
 # and a trusted external Keycloak, PostgreSQL, TLS termination and egress controls.
-# Never expose worker/provisioner or Keycloak Admin REST on a public interface.
+# API configuration must include KeyProtection and explicit Transport:TrustedProxies.
 name: permora-pilot
 
 x-hardening: &hardening
   read_only: true
-  cap_drop:
-    - ALL
-  security_opt:
-    - no-new-privileges:true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
   init: true
-  tmpfs:
-    - /tmp:size=64m,mode=1777
+  tmpfs: ["/tmp:size=64m,mode=1777"]
   restart: unless-stopped
 
 services:
@@ -42,13 +39,15 @@ services:
         target: /run/secrets/portal-client
         read_only: true
       - type: bind
+        source: ../.local/permora-pilot/key-protection
+        target: /run/key-protection
+        read_only: true
+      - type: bind
         source: ../.local/permora-pilot/keys
         target: /var/lib/permora/keys
     ports:
-      # Host-local proxy only. Configure HTTPS + trusted proxy headers separately.
       - "127.0.0.1:18088:8080"
-    networks:
-      - trusted-egress
+    networks: [trusted-egress]
 
   worker:
     <<: *hardening
@@ -81,13 +80,11 @@ services:
         source: ../.local/permora-pilot/directory-reader.secret
         target: /run/secrets/directory-reader
         read_only: true
-    networks:
-      - trusted-egress
+    networks: [trusted-egress]
 
   provisioner:
     <<: *hardening
-    profiles:
-      - provisioning
+    profiles: [provisioning]
     build:
       context: ..
       dockerfile: deploy/Dockerfile
@@ -109,8 +106,7 @@ services:
         source: ../.local/permora-pilot/client-preparer.secret
         target: /run/secrets/client-preparer
         read_only: true
-    networks:
-      - trusted-egress
+    networks: [trusted-egress]
 
 networks:
   trusted-egress:

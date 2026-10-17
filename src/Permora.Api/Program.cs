@@ -29,7 +29,7 @@ builder.Services.AddSingleton<PostgresStore>();
 builder.Services.AddSingleton<IPortalStore>(p => p.GetRequiredService<PostgresStore>());
 builder.Services.AddScoped<ChangeService>();
 builder.Services.AddSingleton<SessionStore>();
-builder.Services.AddDataProtection().SetApplicationName("Permora").PersistKeysToFileSystem(new DirectoryInfo(options.DataProtectionPath));
+builder.Services.AddPermoraHostingSecurity(builder.Configuration, options, builder.Environment.IsDevelopment());
 builder.Services.AddAntiforgery(o => { o.HeaderName = "X-XSRF-TOKEN"; o.Cookie.Name = "Permora.Antiforgery"; o.Cookie.SecurePolicy = options.AllowHttpInDevelopment && builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; });
 builder.Services.Configure<JsonOptions>(o =>
 {
@@ -73,10 +73,7 @@ else
         o.Authority = options.Authority; o.ClientId = options.ClientId;
         o.ClientSecret = File.ReadAllText(options.ClientSecretFile).Trim();
         o.ResponseType = "code"; o.UsePkce = true; o.SaveTokens = false; o.MapInboundClaims = false;
-        // ASP.NET Core's default ClaimActions.DeleteClaim("acr") runs AFTER the
-        // signed ID token was validated. Preserve that validated claim so a
-        // Keycloak LoA2 session cannot be downgraded to an anonymous assurance
-        // level in the server-side cookie. Keep issuer/audience validation.
+        // Preserve the signed ID-token ACR after ASP.NET Core's default claim processing.
         o.ClaimActions.Remove("acr");
         o.RequireHttpsMetadata = !(builder.Environment.IsDevelopment() && options.AllowHttpInDevelopment);
         o.Scope.Clear(); o.Scope.Add("openid"); o.Scope.Add("profile");
@@ -99,8 +96,6 @@ else
             context.ProtocolMessage.RedirectUri = options.PublicOrigin.TrimEnd('/') + "/signin-oidc";
             if (context.Properties.Items.ContainsKey(SessionAssurance.StepUpChallengeFlag))
             {
-                // Request an essential LoA, not merely the advisory acr_values parameter.
-                // ACR and auth_time are independently verified on every privileged write.
                 context.ProtocolMessage.SetParameter("claims", SessionAssurance.RequiredIdTokenClaims(options.PrivilegedAcr));
                 context.ProtocolMessage.SetParameter("max_age", "0");
                 context.ProtocolMessage.Prompt = "login";
@@ -126,6 +121,7 @@ builder.Services.AddAuthorization(o =>
 });
 
 var app = builder.Build();
+app.UseForwardedHeaders();
 app.Use(async (context, next) =>
 {
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
@@ -133,6 +129,11 @@ app.Use(async (context, next) =>
     context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
     if (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/bff"))
         context.Response.Headers.CacheControl = "no-store";
+    if (HostingSecurity.RequiresHttpsRejection(context, app.Environment.IsDevelopment()))
+    {
+        await Results.Problem(statusCode: 400, title: "https_required", detail: "HTTPS or a configured trusted TLS proxy is required.").ExecuteAsync(context);
+        return;
+    }
     try { await next(context); }
     catch (DomainException ex)
     { await Results.Problem(statusCode: ex.Status, title: ex.Code, detail: ex.Message, extensions: new Dictionary<string, object?> { ["traceId"] = context.TraceIdentifier }).ExecuteAsync(context); }
@@ -161,8 +162,6 @@ app.Use(async (context, next) =>
         || HttpMethods.IsPatch(context.Request.Method) || HttpMethods.IsDelete(context.Request.Method);
     if (protectedPath && mutating)
         await context.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(context);
-    // No mutating API operation may rely on a stale or low-assurance SSO cookie.
-    // Development mode uses a separately gated, loopback-only fake identity.
     if (context.Request.Path.StartsWithSegments("/api/v1") && mutating && !options.EnableDevelopmentLogin
         && !SessionAssurance.IsPrivileged(context.User, options, DateTimeOffset.UtcNow))
         throw new DomainException("step_up_required", "A fresh Keycloak MFA verification is required before changing access. Open /bff/step-up and retry.", 403);
@@ -200,12 +199,10 @@ app.MapGet("/bff/step-up", () =>
 }).RequireAuthorization();
 app.MapPost("/bff/logout", async (HttpContext context) =>
 {
-    // Local BFF sign-out: never redirect an XHR to the identity provider.
-    // The shared Keycloak SSO session is intentionally not terminated for other applications.
+    // Local logout intentionally leaves the shared Keycloak SSO session alone.
     if (!options.EnableDevelopmentLogin) await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     return Results.NoContent();
 });
-
 ApiEndpoints.Map(app, options, admins);
 app.MapFallback("/api/{**path}", () => Results.NotFound()).RequireAuthorization();
 app.MapFallback("/bff/{**path}", () => Results.NotFound()).AllowAnonymous();
