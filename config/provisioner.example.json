@@ -1,6 +1,6 @@
 {
   "ConnectionStrings": {
-    "Portal": "Host=postgres.internal;Database=permora;Username=permora_provisioner;Password=REPLACE_LOCALLY"
+    "PortalFile": "/run/secrets/portal-postgres"
   },
   "Provisioning": {
     "AllowHttpInDevelopment": false,
