@@ -41,6 +41,8 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - name: Verify SBOM graph and safe archive regressions
+        run: python3 -m unittest discover -s scripts -p test_release_evidence.py
       - name: Install checksum-verified scanner
         run: python3 scripts/install-syft.py "$RUNNER_TEMP/scanner"
       - name: Build and inventory actual application artifacts
@@ -49,12 +51,12 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/candidate"
           sha256sum -c SHA256SUMS
-          echo 'Candidate artifacts and image SBOMs verified on an ephemeral runner. No upload, signature or production approval from PR code.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Actual artifact/image inventories and dependency graphs verified. PR code cannot upload or sign candidates.' >> "$GITHUB_STEP_SUMMARY"
 
   sign-draft-candidate:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 45
     permissions:
       contents: write
       attestations: write
@@ -71,6 +73,32 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - name: Require successful core and system tests on this exact main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, time
+          sha, repo = os.environ['GITHUB_SHA'], os.environ['GITHUB_REPOSITORY']
+          required = {'Permora CI', 'Permora system acceptance', 'Permora worker and recovery acceptance'}
+          deadline = time.monotonic() + 900
+          while time.monotonic() < deadline:
+              data = json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/actions/runs?head_sha={sha}&event=push&per_page=100']))
+              by_name = {}
+              for run in sorted(data['workflow_runs'], key=lambda r:r['id']):
+                  if run['name'] in required:
+                      by_name[run['name']] = run
+              if any(r['status']=='completed' and r['conclusion']!='success' for r in by_name.values()):
+                  raise SystemExit('A mandatory exact-source test failed, was skipped or cancelled; no signing allowed.')
+              if required <= by_name.keys() and all(r['conclusion']=='success' for r in by_name.values()):
+                  print('Exact-source mandatory tests verified:', ', '.join(sorted(required)))
+                  break
+              time.sleep(15)
+          else:
+              raise SystemExit('Exact-source acceptance was not proven; no candidate will be signed.')
+          PY
+      - name: Verify SBOM graph and safe archive regressions
+        run: python3 -m unittest discover -s scripts -p test_release_evidence.py
       - name: Install checksum-verified scanner
         run: python3 scripts/install-syft.py "$RUNNER_TEMP/scanner"
       - name: Build exact trusted-main source into candidate artifacts
@@ -105,6 +133,6 @@ jobs:
           tag="candidate-${GITHUB_SHA:0:12}-run${GITHUB_RUN_ID}"
           gh release create "$tag" "$RUNNER_TEMP"/candidate/* \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease \
-            --title "Unsigned-for-production development candidate ${GITHUB_SHA:0:12}" \
-            --notes 'Cryptographically signed build candidates with actual image SBOMs, application checksums and license evidence. This draft is NOT a production release, legal approval, security certification or completed roadmap. Review all remaining release gates before any publication. No OS image tarballs are published.'
+            --title "Development candidate ${GITHUB_SHA:0:12} — not production-approved" \
+            --notes 'Cryptographically signed build candidates, actual image SBOMs, checksums and license evidence. This draft is NOT a production release, legal approval, security certification or completed roadmap. Review all remaining release gates before publication. No OS image tarballs are published.'
           echo "Signed development candidate stored as draft: $tag. Not production-approved." >> "$GITHUB_STEP_SUMMARY"
