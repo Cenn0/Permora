@@ -1,5 +1,14 @@
 # Review und Prüfergebnis
 
+## Aktueller Nachtrag – 17. Oktober 2026
+
+- Die technische CI auf den jeweiligen Implementierungsbranches hat die neuen Sicherheits- und Betriebspfade bestätigt: [echter Browser-OIDC-/Password-only-Negativtest](https://github.com/Cenn0/Permora/actions/runs/38985065471), [Cross-Team-IDOR-Regression](https://github.com/Cenn0/Permora/actions/runs/38985300214), [vorherige Basis-CI](https://github.com/Cenn0/Permora/actions/runs/38964688463).
+- Reconciliation-Drift meldet nun explizit Konflikt; externe Gruppenmitgliedschaft kann SoD-Entzüge auslösen; die Admin-Queue besitzt aggregierte Gesundheitsdiagnostik. Das Offline-CycloneDX-Inventar und die isolierte PostgreSQL-Dump-/Restore-Probe sind **Teilprüfungen**.
+- **Nicht nachgewiesen:** positive produktionsnahe MFA, unternehmensweites LDAP/AD, komplett minimale Group-Manage-FGAP-Rechte, sofortiger JWT-Widerruf, Multi-Service-Disaster-Recovery, Last-/HA-/Retention- und unabhängige Sicherheitsabnahme.
+
+Die früheren Berichtsaussagen bleiben als historische Ausgangsbefunde erhalten; sie dürfen nicht als heutige Freigabelage interpretiert werden. Siehe [Release-Gates](release-checklist.md) und [Threat Model](threat-model.md).
+
+
 **Neuester technischer Stand:** [Workflow #38946163282](https://github.com/Cenn0/Permora/actions/runs/38946163282) auf dem CI-Branch ist komplett grün (7/7 Jobs). Docker-Build, Keycloak-FGAP-Zielbenutzer-/Gruppenzuweisungen und echte npm-/NuGet-Lockfiles sind geprüft. Historische Aussagen zu ursprünglich fehlenden .NET-/Angular-Testumgebungen und fehlenden Lockfiles sind als **damalige Befunde** zu lesen, nicht als aktuelle Blocker. Weiterhin offen: umfassendes Produkt-/BFF-SSO-/MFA-/LDAP-/ABAC-/SoD-/Release-Audit und Last-/Recovery-/Penetrationstests. [Aktuelles Protokoll](evidence/ci-2026-10-16-final.md).
 
 

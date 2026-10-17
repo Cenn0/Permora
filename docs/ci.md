@@ -1,5 +1,14 @@
 # Permora CI: Tests, Belege und Grenzen
 
+## Nachtrag: integrierte CI, 17. Oktober 2026
+
+**Neu:** Die nachträgliche technische CI umfasst neben der bisherigen siebenstufigen Prüfung einen achten Pflichtjob für echten Chromium-/Keycloak-/ASP.NET-BFF-OIDC-Login. Der separate [erfolgreiche PR-#13-Lauf](https://github.com/Cenn0/Permora/actions/runs/38985065471) bestätigt den **Passwort-only-Negativtest** gegen das serverseitige ACR-/auth_time-Gate, echte BFF-Sitzung und CSRF-Verarbeitung. Die [erfolgreiche PR-#18-CI](https://github.com/Cenn0/Permora/actions/runs/38985300214) enthält weitere echte HTTP-Tests gegen Cross-Team-IDORs und die Korrektur, die Fremd-App-Sichtbarkeit vor fachlicher Payload-Validierung prüft.
+
+Die aktuelle Standard-CI prüft außerdem ein offline erzeugtes CycloneDX-*Lockfile-Inventar* und eine isolierte PostgreSQL-Dump-/Restore-Probe. Dies ist **keine** vollständige Release-SBOM oder Mehrsystem-Disaster-Recovery. Ein tatsächlich bestandenes **positives MFA-Step-up**, LDAP-/AD-Federation, unabhängiger Pentest, HA-/Lastgrenzen und Hersteller-Support für Permora werden durch diese Prüfungen **nicht** behauptet. Die folgenden Abschnitte vom 16. Oktober bleiben als historische Lauf- und Review-Nachweise erhalten.
+
+[Release-Freigabekriterien](release-checklist.md) · [Threat Model](threat-model.md) · [Security](security.md)
+
+
 ## Vollständiger grüner Prüflauf – 16.10.2026
 
 [GitHub Actions #38946163282](https://github.com/Cenn0/Permora/actions/runs/38946163282) hat **alle sieben Pflichtjobs** erfolgreich ausgeführt: C#-Release-Build und 102 xUnit-Tests mit echter PostgreSQL-Integration ohne Skips, API-HTTP-Sicherheitstest, Angular-Produktionsbuild und 32 Frontend-Logiktests sowie 8 Playwright-Tests, Keycloak 26.8.1 mit zwei delegierten FGAP-Servicekonten inklusive Zielbenutzer-/Gruppen-Positiv-/Negativfällen, gesperrte npm-/NuGet-Dependency-Restores, lokaler Docker-Build des tatsächlichen Produktionsimages und fail-closed Zusammenfassungs-Gate.

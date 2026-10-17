@@ -18,7 +18,7 @@
 
 Permora ist ein eigenständiges, quelloffenes **C#-/Angular-Portal** für die eingeschränkte Verwaltung eigener Anwendungen. Anwendungsteams können fachliche Rollen, Einzelberechtigungen und Zugriffsanträge bearbeiten, ohne die zentrale Realm-Verwaltung zu erhalten.
 
-> **Status: technisch in CI geprüft, nicht produktionsfreigegeben.** Der dokumentierte GitHub-Actions-Abnahmelauf hat sieben Pflichtjobs bestanden: .NET-/Angular-Builds, 102 xUnit-Tests einschließlich PostgreSQL, 32 Frontend-Logiktests, 8 Playwright-Tests, ausgewählte FGAP-Berechtigungstests mit echtem Keycloak 26.8.1 und ein lokaler Docker-Build. **Produktives OIDC/MFA, LDAP/AD, vollständige Berechtigungsmatrix, Wiederanlauf- und Penetrationstests sind weiterhin offen.** Siehe [CI-Nachweise](docs/ci.md) und [Roadmap](docs/roadmap.md).
+> **Status: technischer Entwicklungsstand mit erfolgreicher CI, nicht produktionsfreigegeben.** Die aktuelle CI umfasst .NET-/Angular-Builds, echte PostgreSQL-/xUnit- und Browserprüfungen, ausgewählte FGAP-v2-Zielbenutzer-/Gruppenprüfungen mit Keycloak 26.8.1 und einen **echten Chromium-/Keycloak-/ASP.NET-BFF-Login mit Cookie-/CSRF-Prüfung und Ablehnung privilegierter Änderungen nach reiner Passwortanmeldung**. Dazu kommen ein Docker-Build, ein begrenztes CycloneDX-Paketinventar aus NuGet/npm-Lockfiles und eine isolierte PostgreSQL-Wiederherstellungsprobe. **Positives MFA-Step-up in produktionsnaher Konfiguration, Unternehmens-AD/LDAP, vollständige Rechteisolation, Mehrsystem-Recovery, vollständige Lizenz-/SBOM-/Sicherheitsbewertung, Last/HA und ein unabhängiger Penetrationstest bleiben offen.** [CI-Nachweise](docs/ci.md) · [Release-Gates](docs/release-checklist.md) · [Roadmap](docs/roadmap.md).
 
 ## Was Permora abdeckt
 
