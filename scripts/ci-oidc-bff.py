@@ -154,6 +154,8 @@ def run():
         test_password = "PermoraOnly-CI-Password-1!"
         admin_http("POST", admin + "/users", {
             "username": "bff-ci-user", "enabled": True, "emailVerified": True,
+            "firstName": "Permora", "lastName": "CI",
+            "email": "bff-ci-user@permora.invalid",
             "requiredActions": [], "credentials": [
                 {"type": "password", "value": test_password, "temporary": False}
             ]
