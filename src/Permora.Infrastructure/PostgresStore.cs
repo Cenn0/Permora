@@ -180,7 +180,7 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
         await tx.CommitAsync(ct);
     }
 
-    public async Task<IReadOnlyList<Guid>> DueApplicationsAsync(DateTimeOffset now, int limit, CancellationToken ct)
+    public async Task<IReadOnlyList<Guid>> DueApplicationsAsync(DateTimeOffset now, int limit, Guid afterId, CancellationToken ct)
     {
         await using var connection = await source.OpenConnectionAsync(ct);
         await using var command = new NpgsqlCommand("""
