@@ -1,0 +1,138 @@
+name: Permora artifact integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'deploy/Dockerfile'
+      - 'Directory.*.props'
+      - 'scripts/*release*'
+      - 'scripts/install-syft.py'
+      - '.github/workflows/release-integrity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/*release*'
+      - 'scripts/install-syft.py'
+      - '.github/workflows/release-integrity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: permora-artifact-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-candidates:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify SBOM graph and safe archive regressions
+        run: python3 -m unittest discover -s scripts -p test_release_evidence.py
+      - name: Install checksum-verified scanner
+        run: python3 scripts/install-syft.py "$RUNNER_TEMP/scanner"
+      - name: Build and inventory actual application artifacts
+        run: python3 scripts/build-release-evidence.py --syft "$RUNNER_TEMP/scanner/syft" --output "$RUNNER_TEMP/candidate"
+      - name: Validate checksums and inventory without publishing
+        run: |
+          cd "$RUNNER_TEMP/candidate"
+          sha256sum -c SHA256SUMS
+          echo 'Actual artifact/image inventories and dependency graphs verified. PR code cannot upload or sign candidates.' >> "$GITHUB_STEP_SUMMARY"
+
+  sign-draft-candidate:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Require successful core and system tests on this exact main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, time
+          sha, repo = os.environ['GITHUB_SHA'], os.environ['GITHUB_REPOSITORY']
+          required = {'Permora CI', 'Permora system acceptance', 'Permora worker and recovery acceptance'}
+          deadline = time.monotonic() + 900
+          while time.monotonic() < deadline:
+              data = json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/actions/runs?head_sha={sha}&event=push&per_page=100']))
+              by_name = {}
+              for run in sorted(data['workflow_runs'], key=lambda r:r['id']):
+                  if run['name'] in required:
+                      by_name[run['name']] = run
+              if any(r['status']=='completed' and r['conclusion']!='success' for r in by_name.values()):
+                  raise SystemExit('A mandatory exact-source test failed, was skipped or cancelled; no signing allowed.')
+              if required <= by_name.keys() and all(r['conclusion']=='success' for r in by_name.values()):
+                  print('Exact-source mandatory tests verified:', ', '.join(sorted(required)))
+                  break
+              time.sleep(15)
+          else:
+              raise SystemExit('Exact-source acceptance was not proven; no candidate will be signed.')
+          PY
+      - name: Verify SBOM graph and safe archive regressions
+        run: python3 -m unittest discover -s scripts -p test_release_evidence.py
+      - name: Install checksum-verified scanner
+        run: python3 scripts/install-syft.py "$RUNNER_TEMP/scanner"
+      - name: Build exact trusted-main source into candidate artifacts
+        run: python3 scripts/build-release-evidence.py --syft "$RUNNER_TEMP/scanner/syft" --output "$RUNNER_TEMP/candidate"
+      - name: Attest actual candidate bytes using GitHub OIDC
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: ${{ runner.temp }}/candidate/*
+          create-storage-record: false
+          push-to-registry: false
+      - name: Verify signed source, workflow identity and exact artifact digests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = 'Cenn0/Permora'
+          test "$GITHUB_REF" = 'refs/heads/main'
+          cd "$RUNNER_TEMP/candidate"
+          sha256sum -c SHA256SUMS
+          gh attestation verify SHA256SUMS --repo "$GITHUB_REPOSITORY" \
+            --bundle "$BUNDLE" --source-digest "$GITHUB_SHA" --source-ref refs/heads/main \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-integrity.yml" \
+            --deny-self-hosted-runners
+          cp "$BUNDLE" provenance.sigstore.json
+      - name: Store signed candidates as a draft, never a production release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="candidate-${GITHUB_SHA:0:12}-run${GITHUB_RUN_ID}"
+          gh release create "$tag" "$RUNNER_TEMP"/candidate/* \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease \
+            --title "Development candidate ${GITHUB_SHA:0:12} — not production-approved" \
+            --notes 'Cryptographically signed build candidates, actual image SBOMs, checksums and license evidence. This draft is NOT a production release, legal approval, security certification or completed roadmap. Review all remaining release gates before publication. No OS image tarballs are published.'
+          echo "Signed development candidate stored as draft: $tag. Not production-approved." >> "$GITHUB_STEP_SUMMARY"
