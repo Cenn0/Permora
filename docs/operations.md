@@ -41,3 +41,10 @@ Ein neuer oder neu gebundener Client bleibt bis zur zentralen IAM-Prüfung gespe
 Zentrale IAM-Administratoren können `GET /api/v1/admin/operations-health` abfragen. Die Antwort enthält nur globale Summen für `Queued`, `AwaitingApproval`, `Failed`, `Conflict`, fällige systemseitige Entzüge und das Alter des ältesten fälligen Entzugs in Sekunden. Andere Teams haben keinen Zugriff. Werte sind **kein** Ersatz für vollständige Keycloak-Soll-/Ist-Verifikation, keine Aussage über noch gültige JWTs und ohne Lasttest keine zugesagte Entzugs-SLA.
 
 Alarmierung auf die neuen Kennzahlen sollte insbesondere blockierte Aufträge und überfällige automatische Entzüge betrachten; Schwellenwerte müssen im Pilotbetrieb anhand gemessener Last bestätigt werden. Für Prometheus/OpenTelemetry ist noch kein Exporter konfiguriert.
+
+
+## Isolierte PostgreSQL-Restore-Prüfung in CI
+
+`scripts/ci-database-recovery.sh` erzeugt **nach dem echten API-HTTP-Test** einen temporären `pg_dump` aus der isolierten CI-PostgreSQL-Datenbank, importiert ihn in eine getrennte temporäre Testdatenbank und vergleicht Tabellenbestände, Anwendungs-JSONB-Prüfsummen und die Existenz der Audit-Append-only-Trigger. Das Skript verweigert Remote-Hosts und nicht-testbezogene Datenbanknamen, löscht die Kopie und speichert kein Backup-Artefakt.
+
+**Grenzen:** Kein vollständiges Disaster-Recovery, keine Keycloak-/BFF-Key-Wiederherstellung, kein PITR oder SLA-/RPO-/RTO-Nachweis. Nach jedem echten Restore bleiben Worker-Sperre, Remote-Keycloak-Abgleich, Secrets-/Key-Restore und Sicherheitsabnahme erforderlich.

@@ -75,6 +75,14 @@ jobs:
         run: python3 scripts/ci-verify-trx.py tests/Permora.Tests/TestResults
       - name: Exercise ASP.NET API over HTTP with two scoped test identities
         run: python3 scripts/ci-api-smoke.py
+      - name: Recovery smoke - isolated PostgreSQL backup and restore
+        env:
+          PERMORA_CI_PGHOST: 127.0.0.1
+          PERMORA_CI_PGPORT: '5432'
+          PERMORA_CI_PGUSER: permora_ci
+          PERMORA_CI_PGPASSWORD: permora_ci_isolated
+          PERMORA_CI_PGDATABASE: permora_test_ci
+        run: bash scripts/ci-database-recovery.sh
       - name: Summarize local test evidence without upload
         if: always()
         shell: bash
