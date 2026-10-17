@@ -1,6 +1,36 @@
 // Real Keycloak/ASP.NET OIDC BFF browser smoke. Launched only by the isolated CI runner.
-// The IdP test account is a disposable password-only identity; this is NOT positive MFA proof.
+// Disposable Keycloak account: first LoA1 password, then genuine configured OTP/LoA2. Not corporate MFA certification.
 import { chromium } from '@playwright/test';
+import { createHmac } from 'node:crypto';
+
+function decodeBase32(encoded) {
+ let bits = 0, value = 0;
+ const bytes = [];
+ for (const symbol of encoded.toUpperCase().replace(/[^A-Z2-7]/g,'')) {
+  const index = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'.indexOf(symbol);
+  if (index < 0) throw new Error('Invalid temporary OTP enrollment secret');
+  value = (value << 5) | index;
+  bits += 5;
+  if (bits >= 8) {
+   bytes.push((value >>> (bits - 8)) & 0xff);
+   bits -= 8;
+  }
+ }
+ if (bytes.length < 10) throw new Error('Ephemeral OTP secret too short');
+ return Buffer.from(bytes);
+}
+function currentTotp(secret) {
+ const counter = Math.floor(Date.now() / 30000);
+ const bytes = Buffer.alloc(8); bytes.writeBigUInt64BE(BigInt(counter));
+ const mac = createHmac('sha1', secret).update(bytes).digest();
+ const offset = mac[mac.length - 1] & 0xf;
+ const truncated = mac.readUInt32BE(offset) & 0x7fffffff;
+ return String(truncated % 1_000_000).padStart(6,'0');
+}
+async function nextTotpSlot() {
+ const msToNextSlot = 30000 - (Date.now() % 30000) + 1000;
+ await new Promise(resolve => setTimeout(resolve, msToNextSlot));
+}
 
 const base = 'http://127.0.0.1:5082';
 const username = process.env.PERMORA_TEST_BROWSER_USERNAME;
@@ -17,8 +47,18 @@ try {
  await page.locator('#username').fill(username);
  await page.locator('#password').fill(password);
  await page.locator('#kc-login').click();
+ // New disposable identity configures a real TOTP credential via Keycloak's
+ // required action; never log/persist the enrollment secret or OTP.
+ await page.locator('#mode-manual').waitFor({timeout: 30000});
+ await page.locator('#mode-manual').click();
+ const encodedSecret = (await page.locator('#kc-totp-secret-key').textContent())?.trim();
+ if (!encodedSecret) throw new Error('Keycloak did not expose a temporary manual OTP enrollment secret');
+ const otpSecret = decodeBase32(encodedSecret);
+ await page.locator('#totp').fill(currentTotp(otpSecret));
+ await page.locator('#userLabel').fill('Permora ephemeral CI OTP');
+ await page.locator('#saveTOTPBtn').click();
  await page.waitForURL(url => url.origin === base, {timeout: 45000});
- console.log('PASS: Browser completed real Keycloak login and ASP.NET OIDC callback');
+ console.log('PASS: Real Keycloak password login and disposable OTP enrollment completed');
 
  const getSession = async () => page.evaluate(async () => {
   const r = await fetch('/bff/session', {credentials:'same-origin'});
@@ -48,6 +88,40 @@ try {
  if (write.status !== 403 || write.title !== 'step_up_required')
   throw new Error('Low assurance unexpectedly passed the privileged API gate');
  console.log('PASS: Real password-only OIDC session cannot change privileges');
+
+ // Force a new authorization challenge for an essential ID-token ACR 2.
+ // Keycloak's separate condition requires a genuinely configured OTP factor.
+ await page.goto(base + '/bff/step-up', {waitUntil:'domcontentloaded', timeout:45000});
+ if (await page.locator('#username').isVisible()) {
+  await page.locator('#username').fill(username);
+  await page.locator('#password').fill(password);
+  await page.locator('#kc-login').click();
+ }
+ await page.locator('#otp').waitFor({timeout:45000});
+ // Keycloak rejects re-use of a one-time code from the initial enrollment slot.
+ await nextTotpSlot();
+ await page.locator('#otp').fill(currentTotp(otpSecret));
+ await page.locator('#kc-login').click();
+ await page.waitForURL(url => url.origin === base, {timeout:45000});
+ const verified = await getSession();
+ if (verified.status !== 200 || !verified.body.authenticated || !verified.body.strongAuthentication)
+  throw new Error('Real OTP step-up did not produce fresh trusted ACR 2');
+ console.log('PASS: Real OTP second factor yielded Keycloak LoA2 and trusted BFF strong session');
+
+ const elevated = await page.evaluate(async () => {
+  const xsrf = document.cookie.split('; ').find(x => x.startsWith('XSRF-TOKEN='))?.split('=')[1];
+  const r = await fetch('/api/v1/applications', {
+   method:'POST', credentials:'same-origin',
+   headers:{'X-XSRF-TOKEN':decodeURIComponent(xsrf||''),'Content-Type':'application/json'},
+   body: JSON.stringify({teamId:'10000000-0000-4000-8000-000000000001',
+    realmKey:'unapproved',slug:'not-created',name:'Elevated',
+    description:'Still denied by application ownership',environment:'Test'})
+  });
+  return {status:r.status, title:(await r.json()).title};
+ });
+ if (elevated.title === 'step_up_required' || elevated.status !== 404)
+  throw new Error('Strong session did not pass the assurance gate before scoped app validation');
+ console.log('PASS: LoA2 session passes the assurance gate but still respects application authorization');
 
  const logout = await page.evaluate(async () => {
   const xsrf = document.cookie.split('; ').find(x => x.startsWith('XSRF-TOKEN='))?.split('=')[1];
