@@ -48,6 +48,32 @@ public sealed class PostgresTests
             var dashboard = await store.DashboardAsync([f.App.Id], TestContext.Current.CancellationToken);
             Assert.Equal(35, dashboard.AwaitingApproval); Assert.Equal(20, dashboard.Requests.Count);
             Assert.Equal(0, (await store.DashboardAsync([], TestContext.Current.CancellationToken)).AwaitingApproval);
+            // A queued revocation is not the only exposure: failed and conflicting
+            // revocations must remain visible for incident response even after retries end.
+            var system = new Permora.Core.Actor("system", "Lifecycle");
+            Permora.Core.Operation Revocation(Permora.Core.OperationStatus status, int ageMinutes, int attempts) =>
+                new(Guid.NewGuid(), f.App.Id, system,
+                    new Permora.Core.Change { Kind = Permora.Core.ChangeKind.RevokeAccess, TargetId = Guid.NewGuid(),
+                        Reason = "Isolated health regression" }, 1,
+                    Guid.NewGuid().ToString("N"), "hash", status,
+                    f.Clock.Now.AddMinutes(-ageMinutes), f.Clock.Now.AddMinutes(-1), attempts,
+                    SystemRevocation: true);
+            await store.InApplicationAsync(f.App.Id, async tx =>
+            {
+                await tx.SaveOperationAsync(Revocation(Permora.Core.OperationStatus.Queued, 10, 1),
+                    TestContext.Current.CancellationToken);
+                await tx.SaveOperationAsync(Revocation(Permora.Core.OperationStatus.Failed, 120, 6),
+                    TestContext.Current.CancellationToken);
+                await tx.SaveOperationAsync(Revocation(Permora.Core.OperationStatus.Conflict, 30, 1),
+                    TestContext.Current.CancellationToken);
+                return true;
+            }, TestContext.Current.CancellationToken);
+            var health = await OperationsHealth.ReadAsync(source, f.Clock.Now, TestContext.Current.CancellationToken);
+            Assert.Equal(1, health.DueRevocations);
+            Assert.Equal(1, health.FailedRevocations);
+            Assert.Equal(1, health.ConflictedRevocations);
+            Assert.InRange(health.OldestOutstandingRevocationSeconds, 7199, 7201);
+
             var audit = await store.AuditAsync(f.App.Id, 0, 100, TestContext.Current.CancellationToken); Assert.True(AuditChain.Verify(audit));
             await using var mutate = source.CreateCommand("UPDATE audit_events SET sequence=sequence+1");
             await Assert.ThrowsAsync<PostgresException>(() => mutate.ExecuteNonQueryAsync(TestContext.Current.CancellationToken));

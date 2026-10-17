@@ -48,3 +48,20 @@ Alarmierung auf die neuen Kennzahlen sollte insbesondere blockierte Aufträge un
 `scripts/ci-database-recovery.sh` erzeugt **nach dem echten API-HTTP-Test** einen temporären `pg_dump` aus der isolierten CI-PostgreSQL-Datenbank, importiert ihn in eine getrennte temporäre Testdatenbank und vergleicht Tabellenbestände, Anwendungs-JSONB-Prüfsummen und die Existenz der Audit-Append-only-Trigger. Das Skript verweigert Remote-Hosts und nicht-testbezogene Datenbanknamen, löscht die Kopie und speichert kein Backup-Artefakt.
 
 **Grenzen:** Kein vollständiges Disaster-Recovery, keine Keycloak-/BFF-Key-Wiederherstellung, kein PITR oder SLA-/RPO-/RTO-Nachweis. Nach jedem echten Restore bleiben Worker-Sperre, Remote-Keycloak-Abgleich, Secrets-/Key-Restore und Sicherheitsabnahme erforderlich.
+
+### Störfälle: nicht mehr automatisch wiederholbare Entzüge
+
+`GET /api/v1/admin/operations-health` unterscheidet zusätzlich
+`failedRevocations`, `conflictedRevocations` und
+`oldestOutstandingRevocationSeconds`. Letzterer Wert berücksichtigt
+sämtliche noch in `Queued`, `Failed` oder `Conflict` befindlichen
+systemischen Entzüge – nicht nur aktuell fällige Queued-Aufträge.
+
+**Betriebsregel:** Jeder `Failed`-/`Conflict`-Entzug erfordert einen
+gezielten Alarm und eine kontrollierte manuelle Soll-/Ist-Prüfung.
+`oldestOutstandingRevocationSeconds` ist ein Alter des ältesten
+Bearbeitungsbedarfs, **keine** Messung real noch gültiger JWT-Zugriffe.
+Die API veröffentlicht keine personenbezogenen Identifikatoren oder
+Realm-/Clientnamen. Schwellwerte und ein verbindlicher Entzugs-SLO
+dürfen erst nach Last-/Recovery-Messung für die konkrete Installation
+festgelegt werden.
