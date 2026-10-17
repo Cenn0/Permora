@@ -5,13 +5,13 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
     public async Task<Operation> RequestAsync(Guid appId, Actor actor, Change change, long expectedRevision,
         string idempotencyKey, CancellationToken ct)
     {
-        Policy.Text(idempotencyKey, "Idempotency-Key", 8, 128);
         var initial = await store.ApplicationAsync(appId, ct) ?? throw new DomainException("not_found", "Application not found.", 404);
         var directory = await store.DirectoryAsync(initial.RealmKey, ct);
         var hash = Wire.Hash(Wire.Serialize(new { change, expectedRevision }));
         return await store.InApplicationAsync(appId, async tx =>
         {
             Policy.RequireVisible(actor, tx.Team, administrators);
+            Policy.Text(idempotencyKey, "Idempotency-Key", 8, 128);
             var existing = await tx.IdempotentAsync(actor.Key, idempotencyKey, ct);
             if (existing is not null)
             {
@@ -37,10 +37,10 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
 
     public Task<Operation> DecideAsync(Guid appId, Guid operationId, Actor actor, bool approve, string reason, CancellationToken ct)
     {
-        Policy.Text(reason, "Decision reason", 3, 1000);
         return store.InApplicationAsync(appId, async tx =>
         {
             Policy.RequireVisible(actor, tx.Team, administrators);
+            Policy.Text(reason, "Decision reason", 3, 1000);
             var operation = await tx.OperationAsync(operationId, ct) ?? throw new DomainException("not_found", "Request not found.", 404);
             Policy.RequireApproval(actor, operation.RequestedBy, tx.Team, administrators);
             if (operation.Status != OperationStatus.AwaitingApproval)
@@ -61,14 +61,14 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
 
     public Task<AccessReview> StartReviewAsync(Guid appId, Actor actor, string name, DateTimeOffset dueAt, CancellationToken ct)
     {
-        Policy.Text(name, "Review name", 3, 120);
-        if (dueAt <= clock.GetUtcNow() || dueAt > clock.GetUtcNow().AddDays(90))
-            throw new DomainException("invalid_due_date", "Review due date must be within the next 90 days.");
         return store.InApplicationAsync(appId, async tx =>
         {
             Policy.RequireVisible(actor, tx.Team, administrators);
             if (Policy.Role(actor, tx.Team, administrators) != ManagementRole.Owner)
                 throw new DomainException("forbidden", "Only application owners may start a review.", 403);
+            Policy.Text(name, "Review name", 3, 120);
+            if (dueAt <= clock.GetUtcNow() || dueAt > clock.GetUtcNow().AddDays(90))
+                throw new DomainException("invalid_due_date", "Review due date must be within the next 90 days.");
             var review = new AccessReview(Guid.NewGuid(), appId, name, dueAt,
                 tx.Application.Assignments.Select(a => new ReviewItem(a.Id, "Pending")).ToArray());
             await tx.SaveReviewAsync(review, ct);

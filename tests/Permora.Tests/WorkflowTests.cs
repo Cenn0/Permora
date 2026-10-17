@@ -2,6 +2,22 @@ namespace Permora.Tests;
 
 public sealed class WorkflowTests
 {
+    [Fact] public async Task Foreign_team_is_not_allowed_to_probe_review_or_decision_field_validation()
+    {
+        var f = new Fixture(); var service = new ChangeService(new MemoryStore(f), f.Admins, f.Clock);
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            service.StartReviewAsync(f.App.Id, f.Outsider, "x", DateTimeOffset.MinValue, Ct));
+        Assert.Equal("not_found", error.Code);
+        Assert.Equal(404, error.Status);
+        var decision = await Assert.ThrowsAsync<DomainException>(() =>
+            service.DecideAsync(f.App.Id, Guid.NewGuid(), f.Outsider, true, "x", Ct));
+        Assert.Equal("not_found", decision.Code);
+        Assert.Equal(404, decision.Status);
+        var request = await Assert.ThrowsAsync<DomainException>(() =>
+            service.RequestAsync(f.App.Id, f.Outsider, f.Grant(), 1, "", Ct));
+        Assert.Equal("not_found", request.Code);
+        Assert.Equal(404, request.Status);
+    }
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
     [Fact] public async Task Disabled_requester_cannot_execute_an_already_approved_grant()
     {
