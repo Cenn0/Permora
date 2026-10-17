@@ -1,0 +1,10 @@
+{
+  "name": "permora-accessibility-tooling",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CI-only accessibility scanner; not shipped in the application",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "axe-core": "4.14.0"
+  }
+}
