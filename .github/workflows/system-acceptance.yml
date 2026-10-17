@@ -28,11 +28,13 @@ jobs:
           sudo apt-get update -qq
           sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq slapd ldap-utils
           sudo systemctl stop slapd
+          sudo install -d -m 0700 -o "$(id -u)" -g "$(id -g)" /var/lib/ldap/permora-ci
       - name: Validate test syntax
         run: python3 -m py_compile scripts/ci-federation.py
       - name: Execute real LDAPS federation and delegated security matrix
         env:
           PERMORA_SYSTEM_TESTS: isolated
+          TMPDIR: /var/lib/ldap/permora-ci
         run: python3 scripts/ci-federation.py
       - name: Record scope without storing secrets or artifacts
         if: always()
