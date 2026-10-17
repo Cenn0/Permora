@@ -28,3 +28,5 @@ Changes are asynchronous. HTTP 202 acceptance is **not** confirmation of remote 
 No invented dashboard screenshot is published; the [tracked brand asset](../web/public/brand/permora.svg) and [design description](design.md) are available until a verified application capture exists.
 
 **Dependency inventory:** [Lockfile CycloneDX generator and exclusions](supply-chain.md).
+
+**Release security:** [Threat model](threat-model.md) · [Release gate checklist](release-checklist.md).
