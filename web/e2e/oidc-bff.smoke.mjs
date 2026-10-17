@@ -94,9 +94,23 @@ try {
  await page.goto(base + '/bff/step-up', {waitUntil:'domcontentloaded', timeout:45000});
  // prompt=login may require another password challenge before the LoA2 OTP form.
  // Wait for a *visible* form instead of checking #username during the redirect race.
- await page.locator('#username:visible, #otp:visible').first().waitFor({timeout:45000});
- if (await page.locator('#username:visible').count()) {
-  await page.locator('#username').fill(username);
+ try {
+  await page.locator('#username:visible, #password:visible, #otp:visible').first().waitFor({timeout:30000});
+ } catch (error) {
+  // Diagnostic metadata only. Do not emit input values, OTP enrollment secrets,
+  // cookies, redirect URLs or authentication tokens.
+  const visibleInputs = await page.locator('input:visible').evaluateAll(elements =>
+   elements.map(e=>({id:e.id,name:e.getAttribute('name'),type:e.type})));
+  const titles = await page.locator('h1, h2').allTextContents();
+  console.error('Unexpected Keycloak step-up form (metadata only):', JSON.stringify({
+   path:new URL(page.url()).pathname,
+   headings:titles.map(x=>x.trim().slice(0,80)),
+   visibleInputs
+  }));
+  throw error;
+ }
+ if (await page.locator('#password:visible').count()) {
+  if (await page.locator('#username:visible').count()) await page.locator('#username').fill(username);
   await page.locator('#password').fill(password);
   await page.locator('#kc-login').click();
  }
