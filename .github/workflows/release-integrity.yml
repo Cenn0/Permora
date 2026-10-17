@@ -1,0 +1,110 @@
+name: Permora artifact integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'deploy/Dockerfile'
+      - 'Directory.*.props'
+      - 'scripts/*release*'
+      - 'scripts/install-syft.py'
+      - '.github/workflows/release-integrity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/*release*'
+      - 'scripts/install-syft.py'
+      - '.github/workflows/release-integrity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: permora-artifact-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-candidates:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install checksum-verified scanner
+        run: python3 scripts/install-syft.py "$RUNNER_TEMP/scanner"
+      - name: Build and inventory actual application artifacts
+        run: python3 scripts/build-release-evidence.py --syft "$RUNNER_TEMP/scanner/syft" --output "$RUNNER_TEMP/candidate"
+      - name: Validate checksums and inventory without publishing
+        run: |
+          cd "$RUNNER_TEMP/candidate"
+          sha256sum -c SHA256SUMS
+          echo 'Candidate artifacts and image SBOMs verified on an ephemeral runner. No upload, signature or production approval from PR code.' >> "$GITHUB_STEP_SUMMARY"
+
+  sign-draft-candidate:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install checksum-verified scanner
+        run: python3 scripts/install-syft.py "$RUNNER_TEMP/scanner"
+      - name: Build exact trusted-main source into candidate artifacts
+        run: python3 scripts/build-release-evidence.py --syft "$RUNNER_TEMP/scanner/syft" --output "$RUNNER_TEMP/candidate"
+      - name: Attest actual candidate bytes using GitHub OIDC
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: ${{ runner.temp }}/candidate/*
+          create-storage-record: false
+          push-to-registry: false
+      - name: Verify signed source, workflow identity and exact artifact digests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = 'Cenn0/Permora'
+          test "$GITHUB_REF" = 'refs/heads/main'
+          cd "$RUNNER_TEMP/candidate"
+          sha256sum -c SHA256SUMS
+          gh attestation verify SHA256SUMS --repo "$GITHUB_REPOSITORY" \
+            --bundle "$BUNDLE" --source-digest "$GITHUB_SHA" --source-ref refs/heads/main \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-integrity.yml" \
+            --deny-self-hosted-runners
+          cp "$BUNDLE" provenance.sigstore.json
+      - name: Store signed candidates as a draft, never a production release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="candidate-${GITHUB_SHA:0:12}-run${GITHUB_RUN_ID}"
+          gh release create "$tag" "$RUNNER_TEMP"/candidate/* \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease \
+            --title "Unsigned-for-production development candidate ${GITHUB_SHA:0:12}" \
+            --notes 'Cryptographically signed build candidates with actual image SBOMs, application checksums and license evidence. This draft is NOT a production release, legal approval, security certification or completed roadmap. Review all remaining release gates before any publication. No OS image tarballs are published.'
+          echo "Signed development candidate stored as draft: $tag. Not production-approved." >> "$GITHUB_STEP_SUMMARY"
