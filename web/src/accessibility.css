@@ -1,0 +1,44 @@
+/* Accessibility refinements shared by all views, not scanner-only overrides.
+ * Keep the selected light/pastel design while separating readable text from
+ * decorative chart/icon accents. No WCAG rule is excluded by these styles.
+ */
+:root { --muted: #4b5d79; }
+.eyebrow, .page-heading p, .top-search, .profile small,
+.application-card > small, .feed-item small, .task-card small,
+.tabs button, th, td small, .empty, label small, .details dt,
+.login p { color: #475b7a; }
+.purple { color: #6336b5; }
+.green { color: #096537; }
+.coral { color: #b52c48; }
+.application-card { color: var(--ink); }
+input[readonly] { color: #475b7a; }
+::placeholder { color: #52617a; opacity: 1; }
+
+/* Min-content constraints must not force a horizontal document scrollbar.
+ * Data tables retain their own horizontal scroll region where necessary.
+ */
+main, .panel, .form-panel, .page-heading > div, .section-heading > div,
+.metric > div, .quick-actions a > div { min-width: 0; }
+.page-heading, .section-heading, .toolbar, .search-inline { flex-wrap: wrap; }
+.application-cards.wide { grid-template-columns: repeat(auto-fit,minmax(min(240px,100%),1fr)); }
+.review-line code { min-width: 0; overflow-wrap: anywhere; }
+.details dd, .metric div > span, .quick-actions a > div { overflow-wrap: anywhere; }
+@media (max-width: 420px) {
+  main { padding: 16px 12px 28px; }
+  .panel { padding: 14px; }
+  .welcome { padding: 18px 14px; gap: 10px; }
+  .welcome img { display: none; }
+  .metrics, .two-columns, .side-column, .quick-actions { grid-template-columns: minmax(0,1fr); }
+  .metric { min-height: 76px; }
+  .details { grid-template-columns: minmax(0,1fr); gap: 7px; }
+  .details dd { margin-bottom: 12px; }
+  .compact-form { padding: 12px; }
+  .compact-form label { min-width: 0; flex-basis: 100%; }
+  .review-card { padding: 12px; }
+  .topbar { padding: 10px 12px; height: auto; min-height: 76px; gap: 8px; }
+  .search-field { width: 100%; }
+  .section-heading > a { white-space: normal; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}
