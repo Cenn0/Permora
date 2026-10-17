@@ -55,8 +55,10 @@ public sealed class PortalWorker(IServiceProvider services, KeycloakOptions opti
                     nextSync = DateTimeOffset.UtcNow.AddMinutes(5);
                     await CleanupSessionsAsync(scope.ServiceProvider.GetRequiredService<NpgsqlDataSource>(), stoppingToken);
                 }
-                foreach (var id in await store.DueApplicationsAsync(DateTimeOffset.UtcNow, 100, stoppingToken))
+                var due = await store.DueApplicationsAsync(DateTimeOffset.UtcNow, 100, afterApplicationId, stoppingToken);
+                foreach (var id in due)
                 {
+                    afterApplicationId = id;
                     try
                     {
                         using var budget = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
