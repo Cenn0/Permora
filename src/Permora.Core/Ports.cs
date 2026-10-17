@@ -11,7 +11,7 @@ public interface IPortalStore
     Task<T> InApplicationAsync<T>(Guid id, Func<IApplicationTransaction, Task<T>> action, CancellationToken ct);
     Task<IReadOnlyList<DirectoryPrincipal>> DirectoryAsync(string realm, CancellationToken ct);
     Task ReplaceDirectoryAsync(string realm, IReadOnlyList<DirectoryPrincipal> principals, CancellationToken ct);
-    Task<IReadOnlyList<Guid>> DueApplicationsAsync(DateTimeOffset now, int limit, CancellationToken ct);
+    Task<IReadOnlyList<Guid>> DueApplicationsAsync(DateTimeOffset now, int limit, Guid afterId, CancellationToken ct);
     Task<IReadOnlyList<AuditEvent>> AuditAsync(Guid appId, long after, int limit, CancellationToken ct);
     Task<IReadOnlyList<Operation>> OperationsAsync(Guid appId, int limit, CancellationToken ct);
     Task<IReadOnlyList<AccessReview>> ReviewsAsync(Guid appId, CancellationToken ct);

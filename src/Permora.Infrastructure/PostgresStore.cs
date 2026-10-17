@@ -180,7 +180,7 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
         await tx.CommitAsync(ct);
     }
 
-    public async Task<IReadOnlyList<Guid>> DueApplicationsAsync(DateTimeOffset now, int limit, CancellationToken ct)
+    public async Task<IReadOnlyList<Guid>> DueApplicationsAsync(DateTimeOffset now, int limit, Guid afterId, CancellationToken ct)
     {
         await using var connection = await source.OpenConnectionAsync(ct);
         await using var command = new NpgsqlCommand("""
@@ -191,9 +191,13 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
                 WHERE (item->>'expiresAt')::timestamptz<=@now AND NOT EXISTS (
                   SELECT 1 FROM operations o WHERE o.application_id=a.id AND o.actor_key='system'
                   AND o.idempotency_key='revoke:'||(item->>'id')))
-            ORDER BY id LIMIT @limit
+            -- Rotate across eligible IDs instead of repeatedly truncating to the
+            -- same first 100 hot applications. When the cursor reaches the end,
+            -- wrap to the beginning; a subsequent worker tick advances the cursor.
+            ORDER BY (a.id <= @after), a.id LIMIT @limit
             """, connection);
         command.Parameters.AddWithValue("now", now); command.Parameters.AddWithValue("limit", Math.Clamp(limit, 1, 1000));
+        command.Parameters.AddWithValue("after", afterId);
         await using var reader = await command.ExecuteReaderAsync(ct);
         var result = new List<Guid>();
         while (await reader.ReadAsync(ct)) result.Add(reader.GetGuid(0));

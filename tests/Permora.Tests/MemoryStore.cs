@@ -17,7 +17,7 @@ public sealed class MemoryStore(Fixture fixture) : IPortalStore
     public Task CreateApplicationAsync(ApplicationDocument app, Actor actor, CancellationToken ct) { App = app; return Task.CompletedTask; }
     public Task<IReadOnlyList<DirectoryPrincipal>> DirectoryAsync(string realm, CancellationToken ct) => Task.FromResult<IReadOnlyList<DirectoryPrincipal>>(Directory.Where(d => d.RealmKey == realm).ToArray());
     public Task ReplaceDirectoryAsync(string realm, IReadOnlyList<DirectoryPrincipal> principals, CancellationToken ct) { Directory = principals; return Task.CompletedTask; }
-    public Task<IReadOnlyList<Guid>> DueApplicationsAsync(DateTimeOffset now, int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<Guid>>([App.Id]);
+    public Task<IReadOnlyList<Guid>> DueApplicationsAsync(DateTimeOffset now, int limit, Guid afterId, CancellationToken ct) => Task.FromResult<IReadOnlyList<Guid>>([App.Id]);
     public Task<IReadOnlyList<AuditEvent>> AuditAsync(Guid appId, long after, int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<AuditEvent>>(Audit.Where(e => e.Sequence > after && e.ApplicationId == appId).Take(limit).ToArray());
     public Task<IReadOnlyList<Operation>> OperationsAsync(Guid appId, int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<Operation>>(Operations.Values.Where(o => o.ApplicationId == appId).Take(limit).ToArray());
     public Task<IReadOnlyList<AccessReview>> ReviewsAsync(Guid appId, CancellationToken ct) => Task.FromResult<IReadOnlyList<AccessReview>>(Reviews.Values.Where(r => r.ApplicationId == appId).ToArray());
