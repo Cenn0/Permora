@@ -1,8 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { resolve } from 'node:path';
 
-// Explicit, synthetic view fixtures. Accessibility evidence is NOT a server
-// authorization test or proof that a real Keycloak grant was applied.
+// Synthetic view data is not evidence of server authorization or a Keycloak write.
 const id='10000000-0000-4000-8000-000000000099';
 const teamId='10000000-0000-4000-8000-000000000001';
 const permissionId='20000000-0000-4000-8000-000000000001';
@@ -47,20 +46,25 @@ async function fixtures(page:Page, authenticated=true, failure=false) {
  });
 }
 
-type Scan = {violations:{id:string;impact:string;nodes:{target:string[]}[]}[];incomplete:unknown[]};
+type Scan={violations:{id:string;impact:string;nodes:{target:string[];html:string;failureSummary:string}[]}[];incomplete:unknown[]};
 async function audit(page:Page) {
+ await page.evaluate(()=>document.fonts.ready);
  await page.addScriptTag({path:resolve('../tools/accessibility/node_modules/axe-core/axe.min.js')});
  const result=await page.evaluate(async()=>{
-  const axe=(globalThis as unknown as {axe:{run:(node:Document, options:unknown)=>Promise<Scan>}}).axe;
+  const axe=(globalThis as unknown as {axe:{run:(node:Document,options:unknown)=>Promise<Scan>}}).axe;
   return await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']},
    resultTypes:['violations','incomplete']});
  });
- console.log(JSON.stringify({route:new URL(page.url()).pathname,
-  violations:result.violations.map(v=>({rule:v.id,impact:v.impact,targets:v.nodes.map(n=>n.target)})),
-  manualReviewChecks:result.incomplete.length}));
- expect(result.violations,'Automated WCAG violations must be fixed, not excluded').toEqual([]);
- expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),
-  'The document must reflow without horizontal page scrolling; internal tables may scroll').toBeTruthy();
+ const issues=result.violations.map(v=>({rule:v.id,impact:v.impact,nodes:v.nodes.map(n=>({
+  target:n.target,html:n.html.slice(0,180),reason:n.failureSummary?.slice(0,280)
+ }))}));
+ const layout=await page.evaluate(()=>({width:window.innerWidth,documentWidth:document.documentElement.scrollWidth,
+  overflow:[...document.querySelectorAll('main *,header *')].filter(e=>{
+   const r=e.getBoundingClientRect();return r.width>0&&r.right>window.innerWidth+1;
+  }).slice(0,12).map(e=>({tag:e.tagName,className:e.className,width:Math.round(e.getBoundingClientRect().width)}))}));
+ console.log('A11Y',JSON.stringify({route:new URL(page.url()).pathname,issues,layout,manualReviewChecks:result.incomplete.length}));
+ expect(issues,'All automated WCAG violations must be fixed, not excluded').toEqual([]);
+ expect(layout.documentWidth,'Document must reflow; internal table scrolling is permitted').toBeLessThanOrEqual(layout.width+1);
 }
 
 for(const view of [
@@ -70,14 +74,14 @@ for(const view of [
 ])test(view.name,async({page})=>{
  await fixtures(page);await page.goto(view.path);await expect(page.locator('main h1')).toBeVisible();await audit(page);
 });
-
-for(const tab of ['Rollen','Berechtigungen','Zugriffe','Aufträge','Rezertifizierung','Änderungsprotokoll','Einstellungen'])
+for(const tab of ['Rollen','Berechtigungen','Zugriffe','Aufträge','Rezertifizierung','Änderungsprotokoll','Anbindung'])
  test('application-'+tab,async({page})=>{
   await fixtures(page);await page.goto('/applications/'+id);
   const button=page.getByRole('navigation',{name:'Anwendungsbereiche'}).getByRole('button',{name:tab,exact:true});
-  await button.click();await expect(button).toHaveAttribute('aria-current','page');await audit(page);
+  await button.click();await expect(button).toHaveAttribute('aria-current','page');
+  await expect(page.locator('main section.panel').first().getByRole('heading').first()).toBeVisible();
+  await audit(page);
  });
-
 test('role-editor',async({page})=>{
  await fixtures(page);await page.goto('/applications/'+id);
  await page.getByRole('button',{name:'Neue Rolle',exact:true}).click();
