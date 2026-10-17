@@ -12,6 +12,9 @@ public sealed class PortalWorker(IServiceProvider services, KeycloakOptions opti
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var nextSync = DateTimeOffset.MinValue;
+        // The in-memory cursor avoids permanently selecting only the lowest 100 UUIDs
+        // under sustained queues. No task ownership changes or global lock is implied.
+        var afterApplicationId = Guid.Empty;
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
         do
         {
