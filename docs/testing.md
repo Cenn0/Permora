@@ -1,5 +1,12 @@
 # Teststrategie und Ausführung
 
+## Technischer Testnachweis – 17. Oktober 2026
+
+[Integrierter OIDC-/MFA-Negativlauf](https://github.com/Cenn0/Permora/actions/runs/38985065471): Echter Chromium-Browser mit Keycloak-26.8.1-Login, Cookies, ASP.NET-BFF-Sitzung und serverseitigem `403 step_up_required` bei Passwort-only; dazu Builds, xUnit/PostgreSQL, Angular/Playwright, FGAP-Contract, Docker und Lockfile-Gates. [Cross-Team-IDOR-Lauf](https://github.com/Cenn0/Permora/actions/runs/38985300214): direkter REST-Zugriff auf fremde Anwendungs-/Operation-/Audit-/Review-IDs führt in den getesteten Fällen zu HTTP 404, verbotene zentrale Administration zu 403. Das Validierungs-Reihenfolgeproblem wurde korrigiert. Die CI enthält außerdem den isolierten PostgreSQL-Restore- und den offline SBOM-Komponententest.
+
+**Unbewiesen:** erfolgreicher zweiter MFA-Faktor mit dem tatsächlichen Unternehmens-LoA, volle produktive FGAP-/LDAP-Matrix, verteilte Recovery und Last-/Sicherheitstests. Die älteren Testzahlen in den nachfolgenden Abschnitten beziehen sich auf konkrete historische Workflows.
+
+
 **Aktueller Vollnachweis der vorhandenen CI:** [Run #38946163282](https://github.com/Cenn0/Permora/actions/runs/38946163282), 7/7 Pflichtjobs grün, 102/102 xUnit ohne Skips einschließlich PostgreSQL, 32 isolierte TypeScript-Tests, 8/8 Playwright, echte Keycloak 26.8.1 FGAP-Client- und User-/Group-Positiv-/Negativfälle, gesperrte Dependency-Restores und tatsächlicher Docker-Image-Build. [Evidenz und offene Grenzen](evidence/ci-2026-10-16-final.md).
 
 

@@ -18,7 +18,7 @@
 
 Permora is an independent open-source **C# / Angular portal** designed to let application teams manage their own roles, fine-grained permissions, and access requests. Central IAM administrators retain control over the realm and cross-application security policies.
 
-> **Status: CI-tested development version, not approved for production.** The documented technical acceptance run completed seven required GitHub Actions jobs, including .NET/Angular builds, 102 xUnit tests with PostgreSQL, 32 frontend-logic tests, 8 Playwright tests, selected Keycloak 26.8.1 FGAP permission tests, and a local Docker build. **Production OIDC/MFA, LDAP/AD, full authorization-policy coverage, recovery and penetration testing remain open.** See [CI scope and evidence](docs/ci.md) and the [roadmap](docs/roadmap.md).
+> **Status: CI-tested development version, not approved for production.** Current development CI covers .NET/Angular builds, real PostgreSQL/xUnit, frontend and Playwright tests, selected Keycloak 26.8.1 FGAP role/user/group tests, and **real Chromium → Keycloak → ASP.NET BFF password-only login, cookie/CSRF and denial of low-assurance privileged writes**. It also builds a non-root Docker image, generates a partial offline CycloneDX NuGet/npm package inventory, and tests isolated PostgreSQL backup/restore. **Production-like positive MFA/step-up, enterprise LDAP/AD, full delegated rights isolation, full system disaster recovery, complete SBOM/third-party licenses, load/HA and independent penetration testing remain open.** [CI evidence](docs/ci.md) · [Release gates](docs/release-checklist.md) · [Roadmap](docs/roadmap.md).
 
 ## Scope
 
