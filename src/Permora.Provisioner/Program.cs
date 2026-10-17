@@ -16,7 +16,7 @@ ConfigurationChecks.AddLocalFile(builder.Configuration);
 var options = builder.Configuration.GetSection("Provisioning").Get<ProvisioningOptions>() ?? new ProvisioningOptions();
 foreach (var realm in options.Realms.Values)
     ConfigurationChecks.ValidateUrl(realm.BaseUrl, builder.Environment.IsDevelopment() && options.AllowHttpInDevelopment);
-var connectionString = builder.Configuration.GetConnectionString("Portal") ?? throw new InvalidOperationException("ConnectionStrings:Portal is required.");
+var connectionString = ConfigurationChecks.ReadPortalConnectionString(builder.Configuration);
 builder.Services.AddSingleton(NpgsqlDataSource.Create(connectionString));
 builder.Services.AddSingleton<IPortalStore, PostgresStore>();
 builder.Services.AddSingleton(options);
