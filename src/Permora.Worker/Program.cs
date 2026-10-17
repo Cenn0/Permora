@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using Permora.Core;
 using Permora.Infrastructure;
@@ -43,4 +44,13 @@ if (args.Contains("--seed-demo", StringComparer.Ordinal))
     await DemoSeed.RunAsync(host.Services.GetRequiredService<IPortalStore>(), portal.Authority, CancellationToken.None);
     return;
 }
+var startupLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Permora.Worker.Startup");
+startupLogger.LogInformation("Worker configured realms: {RealmCount}; registered hosted services: {HostedServiceCount}",
+    keycloak.Realms.Count, host.Services.GetServices<IHostedService>().Count());
+host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStarted.Register(() =>
+{
+    foreach (var service in host.Services.GetServices<IHostedService>().OfType<BackgroundService>())
+        startupLogger.LogInformation("Worker background task: {ServiceType}; state: {TaskState}",
+            service.GetType().Name, service.ExecuteTask?.Status.ToString() ?? "not-started");
+});
 await host.RunAsync();
