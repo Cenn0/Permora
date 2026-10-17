@@ -1,10 +1,18 @@
 # Permora CI: Tests, Belege und Grenzen
 
+## Abgenommener technischer CI-Umfang – 17. Oktober 2026
+
+[GitHub Actions #39011230492](https://github.com/Cenn0/Permora/actions/runs/39011230492) ist **mit acht von acht Pflichtjobs erfolgreich**. Die isolierte Keycloak-26.8.1-Instanz konfiguriert einen echten Passwort-LoA1-/TOTP-LoA2-Browserflow. Chromium meldet einen temporären Benutzer mit Passwort an, registriert ein TOTP-Gerät, bestätigt eine fehlgeschlagene privilegierte Aktion ohne LoA2, führt den erneuten Passwort-/OTP-Challenge aus und verifiziert den frischen signierten ACR-/auth_time-Vertrag in der serverseitigen BFF-Sitzung. Nach dem Step-up muss eine fachlich fremde/ungültige Aktion **weiterhin** durch Anwendungsautorisierung scheitern; Logout beendet die lokale Sitzung.
+
+**Behobener Fehler:** Der ASP.NET-Core-OIDC-Handler entfernt `acr` standardmäßig durch eine Claim-Action **nach** der Signatur-/Issuer-/Audience-Prüfung. Das Portal erhält den **validierten** `acr`-Claim jetzt mittels `ClaimActions.Remove("acr")` auch im Cookie-Ticket, statt den Step-up-Gate abzuschalten. Temporäre Diagnoseinstrumente wurden vor dem Merge entfernt. Nachweise: [PR #21](https://github.com/Cenn0/Permora/pull/21) · [CI-Run](https://github.com/Cenn0/Permora/actions/runs/39011230492).
+
+**Abgrenzung:** Dies ist eine reale **isolierte** positive MFA-E2E-Prüfung, keine Freigabe eines firmenspezifischen Keycloak-Browserflows oder AD-/LDAP-Identitätsproviders, keine Enterprise-FGAP-Vollmatrix, kein unabhängiger Pentest und kein produktiver TLS-/HA-/Restore-Nachweis. Nachfolgende Abschnitte beschreiben **historische** frühere Teilabnahmen und dürfen die neuere Evidenz nicht überlagern.
+
 ## Nachtrag: integrierte CI, 17. Oktober 2026
 
 **Neu:** Die nachträgliche technische CI umfasst neben der bisherigen siebenstufigen Prüfung einen achten Pflichtjob für echten Chromium-/Keycloak-/ASP.NET-BFF-OIDC-Login. Der separate [erfolgreiche PR-#13-Lauf](https://github.com/Cenn0/Permora/actions/runs/38985065471) bestätigt den **Passwort-only-Negativtest** gegen das serverseitige ACR-/auth_time-Gate, echte BFF-Sitzung und CSRF-Verarbeitung. Die [erfolgreiche PR-#18-CI](https://github.com/Cenn0/Permora/actions/runs/38985300214) enthält weitere echte HTTP-Tests gegen Cross-Team-IDORs und die Korrektur, die Fremd-App-Sichtbarkeit vor fachlicher Payload-Validierung prüft.
 
-Die aktuelle Standard-CI prüft außerdem ein offline erzeugtes CycloneDX-*Lockfile-Inventar* und eine isolierte PostgreSQL-Dump-/Restore-Probe. Dies ist **keine** vollständige Release-SBOM oder Mehrsystem-Disaster-Recovery. Ein tatsächlich bestandenes **positives MFA-Step-up**, LDAP-/AD-Federation, unabhängiger Pentest, HA-/Lastgrenzen und Hersteller-Support für Permora werden durch diese Prüfungen **nicht** behauptet. Die folgenden Abschnitte vom 16. Oktober bleiben als historische Lauf- und Review-Nachweise erhalten.
+Die aktuelle Standard-CI prüft außerdem ein offline erzeugtes CycloneDX-*Lockfile-Inventar* und eine isolierte PostgreSQL-Dump-/Restore-Probe. Dies ist **keine** vollständige Release-SBOM oder Mehrsystem-Disaster-Recovery. Ein positives MFA-Step-up war **in diesem historischen Zwischenstand** noch nicht bewiesen; es wurde später in der oben verlinkten echten Keycloak-26.8.1-TOTP-CI bestätigt. LDAP-/AD-Federation, unabhängiger Pentest, HA-/Lastgrenzen und Hersteller-Support für Permora bleiben **unbewiesen**. Die folgenden Abschnitte vom 16. Oktober bleiben als historische Lauf- und Review-Nachweise erhalten.
 
 [Release-Freigabekriterien](release-checklist.md) · [Threat Model](threat-model.md) · [Security](security.md)
 
