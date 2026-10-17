@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
@@ -92,6 +93,14 @@ else
         o.Events.OnRedirectToIdentityProvider = context =>
         {
             context.ProtocolMessage.RedirectUri = options.PublicOrigin.TrimEnd('/') + "/signin-oidc";
+            if (context.Properties.Items.ContainsKey(SessionAssurance.StepUpChallengeFlag))
+            {
+                // Request an essential LoA, not merely the advisory acr_values parameter.
+                // ACR and auth_time are independently verified on every privileged write.
+                context.ProtocolMessage.SetParameter("claims", SessionAssurance.RequiredIdTokenClaims(options.PrivilegedAcr));
+                context.ProtocolMessage.SetParameter("max_age", "0");
+                context.ProtocolMessage.Prompt = "login";
+            }
             if (context.Request.Path.StartsWithSegments("/api"))
             { context.Response.StatusCode = 401; context.HandleResponse(); }
             return Task.CompletedTask;
@@ -148,6 +157,11 @@ app.Use(async (context, next) =>
         || HttpMethods.IsPatch(context.Request.Method) || HttpMethods.IsDelete(context.Request.Method);
     if (protectedPath && mutating)
         await context.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(context);
+    // No mutating API operation may rely on a stale or low-assurance SSO cookie.
+    // Development mode uses a separately gated, loopback-only fake identity.
+    if (context.Request.Path.StartsWithSegments("/api/v1") && mutating && !options.EnableDevelopmentLogin
+        && !SessionAssurance.IsPrivileged(context.User, options, DateTimeOffset.UtcNow))
+        throw new DomainException("step_up_required", "A fresh Keycloak MFA verification is required before changing access. Open /bff/step-up and retry.", 403);
     await next(context);
 });
 app.MapGet("/health/live", () => Results.Ok(new { status = "live" })).AllowAnonymous();
@@ -167,11 +181,19 @@ app.MapGet("/bff/session", (HttpContext context, IAntiforgery antiforgery) =>
         authenticated, name = authenticated ? CurrentActor(context.User, options).Name : "",
         subjectKey = authenticated ? CurrentActor(context.User, options).Key : "",
         administrator = authenticated && admins.Contains(CurrentActor(context.User, options).Key),
-        development = options.EnableDevelopmentLogin
+        development = options.EnableDevelopmentLogin,
+        strongAuthentication = options.EnableDevelopmentLogin || SessionAssurance.IsPrivileged(context.User, options, DateTimeOffset.UtcNow)
     });
 }).AllowAnonymous();
 app.MapGet("/bff/login", () => options.EnableDevelopmentLogin ? Results.Redirect("/")
     : Results.Challenge(new AuthenticationProperties { RedirectUri = "/" }, [OpenIdConnectDefaults.AuthenticationScheme])).AllowAnonymous();
+app.MapGet("/bff/step-up", () =>
+{
+    if (options.EnableDevelopmentLogin) return (IResult)Results.Redirect("/");
+    var properties = new AuthenticationProperties { RedirectUri = "/" };
+    properties.Items[SessionAssurance.StepUpChallengeFlag] = "true";
+    return Results.Challenge(properties, [OpenIdConnectDefaults.AuthenticationScheme]);
+}).RequireAuthorization();
 app.MapPost("/bff/logout", async (HttpContext context) =>
 {
     // Local BFF sign-out: never redirect an XHR to the identity provider.
