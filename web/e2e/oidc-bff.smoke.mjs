@@ -136,8 +136,15 @@ try {
  await page.locator('#kc-login').click();
  await page.waitForURL(url => url.origin === base, {timeout:45000});
  const verified = await getSession();
- if (verified.status !== 200 || !verified.body.authenticated || !verified.body.strongAuthentication)
+ if (verified.status !== 200 || !verified.body.authenticated || !verified.body.strongAuthentication) {
+  const cookies = (await context.cookies(base)).map(c => c.name);
+  console.error('BFF strong-session assertion (safe metadata):', JSON.stringify({
+   status:verified.status,authenticated:verified.body.authenticated,
+   strongAuthentication:verified.body.strongAuthentication,
+   cookiesPresent: cookies.filter(n=>n==='Permora.Session'||n==='Permora.Antiforgery'||n==='XSRF-TOKEN')
+  }));
   throw new Error('Real OTP step-up did not produce fresh trusted ACR 2');
+ }
  console.log('PASS: Real OTP second factor yielded Keycloak LoA2 and trusted BFF strong session');
 
  const elevated = await page.evaluate(async () => {
