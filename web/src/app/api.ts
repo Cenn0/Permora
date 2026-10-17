@@ -9,10 +9,20 @@ export class PortalApi {
  readonly session = signal<Session | null>(null);
  async loadSession(): Promise<void> { this.session.set(await this.get<Session>('/bff/session')); }
  get<T>(path: string): Promise<T> { return firstValueFrom(this.http.get<T>(path)); }
- post<T>(path: string, body: unknown, key?: string): Promise<T> {
-  return firstValueFrom(this.http.post<T>(path, body, { headers: key ? new HttpHeaders({ 'Idempotency-Key': key }) : undefined }));
+ async post<T>(path: string, body: unknown, key?: string): Promise<T> {
+  try {
+   return await firstValueFrom(this.http.post<T>(path, body, { headers: key ? new HttpHeaders({ 'Idempotency-Key': key }) : undefined }));
+  } catch (error) { this.handleWriteFailure(error); throw error; }
  }
- put<T>(path: string, body: unknown): Promise<T> { return firstValueFrom(this.http.put<T>(path, body)); }
+ async put<T>(path: string, body: unknown): Promise<T> {
+  try { return await firstValueFrom(this.http.put<T>(path, body)); }
+  catch (error) { this.handleWriteFailure(error); throw error; }
+ }
+ private handleWriteFailure(error: unknown): void {
+  const response = error as { status?: number; error?: { title?: string } };
+  if (response?.status === 403 && response?.error?.title === 'step_up_required')
+   this.session.update(s => s ? { ...s, strongAuthentication: false } : s);
+ }
  dashboard(): Promise<Dashboard> { return this.get('/api/v1/dashboard'); }
  applications(): Promise<AppSummary[]> { return this.get('/api/v1/applications'); }
  application(id: string): Promise<AppDetail> { return this.get(`/api/v1/applications/${encodeURIComponent(id)}`); }

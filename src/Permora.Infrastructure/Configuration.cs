@@ -15,6 +15,9 @@ public sealed class PortalOptions
     public bool AllowHttpInDevelopment { get; init; }
     public bool EnableDevelopmentLogin { get; init; }
     public string DevelopmentSubject { get; init; } = "demo-owner";
+    // This must correspond to a tested Keycloak LoA mapped into the signed ID token.
+    public string PrivilegedAcr { get; init; } = "2";
+    public int PrivilegedAuthenticationMaxAgeMinutes { get; init; } = 10;
 }
 
 public static class ConfigurationChecks
@@ -33,6 +36,10 @@ public static class ConfigurationChecks
         if (new Uri(options.PublicOrigin).AbsolutePath != "/") throw new InvalidOperationException("PublicOrigin must not contain a path.");
         if (string.IsNullOrWhiteSpace(options.ClientId) || string.IsNullOrWhiteSpace(options.DataProtectionPath))
             throw new InvalidOperationException("Portal client and persistent data-protection path are required.");
+        if (string.IsNullOrWhiteSpace(options.PrivilegedAcr) || options.PrivilegedAcr.Length > 64
+            || options.PrivilegedAcr.Any(c => !char.IsLetterOrDigit(c) && c is not ('.' or '_' or ':' or '-'))
+            || options.PrivilegedAuthenticationMaxAgeMinutes is < 1 or > 60)
+            throw new InvalidOperationException("Privileged authentication requires a valid ACR and a 1-60 minute maximum age.");
         if (options.EnableDevelopmentLogin && !development)
             throw new InvalidOperationException("Development authentication is forbidden outside Development.");
         if (!options.EnableDevelopmentLogin && !File.Exists(options.ClientSecretFile))

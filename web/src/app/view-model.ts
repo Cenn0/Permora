@@ -31,6 +31,8 @@ export function safeExpiry(value: string): string | null {
 export function problem(error: unknown): string {
  const value = error as { status?: number; error?: { title?: string; detail?: string; code?: string } };
  if (value?.status === 401) return 'Die Sitzung ist abgelaufen. Bitte erneut anmelden.';
+ if (value?.status === 403 && value?.error?.title === 'step_up_required')
+  return 'Für diese Änderung ist eine aktuelle MFA-Bestätigung erforderlich. Bitte über den Hinweis oben erneut bei Keycloak bestätigen.';
  if (value?.status === 0) return 'Der Server ist nicht erreichbar. Die Änderung wurde nicht bestätigt.';
  if (value?.status === 412) return 'Die Anwendung wurde zwischenzeitlich geändert. Bitte aktualisieren.';
  const detail = value?.error?.detail;

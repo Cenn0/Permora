@@ -4,7 +4,7 @@ export type Risk = 'Standard' | 'High';
 export type OperationStatus = 'AwaitingApproval' | 'Queued' | 'Applying' | 'Applied' | 'Rejected' | 'Conflict' | 'Failed';
 export interface TeamMember { subjectKey: string; name: string; role: ManagementRole }
 export interface Team { id: string; name: string; revision: number; members: TeamMember[] }
-export interface Session { authenticated: boolean; name?: string; subjectKey?: string; administrator?: boolean; development?: boolean }
+export interface Session { authenticated: boolean; name?: string; subjectKey?: string; administrator?: boolean; development?: boolean; strongAuthentication?: boolean }
 export interface AppSummary { id: string; teamId: string; name: string; slug: string; description: string; environment: string; status: AppStatus; revision: number; roleCount: number; permissionCount: number; identityCount: number; assignmentCount: number }
 export interface Permission { id: string; key: string; name: string; description: string; risk: Risk }
 export interface Role { id: string; key: string; name: string; description: string; permissionIds: string[] }
