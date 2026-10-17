@@ -1,0 +1,46 @@
+name: Permora worker and recovery acceptance
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: permora-workers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker-system:
+    name: Two real workers, post-commit crash and two-database restore
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      PERMORA_SYSTEM_TESTS: isolated
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          global-json-file: global.json
+      - name: Locked restore and actual Release worker build
+        run: |
+          dotnet restore src/Permora.Worker/Permora.Worker.csproj --locked-mode
+          dotnet build src/Permora.Worker/Permora.Worker.csproj -c Release --no-restore
+      - name: Validate fixture syntax
+        run: python3 -m py_compile scripts/ci-worker-system.py
+      - name: Execute real failure and recovery matrix
+        run: python3 scripts/ci-worker-system.py
+      - name: Summarize boundaries without retaining secrets or backups
+        if: always()
+        run: |
+          echo 'The fixture uses actual Permora.Worker processes, actual Keycloak and separate PostgreSQL databases.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Includes outage, lost response after remote commit, worker kill, survivor completion, quiesced database backup/restore.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A CI runtime measurement is not a production SLO, multi-host HA or an independent release approval.' >> "$GITHUB_STEP_SUMMARY"
