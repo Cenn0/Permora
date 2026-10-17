@@ -1,0 +1,58 @@
+name: Permora system acceptance
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: permora-system-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  federation:
+    name: Real LDAPS and FGAP with imported and non-imported users
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install isolated LDAP server and clients
+        run: |
+          sudo apt-get update -qq
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq slapd ldap-utils acl
+          sudo systemctl stop slapd
+          # The distribution data parent is not traversable by the runner account.
+          # Grant traversal only, not access to other LDAP data or any secret file.
+          sudo setfacl -m "u:$(id -un):--x" /var/lib/ldap
+          sudo install -d -m 0700 -o "$(id -u)" -g "$(id -g)" /var/lib/ldap/permora-ci
+          test -x /var/lib/ldap/permora-ci
+      - name: Validate test syntax
+        run: python3 -m py_compile scripts/ci-federation.py
+      - name: Execute real LDAPS federation and delegated security matrix
+        env:
+          PERMORA_SYSTEM_TESTS: isolated
+          TMPDIR: /var/lib/ldap/permora-ci
+        run: python3 scripts/ci-federation.py
+      - name: Record scope without storing secrets or artifacts
+        if: always()
+        run: |
+          echo 'Real OpenLDAP/LDAPS + Keycloak 26.8.1. Imported/non-imported users, nested groups and negative delegated authorization.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Not Microsoft AD, Kerberos, corporate IAM or a production approval. No test secrets or backups are uploaded.' >> "$GITHUB_STEP_SUMMARY"
+  system-gate:
+    name: Required system acceptance gate
+    if: always()
+    needs: [federation]
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Fail on failure, cancellation or skipped acceptance
+        env:
+          FEDERATION: ${{ needs.federation.result }}
+        run: test "$FEDERATION" = success
