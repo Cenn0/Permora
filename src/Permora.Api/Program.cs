@@ -73,6 +73,11 @@ else
         o.Authority = options.Authority; o.ClientId = options.ClientId;
         o.ClientSecret = File.ReadAllText(options.ClientSecretFile).Trim();
         o.ResponseType = "code"; o.UsePkce = true; o.SaveTokens = false; o.MapInboundClaims = false;
+        // ASP.NET Core's default ClaimActions.DeleteClaim("acr") runs AFTER the
+        // signed ID token was validated. Preserve that validated claim so a
+        // Keycloak LoA2 session cannot be downgraded to an anonymous assurance
+        // level in the server-side cookie. Keep issuer/audience validation.
+        o.ClaimActions.Remove("acr");
         o.RequireHttpsMetadata = !(builder.Environment.IsDevelopment() && options.AllowHttpInDevelopment);
         o.Scope.Clear(); o.Scope.Add("openid"); o.Scope.Add("profile");
         o.TokenValidationParameters.NameClaimType = "name";

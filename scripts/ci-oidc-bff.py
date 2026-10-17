@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""True BFF/OIDC Authorization Code + PKCE browser-session smoke against disposable Keycloak.
+"""True BFF/OIDC Authorization Code + PKCE with disposable Keycloak LoA2/TOTP.
 
-This *does not* simulate successful MFA. It proves that a password-only session cannot
-mutate privileges and that the step-up redirect requests essential ACR/auth_time.
-The Keycloak/browser MFA positive path requires an independent configured-LoA test.
-Never invoke against a production realm or with production accounts.
+Runs actual password-only LoA1 denial and authentic two-factor OTP step-up against
+an ephemeral, Admin-REST-configured Keycloak browser flow. This does not certify
+any corporate Keycloak/LDAP deployment or product release. Never use production accounts.
 """
 import html.parser
 import http.cookiejar
@@ -128,6 +127,71 @@ def assert_status(actual, wanted, label):
     print("PASS:", label)
 
 
+def configure_isolated_step_up(realm_admin, token):
+    """Configure LoA1 password + LoA2 TOTP through Keycloak's documented Admin REST API."""
+    auth = realm_admin + "/authentication"
+    root = "permora-ci-step-up"
+    admin_http("POST", auth + "/flows", {
+        "alias": root, "description": "Disposable CI LoA1/LoA2 browser flow",
+        "providerId": "basic-flow", "topLevel": True, "builtIn": False
+    }, token=token)
+
+    def executions(alias):
+        return admin_http("GET", auth + "/flows/" + urllib.parse.quote(alias, safe="") + "/executions", token=token)
+
+    def execution(alias, provider=None, child=None):
+        rows = executions(alias)
+        matches = [row for row in rows if
+                   (provider is not None and row.get("providerId") == provider)
+                   or (child is not None and row.get("displayName") == child)]
+        if len(matches) != 1:
+            raise AssertionError("Unexpected auth-flow topology for " + alias +
+                                 "; selected providers: " + repr([(r.get("displayName"), r.get("providerId")) for r in rows]))
+        return matches[0]
+
+    def requirement(parent, item, value):
+        updated = dict(item)
+        updated["requirement"] = value
+        admin_http("PUT", auth + "/flows/" + urllib.parse.quote(parent, safe="") + "/executions",
+                   updated, token=token, allowed=(204,))
+
+    def create_step(parent, provider, required):
+        path = auth + "/flows/" + urllib.parse.quote(parent, safe="") + "/executions/execution"
+        admin_http("POST", path, {"provider": provider}, token=token, allowed=(201,))
+        item = execution(parent, provider=provider)
+        requirement(parent, item, required)
+        return item
+
+    def create_flow(parent, name, requirement_name):
+        path = auth + "/flows/" + urllib.parse.quote(parent, safe="") + "/executions/flow"
+        admin_http("POST", path, {
+            "alias": name, "type": "basic-flow", "provider": "basic-flow",
+            "description": "Disposable Permora LoA test subflow"
+        }, token=token, allowed=(201,))
+        requirement(parent, execution(parent, child=name), requirement_name)
+
+    create_step(root, "auth-cookie", "ALTERNATIVE")
+    auth_flow = "permora-ci-auth"
+    create_flow(root, auth_flow, "ALTERNATIVE")
+
+    for level, provider, max_age in (
+            ("1", "auth-username-password-form", "36000"),
+            ("2", "auth-otp-form", "0")):
+        condition_alias = "permora-ci-level-" + level
+        create_flow(auth_flow, condition_alias, "CONDITIONAL")
+        item = create_step(condition_alias, "conditional-level-of-authentication", "REQUIRED")
+        admin_http("POST", auth + "/executions/" + item["id"] + "/config", {
+            "alias": "permora-ci-loa-" + level,
+            "config": {"loa-condition-level": level, "loa-max-age": max_age}
+        }, token=token, allowed=(201,))
+        create_step(condition_alias, provider, "REQUIRED")
+
+    admin_http("PUT", realm_admin, {"browserFlow": root}, token=token, allowed=(204,))
+    current = admin_http("GET", realm_admin, token=token)
+    if current.get("browserFlow") != root:
+        raise AssertionError("Keycloak did not activate the disposable LoA browser flow")
+    print("PASS: configured disposable Keycloak LoA1 password + LoA2 OTP browser flow", flush=True)
+
 def run():
     wait_for_idp()
     token = admin_http("POST", "/realms/master/protocol/openid-connect/token", {
@@ -136,6 +200,7 @@ def run():
     admin_http("POST", "/admin/realms", {"realm": REALM, "enabled": True}, token=token)
     try:
         admin = "/admin/realms/" + REALM
+        configure_isolated_step_up(admin, token)
         admin_http("POST", admin + "/clients", {
             "clientId": LOGIN_CLIENT, "enabled": True, "protocol": "openid-connect",
             "standardFlowEnabled": True, "implicitFlowEnabled": False,
@@ -156,7 +221,7 @@ def run():
             "username": "bff-ci-user", "enabled": True, "emailVerified": True,
             "firstName": "Permora", "lastName": "CI",
             "email": "bff-ci-user@permora.invalid",
-            "requiredActions": [], "credentials": [
+            "requiredActions": ["CONFIGURE_TOTP"], "credentials": [
                 {"type": "password", "value": test_password, "temporary": False}
             ]
         }, token=token)
@@ -198,7 +263,7 @@ def run():
                     browser_env["PERMORA_TEST_BROWSER_USERNAME"] = "bff-ci-user"
                     browser_env["PERMORA_TEST_BROWSER_PASSWORD"] = test_password
                     subprocess.run(["node", "web/e2e/oidc-bff.smoke.mjs"],
-                                   cwd=ROOT, env=browser_env, check=True, timeout=120)
+                                   cwd=ROOT, env=browser_env, check=True, timeout=220)
                 except BaseException:
                     # Do not echo request credentials, OIDC codes, or ID tokens into CI logs.
                     print("BFF test failed; ASP.NET process status:", proc.poll())
