@@ -7,9 +7,9 @@ name: permora-pilot
 x-hardening: &hardening
   read_only: true
   cap_drop: [ALL]
-  security_opt: [no-new-privileges:true]
+  security_opt: ["no-new-privileges:true"]
   init: true
-  tmpfs: [/tmp:size=64m,mode=1777]
+  tmpfs: ["/tmp:size=64m,mode=1777"]
   restart: unless-stopped
 
 services:
