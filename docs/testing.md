@@ -1,10 +1,18 @@
 # Teststrategie und Ausführung
 
+## Positiver Keycloak-LoA2-/TOTP-End-to-End-Nachweis (17.10.2026)
+
+[GitHub Actions #39011230492](https://github.com/Cenn0/Permora/actions/runs/39011230492) bestätigt die **tatsächliche** Ausführung des Keycloak-26.8.1-Browserflows in einem isolierten Runner mit temporärer Testidentität: Passwort-only bleibt auf niedrigem ACR; privilegierte Mutationen scheitern mit `step_up_required`; ein neu registrierter TOTP-Faktor wird beim erneuten Login abgefragt; der signierte `acr=2` zusammen mit frischem `auth_time` bleibt nach ASP.NET-Core-Claim-Mapping in der serverseitigen Cookie-Session; ein fremder App-Zugriff wird auch nach MFA weiter verweigert; Logout invalidiert die Sitzung. Alle **acht Pflichtjobs** des PR-Laufs sind erfolgreich.
+
+Die Ursache des ursprünglichen E2E-Fehlers war eine standardmäßige Claim-Action, die `acr` **nach** der ID-Tokenvalidierung entfernte. Sie ist für diesen einen validierten Claim aufgehoben, **nicht** die serverseitige Sicherheitsanforderung. Die temporäre Diagnose wurde entfernt.
+
+Dies ist **kein** Test einer realen Firmen-AD-/LDAP-Föderation oder deren MFA-Konfiguration, kein HA-/Pentest und kein Nachweis der vollständigen Unternehmens-FGAP-Matrix.
+
 ## Technischer Testnachweis – 17. Oktober 2026
 
 [Integrierter OIDC-/MFA-Negativlauf](https://github.com/Cenn0/Permora/actions/runs/38985065471): Echter Chromium-Browser mit Keycloak-26.8.1-Login, Cookies, ASP.NET-BFF-Sitzung und serverseitigem `403 step_up_required` bei Passwort-only; dazu Builds, xUnit/PostgreSQL, Angular/Playwright, FGAP-Contract, Docker und Lockfile-Gates. [Cross-Team-IDOR-Lauf](https://github.com/Cenn0/Permora/actions/runs/38985300214): direkter REST-Zugriff auf fremde Anwendungs-/Operation-/Audit-/Review-IDs führt in den getesteten Fällen zu HTTP 404, verbotene zentrale Administration zu 403. Das Validierungs-Reihenfolgeproblem wurde korrigiert. Die CI enthält außerdem den isolierten PostgreSQL-Restore- und den offline SBOM-Komponententest.
 
-**Unbewiesen:** erfolgreicher zweiter MFA-Faktor mit dem tatsächlichen Unternehmens-LoA, volle produktive FGAP-/LDAP-Matrix, verteilte Recovery und Last-/Sicherheitstests. Die älteren Testzahlen in den nachfolgenden Abschnitten beziehen sich auf konkrete historische Workflows.
+**Zum hier dokumentierten früheren Negativlauf zusätzlich nachgewiesen:** positiver TOTP-Faktor im isolierten Keycloak-26.8.1-Test (siehe oben). **Weiter unbewiesen:** MFA mit dem tatsächlichen Unternehmens-Identity-Provider, volle produktive FGAP-/LDAP-Matrix, verteilte Recovery und Last-/Sicherheitstests. Die älteren Testzahlen in den nachfolgenden Abschnitten beziehen sich auf konkrete historische Workflows.
 
 
 **Aktueller Vollnachweis der vorhandenen CI:** [Run #38946163282](https://github.com/Cenn0/Permora/actions/runs/38946163282), 7/7 Pflichtjobs grün, 102/102 xUnit ohne Skips einschließlich PostgreSQL, 32 isolierte TypeScript-Tests, 8/8 Playwright, echte Keycloak 26.8.1 FGAP-Client- und User-/Group-Positiv-/Negativfälle, gesperrte Dependency-Restores und tatsächlicher Docker-Image-Build. [Evidenz und offene Grenzen](evidence/ci-2026-10-16-final.md).
