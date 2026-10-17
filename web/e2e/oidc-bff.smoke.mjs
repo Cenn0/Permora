@@ -97,7 +97,23 @@ try {
   await page.locator('#password').fill(password);
   await page.locator('#kc-login').click();
  }
- await page.locator('#otp').waitFor({timeout:45000});
+ // Check what Keycloak actually renders: no credential values, tokens, links or request bodies in logs.
+ try {
+  await page.locator('#otp').waitFor({timeout:20000});
+ } catch (error) {
+  const inputNames = await page.locator('input').evaluateAll(elements =>
+    elements.map(e => ({id:e.id, type:e.type, name:e.getAttribute('name')}))
+      .filter(e => e.type !== 'hidden' && e.type !== 'password' && e.type !== 'text'));
+  const errors = await page.locator('#input-error, #kc-error-message, .alert-error').allTextContents();
+  const titles = await page.locator('h1, h2').allTextContents();
+  console.error('Keycloak challenge (redacted):', JSON.stringify({
+   path: new URL(page.url()).pathname,
+   titles: titles.map(s=>s.trim().slice(0,120)),
+   errorPresent: errors.some(s=>Boolean(s.trim())),
+   inputNames
+  }));
+  throw error;
+ }
  // Keycloak rejects re-use of a one-time code from the initial enrollment slot.
  await nextTotpSlot();
  await page.locator('#otp').fill(currentTotp(otpSecret));
