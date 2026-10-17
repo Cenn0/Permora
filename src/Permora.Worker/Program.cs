@@ -18,7 +18,7 @@ foreach (var realm in keycloak.Realms.Values)
     if (realm.Issuer.TrimEnd('/') != portal.Authority.TrimEnd('/'))
         throw new InvalidOperationException("Cross-issuer delegation requires authoritative person correlation; it is not enabled in this release.");
 }
-var connection = builder.Configuration.GetConnectionString("Portal") ?? throw new InvalidOperationException("ConnectionStrings:Portal is required.");
+var connection = ConfigurationChecks.ReadPortalConnectionString(builder.Configuration);
 builder.Services.AddSingleton(NpgsqlDataSource.Create(connection));
 builder.Services.AddSingleton<PostgresStore>();
 builder.Services.AddSingleton<IPortalStore>(p => p.GetRequiredService<PostgresStore>());
