@@ -25,11 +25,7 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Resolve initial isolated axe tool lock (temporary bootstrap)
-        run: |
-          npm install --prefix tools/accessibility --package-lock-only --ignore-scripts
-          cat tools/accessibility/package-lock.json
-      - name: Install isolated test dependencies
+      - name: Install exact committed scanner and application dependencies
         run: |
           npm ci --prefix tools/accessibility --ignore-scripts
           npm ci --prefix web
@@ -38,7 +34,7 @@ jobs:
         run: npx playwright install chromium --with-deps
       - name: Check rendered views, editors, keyboard and reflow
         working-directory: web
-        run: npx playwright test --config playwright.accessibility.config.ts --max-failures=5
+        run: npx playwright test --config playwright.accessibility.config.ts
       - name: Explain scope without retaining screenshots or personal data
         if: always()
         run: |
