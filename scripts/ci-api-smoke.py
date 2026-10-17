@@ -186,6 +186,46 @@ def main():
                 assert_status(status, 404, "Foreign actor cannot discover protected app by direct ID")
                 status, _ = request_http(5081, "GET", "/api/v1/admin/operations-health", foreign_jar)
                 assert_status(status, 403, "Foreign team cannot query central operational telemetry")
+                # Cross-team IDOR regression: every direct-resource API must resolve
+                # application visibility before reading records or mutating state.
+                foreign_resource = "/api/v1/applications/" + app_id
+                scoped_routes = [
+                    foreign_resource,
+                    foreign_resource + "/operations",
+                    foreign_resource + "/operations/" + str(uuid.uuid4()),
+                    foreign_resource + "/identities?q=owner",
+                    foreign_resource + "/audit",
+                    foreign_resource + "/reviews",
+                ]
+                for path in scoped_routes:
+                    status, _ = request_http(5081, "GET", path, foreign_jar)
+                    assert_status(status, 404, "Cross-team read blocked: " + path.split("?")[0])
+
+                foreign_commands = [
+                    (foreign_resource + "/changes",
+                     {"expectedRevision": 1, "change": {"kind": "Reconcile", "reason": "Denied cross-team write"}}),
+                    (foreign_resource + "/reviews",
+                     {"name": "Forbidden outside team", "dueAt": "2099-01-01T00:00:00Z"}),
+                    (foreign_resource + "/operations/" + str(uuid.uuid4()) + "/decision",
+                     {"approve": True, "reason": "Forbidden approval"}),
+                    (foreign_resource + "/operations/" + str(uuid.uuid4()) + "/retry", {}),
+                    (foreign_resource + "/reviews/" + str(uuid.uuid4()) + "/items/" + str(uuid.uuid4()),
+                     {"retain": True}),
+                ]
+                for number, (path, payload) in enumerate(foreign_commands):
+                    status, _ = request_http(5081, "POST", path, foreign_jar, body=payload,
+                        xsrf=foreign_csrf,
+                        extra_headers={"Idempotency-Key": "foreign-denied-" + str(number).zfill(8)})
+                    # Deliberately unauthorized resources must not disclose whether
+                    # an operation/review UUID exists. The same result is expected
+                    # regardless of payload validity.
+                    assert_status(status, 404, "Cross-team mutation blocked: " + path)
+
+                status, _ = request_http(5081, "PUT", "/api/v1/admin/applications/" + app_id + "/binding",
+                    foreign_jar, body={"clientUuid": str(uuid.uuid4()), "clientId": "not-owned",
+                    "expectedRevision": 1}, xsrf=foreign_csrf)
+                assert_status(status, 403, "Cross-team actor cannot rebind a client via central IAM")
+
                 status, _ = request_http(5081, "POST", "/api/v1/admin/teams", foreign_jar,
                                  body={"name": "Forbidden", "members": [], "expectedRevision": 0},
                                  xsrf=foreign_csrf)
