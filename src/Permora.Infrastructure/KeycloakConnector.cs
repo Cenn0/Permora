@@ -270,7 +270,7 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
         }
         foreach (var assignment in app.Assignments)
         {
-            var principal = directory.SingleOrDefault(p => p.Id == assignment.PrincipalId);
+            var principal = directory.SingleOrDefault(p => p.Id == assignment.PrincipalId && p.RealmKey == app.RealmKey);
             if (principal is null) { findings.Add(new(assignment.Id.ToString(), "identity_missing", "The assigned identity is missing.")); continue; }
             var kind = principal.Kind == PrincipalKind.User ? "users" : "groups";
             var actual = await GetAsync<Role[]>(app.RealmKey, "assignments",
@@ -278,6 +278,9 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
             var name = "role." + app.Roles.Single(r => r.Id == assignment.RoleId).Key;
             if (actual.All(r => r.Name != name)) findings.Add(new(assignment.Id.ToString(), "missing_assignment", "The tracked direct mapping is missing."));
         }
+        foreach (var assignmentId in DirectoryGovernance.UnverifiableGroupAssignments(app, directory, clock.GetUtcNow()))
+            findings.Add(new(assignmentId.ToString(), "group_membership_unverified",
+                "Complete, fresh group membership is unavailable; effective access cannot be certified."));
         foreach (var assignmentId in DirectoryGovernance.GroupRevocationsForSeparation(app, directory))
             findings.Add(new(assignmentId.ToString(), "external_group_sod",
                 "Current directory group membership conflicts with the application's separation policy; revoke the group grant."));

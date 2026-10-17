@@ -45,6 +45,26 @@ public static class DirectoryGovernance
         return revokedGroups.Order().ToArray();
     }
 
+    /// <summary>
+    /// Group membership is a prerequisite for a trustworthy effective-access
+    /// reconciliation. An incomplete or stale snapshot MUST produce a finding,
+    /// not a false declaration of drift-free effective access. We deliberately
+    /// do not revoke unknown members solely from incomplete directory data.
+    /// </summary>
+    public static IReadOnlyList<Guid> UnverifiableGroupAssignments(ApplicationDocument app,
+        IReadOnlyList<DirectoryPrincipal> directory, DateTimeOffset now)
+    {
+        var groups = directory.Where(p => p.RealmKey == app.RealmKey && p.Kind == PrincipalKind.Group)
+            .GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First());
+
+        return app.Assignments
+            .Where(a => groups.TryGetValue(a.PrincipalId, out var principal)
+                && (!principal.MembershipComplete
+                    || principal.SyncedAt > now.AddMinutes(1)
+                    || now - principal.SyncedAt > TimeSpan.FromMinutes(15)))
+            .Select(a => a.Id).Distinct().Order().ToArray();
+    }
+
     private static IEnumerable<string> EffectiveKeys(DirectoryPrincipal principal)
         => principal.Kind == PrincipalKind.Group
             ? principal.EffectiveMemberKeys.Where(k => !string.IsNullOrWhiteSpace(k))
