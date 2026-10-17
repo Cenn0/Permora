@@ -84,4 +84,43 @@ public sealed class DirectoryGovernanceTests
         };
         Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(app, [f.OwnerPrincipal, group]));
     }
+    [Fact]
+    public void Incomplete_assigned_group_must_be_reported_as_unverifiable()
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group, MembershipComplete = false };
+        var grant = f.Assignment(principal: group.Id);
+        var app = f.App with { Assignments = [grant] };
+
+        Assert.Equal([grant.Id], DirectoryGovernance.UnverifiableGroupAssignments(app, [group], f.Clock.Now));
+        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(app, [group]));
+    }
+
+    [Fact]
+    public void Stale_or_future_dated_group_snapshot_is_not_certifiable()
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group, MembershipComplete = true };
+        var grant = f.Assignment(principal: group.Id);
+        var app = f.App with { Assignments = [grant] };
+
+        Assert.Empty(DirectoryGovernance.UnverifiableGroupAssignments(app, [group], f.Clock.Now));
+        Assert.Equal([grant.Id], DirectoryGovernance.UnverifiableGroupAssignments(app,
+            [group with { SyncedAt = f.Clock.Now.AddMinutes(-16) }], f.Clock.Now));
+        Assert.Equal([grant.Id], DirectoryGovernance.UnverifiableGroupAssignments(app,
+            [group with { SyncedAt = f.Clock.Now.AddMinutes(2) }], f.Clock.Now));
+    }
+
+    [Fact]
+    public void Unverified_group_detection_does_not_trust_a_different_realm()
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group, MembershipComplete = false,
+            RealmKey = "external-realm" };
+        var app = f.App with { Assignments = [f.Assignment(principal: group.Id)] };
+        // Cross-realm principals are never considered valid group snapshots. Connector
+        // reconciliation reports the missing in-realm identity independently.
+        Assert.Empty(DirectoryGovernance.UnverifiableGroupAssignments(app, [group], f.Clock.Now));
+    }
+
 }
