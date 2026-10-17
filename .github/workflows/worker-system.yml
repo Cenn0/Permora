@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-
 concurrency:
   group: permora-workers-${{ github.ref }}
   cancel-in-progress: true
@@ -39,19 +38,28 @@ jobs:
       - name: Execute real failure and recovery matrix
         run: |
           python3 - <<'PY'
-          import runpy, tempfile
+          import json, re, runpy, tempfile
           from pathlib import Path
           original = tempfile.TemporaryDirectory
           class DiagnosedWorkspace(original):
               def __exit__(self, exc_type, exc, traceback):
                   if exc_type is not None:
-                      # These worker messages contain only exception TYPES, not SQL,
-                      # tokens, request bodies, secrets or personal credentials.
-                      markers = ('Directory synchronization failed', 'Worker iteration failed', 'could not complete:')
-                      for file in Path(self.name).glob('worker-*.log'):
-                          for line in file.read_text(errors='replace').splitlines()[-80:]:
-                              if any(marker in line for marker in markers):
-                                  print('WORKER-DIAGNOSTIC:', line.strip(), flush=True)
+                      root = Path(self.name)
+                      protected = [p.read_text().strip() for p in root.glob('*.secret')]
+                      for config in root.glob('*.json'):
+                          data = json.loads(config.read_text())
+                          for value in data.get('ConnectionStrings', {}).values():
+                              protected.append(value)
+                              match = re.search(r'Password=([^;]+)', value, re.I)
+                              if match: protected.append(match.group(1))
+                      for file in root.glob('worker-*.log'):
+                          text = file.read_text(errors='replace')
+                          for secret in protected:
+                              if secret: text = text.replace(secret, '[REDACTED]')
+                          text = re.sub(r'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+', '[TOKEN]', text)
+                          print('WORKER-LOG:', file.name, 'bytes:', file.stat().st_size, flush=True)
+                          for line in text.splitlines()[-40:]:
+                              print('WORKER-DIAGNOSTIC:', line[:400], flush=True)
                   return super().__exit__(exc_type, exc, traceback)
           tempfile.TemporaryDirectory = DiagnosedWorkspace
           runpy.run_path('scripts/ci-worker-system.py', run_name='__main__')
@@ -59,6 +67,5 @@ jobs:
       - name: Summarize boundaries without retaining secrets or backups
         if: always()
         run: |
-          echo 'The fixture uses actual Permora.Worker processes, actual Keycloak and separate PostgreSQL databases.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Includes outage, lost response after remote commit, worker kill, survivor completion, quiesced database backup/restore.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'A CI runtime measurement is not a production SLO, multi-host HA or an independent release approval.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Actual Permora.Worker processes, actual Keycloak and separate PostgreSQL databases.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A CI measurement is not a production SLO, multi-host HA or an independent release approval.' >> "$GITHUB_STEP_SUMMARY"
