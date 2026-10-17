@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Destructive ONLY to disposable local fixtures created by this process.
+"""Real LDAPS + Keycloak in an explicitly disposable runner, never production.
 
-Real OpenLDAP/LDAPS + Keycloak 26.8.1, imported/non-imported identities,
-nested groups, membership changes and delegated authorization boundaries.
-This does not certify Microsoft AD, Kerberos, cross-forest trusts or production.
-Requires a disposable Linux runner with Docker, slapd, ldap-utils and OpenSSL.
+Covers imported/non-imported LDAP identities, nested membership and FGAP.
+OpenLDAP is not evidence of Microsoft AD, Kerberos or cross-forest behavior.
 """
 from __future__ import annotations
 import base64
@@ -40,12 +38,12 @@ def command(args: list[str], *, data: str | None = None, env=None) -> str:
     result = subprocess.run(args, input=data, text=True, capture_output=True,
                             timeout=120, check=False, env=env)
     if result.returncode:
-        # Neither the input LDIF nor HTTP/LDAP credentials are logged.
         raise RuntimeError(f'{Path(args[0]).name} failed with exit {result.returncode}')
     return result.stdout
 
 
 def ssha(password: str) -> str:
+    # LDAP test fixture only; this is not the product password-storage policy.
     salt = secrets.token_bytes(16)
     return '{SSHA}' + base64.b64encode(hashlib.sha1(password.encode() + salt).digest() + salt).decode()
 
@@ -98,9 +96,7 @@ def run() -> None:
         root.chmod(0o700)
         db = root / 'db'
         db.mkdir()
-        bind_secret = secrets.token_urlsafe(32)
-        user_secret = secrets.token_urlsafe(32)
-        admin_secret = secrets.token_urlsafe(32)
+        bind_secret, user_secret, admin_secret = (secrets.token_urlsafe(32) for _ in range(3))
         (root / 'bind.secret').write_text(bind_secret)
         (root / 'bind.secret').chmod(0o600)
         command(['openssl', 'req', '-x509', '-newkey', 'rsa:3072', '-nodes', '-days', '2',
@@ -130,8 +126,11 @@ access to attrs=userPassword by self write by anonymous auth by * none
 access to * by * read
 ''')
         (root / 'slapd.conf').chmod(0o600)
+        # A ZERO debug mask allows slapd to daemonize. A nonzero stats mask
+        # keeps the actual server process supervised, without BER/password dumps.
+        logfile = (root / 'ldap-startup.log').open('w')
         ldap_process = subprocess.Popen(['/usr/sbin/slapd', '-f', str(root / 'slapd.conf'),
-            '-h', LDAP, '-d', '0'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            '-h', LDAP, '-d', '256'], stdout=logfile, stderr=subprocess.STDOUT)
         container = 'permora-federation-' + uuid.uuid4().hex[:12]
         started = False
         ldap_env = dict(os.environ, LDAPTLS_CACERT=str(root / 'ldap.crt'), LDAPTLS_REQCERT='demand')
@@ -146,9 +145,13 @@ access to * by * read
 
         try:
             context = ssl.create_default_context(cafile=str(root / 'ldap.crt'))
-            for attempt in range(40):
+            for _ in range(40):
                 if ldap_process.poll() is not None:
-                    raise RuntimeError('Isolated slapd terminated before accepting TLS')
+                    logfile.flush()
+                    text = (root / 'ldap-startup.log').read_text(errors='replace').lower()
+                    reasons = [word for word in ('permission denied', 'address already in use', 'unknown directive',
+                               'could not open', 'tls init def ctx failed', 'config error', 'unable to open') if word in text]
+                    raise RuntimeError(f'Isolated slapd exited {ldap_process.returncode}; error categories: {reasons}')
                 try:
                     with socket.create_connection(('127.0.0.1', 1636), timeout=1) as sock:
                         with context.wrap_socket(sock, server_hostname='127.0.0.1'):
@@ -176,7 +179,7 @@ access to * by * read
                 '--http-port=18084', '--truststore-paths=/opt/keycloak/conf/ldap.crt'], env=env)
             started = True
             kc = Keycloak(admin_secret)
-            for attempt in range(80):
+            for _ in range(80):
                 try:
                     kc.request('GET', '/realms/master/.well-known/openid-configuration', admin=False)
                     break
@@ -184,7 +187,6 @@ access to * by * read
                     time.sleep(2)
             else:
                 raise TimeoutError('Disposable Keycloak did not become ready')
-
             for imported in (True, False):
                 group_members('federated0')
                 realm = 'permora-federation-' + uuid.uuid4().hex[:10]
@@ -311,6 +313,7 @@ access to * by * read
             except subprocess.TimeoutExpired:
                 ldap_process.kill()
                 ldap_process.wait(timeout=5)
+            logfile.close()
 
 
 if __name__ == '__main__':
