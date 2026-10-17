@@ -247,8 +247,7 @@ def run():
             env = os.environ.copy()
             env.update({"PERMORA_CONFIG": str(tmp / "portal.json"),
                         "DOTNET_ENVIRONMENT": "Development", "ASPNETCORE_ENVIRONMENT": "Development",
-                        "ASPNETCORE_URLS": APP_URL,
-                        "PERMORA_CI_DIAG_ASSURANCE": "1"})
+                        "ASPNETCORE_URLS": APP_URL})
             subprocess.run(["dotnet", "run", "--project", "src/Permora.Worker",
                             "-c", "Release", "--no-build", "--", "--migrate"],
                            cwd=ROOT, env=env, check=True, timeout=60,
@@ -268,10 +267,6 @@ def run():
                 except BaseException:
                     # Do not echo request credentials, OIDC codes, or ID tokens into CI logs.
                     print("BFF test failed; ASP.NET process status:", proc.poll())
-                    # Only booleans and counts, never token content, cookies or account IDs.
-                    for line in (tmp / "api.log").read_text(errors="replace").splitlines():
-                        if "PERMORA-CI-ASSURANCE:" in line:
-                            print(line.split("PERMORA-CI-ASSURANCE:", 1)[1].strip(), flush=True)
                     raise
                 finally:
                     proc.terminate()
