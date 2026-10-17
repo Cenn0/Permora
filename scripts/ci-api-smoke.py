@@ -135,7 +135,8 @@ def main():
                 status, monitoring = request_http(5080, "GET", "/api/v1/admin/operations-health", jar)
                 assert_status(status, 200, "Central IAM can query aggregate queue and revocation diagnostics")
                 if not isinstance(monitoring, dict) or not all(field in monitoring for field in (
-                    "queued", "awaitingApproval", "failed", "conflict", "dueRevocations", "oldestDueRevocationSeconds"
+                    "queued", "awaitingApproval", "failed", "conflict", "dueRevocations", "oldestDueRevocationSeconds",
+                    "failedRevocations", "conflictedRevocations", "oldestOutstandingRevocationSeconds"
                 )):
                     raise AssertionError("Operational health is missing expected aggregate fields")
                 if len(apps) < 4:
