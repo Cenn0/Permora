@@ -26,3 +26,5 @@ Permora is an independent, open-source C# / Angular portal for **delegated Keycl
 Changes are asynchronous. HTTP 202 acceptance is **not** confirmation of remote role enforcement. Central IAM approval is a distinct prerequisite for newly provisioned client activation.
 
 No invented dashboard screenshot is published; the [tracked brand asset](../web/public/brand/permora.svg) and [design description](design.md) are available until a verified application capture exists.
+
+**Dependency inventory:** [Lockfile CycloneDX generator and exclusions](supply-chain.md).
