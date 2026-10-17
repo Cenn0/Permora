@@ -192,72 +192,11 @@ def run():
                                         stdout=logfile, stderr=subprocess.STDOUT)
                 try:
                     wait_for_bff(proc)
-                    jar = http.cookiejar.CookieJar()
-                    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar), ObservedRedirect())
-                    status, final_url, _, page = browser(opener, "GET", "/bff/login")
-                    if status != 200:
-                        # Only emit static hints and the route path. Never print codes, cookies or credentials.
-                        route = urllib.parse.urlsplit(final_url)
-                        hints = [s for s in ("Invalid parameter: redirect_uri", "Invalid redirect_uri",
-                                            "HTTPS required", "Client not found", "Invalid client",
-                                            "invalid_scope", "Invalid Request") if s.lower() in page.decode("utf-8", "replace").lower()]
-                        additional_hints = [s for s in ("Cookie not found", "Missing cookie", "Invalid code", "Page has expired",
-                                            "Authentication session", "Invalid request", "Invalid session",
-                                            "Restart login", "Something went wrong", "expired", "bad request")
-                                            if s.lower() in page.decode("utf-8", "replace").lower()]
-                        print("OIDC initial response:", status, route.netloc + route.path,
-                              "hints:", hints + additional_hints,
-                              "cookie names:", sorted({cookie.name for cookie in jar}), flush=True)
-                    assert_status(status, 200, "OIDC redirects through Keycloak to the actual login form")
-                    form = LoginForm()
-                    form.feed(page.decode("utf-8"))
-                    if not form.action:
-                        raise AssertionError("Expected real Keycloak HTML login form, not simulated authentication")
-                    form.fields.update({"username": "bff-ci-user", "password": test_password})
-                    status, url, _, _ = browser(opener, "POST", form.action,
-                                                urllib.parse.urlencode(form.fields).encode(),
-                                                {"Content-Type": "application/x-www-form-urlencoded"})
-                    assert_status(status, 200, "Keycloak returned through ASP.NET OIDC callback")
-                    if not url.startswith(APP_URL + "/"):
-                        raise AssertionError("OIDC callback did not return to portal origin")
-
-                    status, _, _, raw = browser(opener, "GET", "/bff/session")
-                    assert_status(status, 200, "Server-issued cookie can read the BFF session")
-                    session = json.loads(raw)
-                    if not session.get("authenticated") or session.get("development") or session.get("strongAuthentication"):
-                        raise AssertionError("Password-only OIDC login must NOT satisfy privileged ACR=2")
-                    assert_status(browser(opener, "GET", "/api/v1/applications")[0], 200,
-                                  "Read-only tenant-scoped API works with a real OIDC cookie")
-                    xsrf = next((c.value for c in jar if c.name == "XSRF-TOKEN"), None)
-                    if not xsrf:
-                        raise AssertionError("CSRF token cookie was not issued")
-                    body = json.dumps({"teamId": str(uuid.uuid4()), "realmKey": REALM,
-                                       "slug": "cannot-write", "name": "Rejected by MFA",
-                                       "description": "CI", "environment": "Test"}).encode()
-                    status, _, _, _ = browser(opener, "POST", "/api/v1/applications", body,
-                                              {"Content-Type": "application/json", "X-XSRF-TOKEN": xsrf})
-                    assert_status(status, 403, "Insufficient Keycloak assurance blocks every privileged write")
-
-                    # Confirm the explicit challenge requests essential LoA, not just advisory acr_values.
-                    no_redirect = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar), NoRedirect())
-                    status, _, headers, _ = browser(no_redirect, "GET", "/bff/step-up")
-                    assert_status(status, 302, "Authenticated user may start a step-up OIDC challenge")
-                    redirect = headers.get("Location", "")
-                    query = urllib.parse.parse_qs(urllib.parse.urlsplit(redirect).query)
-                    claims = json.loads(query.get("claims", ["{}"])[0])
-                    if query.get("max_age") != ["0"] or not claims.get("id_token", {}).get("acr", {}).get("essential"):
-                        raise AssertionError("Step-up did not request fresh essential ID-token ACR")
-                    if claims["id_token"]["acr"].get("values") != ["2"]:
-                        raise AssertionError("Step-up requested unexpected ACR")
-                    print("PASS: OIDC step-up explicitly requires fresh, essential ACR 2")
-
-                    assert_status(browser(opener, "POST", "/bff/logout", b"{}",
-                                          {"Content-Type": "application/json", "X-XSRF-TOKEN": xsrf})[0], 204,
-                                  "Local logout invalidates the ASP.NET server session")
-                    status, _, _, raw = browser(opener, "GET", "/bff/session")
-                    assert_status(status, 200, "Post-logout BFF returns a safe anonymous session")
-                    if json.loads(raw).get("authenticated"):
-                        raise AssertionError("Logout did not invalidate server session")
+                    browser_env = env.copy()
+                    browser_env["PERMORA_TEST_BROWSER_USERNAME"] = "bff-ci-user"
+                    browser_env["PERMORA_TEST_BROWSER_PASSWORD"] = test_password
+                    subprocess.run(["node", "web/e2e/oidc-bff.smoke.mjs"],
+                                   cwd=ROOT, env=browser_env, check=True, timeout=120)
                 except BaseException:
                     # Do not echo request credentials, OIDC codes, or ID tokens into CI logs.
                     print("BFF test failed; ASP.NET process status:", proc.poll())

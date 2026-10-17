@@ -116,6 +116,15 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install headless Chromium for a real browser OIDC session
+        working-directory: web
+        run: |
+          npm ci --fetch-retries=5 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=120000
+          npx playwright install chromium --with-deps
       - name: Restore and build actual ASP.NET BFF and migration worker
         run: |
           dotnet restore Permora.slnx --locked-mode --verbosity minimal
