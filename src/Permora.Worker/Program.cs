@@ -11,7 +11,7 @@ var builder = Host.CreateApplicationBuilder(args.Where(a => a is not "--migrate"
 ConfigurationChecks.AddLocalFile(builder.Configuration);
 var portal = builder.Configuration.GetSection("Portal").Get<PortalOptions>() ?? new PortalOptions();
 ConfigurationChecks.ValidateUrl(portal.Authority, builder.Environment.IsDevelopment() && portal.AllowHttpInDevelopment);
-var keycloak = builder.Configuration.GetSection("Keycloak").Get<KeycloakOptions>() ?? new KeycloakOptions();
+var keycloak = KeycloakConfiguration.Read(builder.Configuration);
 foreach (var realm in keycloak.Realms.Values)
 {
     ConfigurationChecks.ValidateUrl(realm.BaseUrl, builder.Environment.IsDevelopment() && keycloak.AllowHttpInDevelopment);
@@ -44,13 +44,9 @@ if (args.Contains("--seed-demo", StringComparer.Ordinal))
     await DemoSeed.RunAsync(host.Services.GetRequiredService<IPortalStore>(), portal.Authority, CancellationToken.None);
     return;
 }
+if (!builder.Environment.IsDevelopment() && keycloak.Realms.Count == 0)
+    throw new InvalidOperationException("A production worker requires at least one explicitly configured Keycloak realm.");
 var startupLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Permora.Worker.Startup");
 startupLogger.LogInformation("Worker configured realms: {RealmCount}; registered hosted services: {HostedServiceCount}",
     keycloak.Realms.Count, host.Services.GetServices<IHostedService>().Count());
-host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStarted.Register(() =>
-{
-    foreach (var service in host.Services.GetServices<IHostedService>().OfType<BackgroundService>())
-        startupLogger.LogInformation("Worker background task: {ServiceType}; state: {TaskState}",
-            service.GetType().Name, service.ExecuteTask?.Status.ToString() ?? "not-started");
-});
 await host.RunAsync();
