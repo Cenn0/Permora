@@ -20,8 +20,7 @@ ConfigurationChecks.AddLocalFile(builder.Configuration);
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 262144);
 var options = ConfigurationChecks.ReadPortal(builder.Configuration, builder.Environment.IsDevelopment());
 var admins = ConfigurationChecks.Administrators(options);
-var connectionString = builder.Configuration.GetConnectionString("Portal")
-    ?? throw new InvalidOperationException("ConnectionStrings:Portal is required.");
+var connectionString = ConfigurationChecks.ReadPortalConnectionString(builder.Configuration);
 builder.Services.AddSingleton(options);
 builder.Services.AddSingleton<IReadOnlySet<string>>(admins);
 builder.Services.AddSingleton(TimeProvider.System);

@@ -28,6 +28,33 @@ public static class ConfigurationChecks
         if (!string.IsNullOrWhiteSpace(path))
             configuration.AddJsonFile(Path.GetFullPath(path), optional: false, reloadOnChange: false).AddEnvironmentVariables();
     }
+    /// <summary>
+    /// Keep database credentials out of shared JSON and environment variables in
+    /// hardened deployments. A secret file takes precedence only when there is
+    /// no competing inline setting, so conflicting configurations fail closed.
+    /// </summary>
+    public static string ReadPortalConnectionString(IConfiguration configuration)
+    {
+        var inline = configuration.GetConnectionString("Portal");
+        var path = configuration["ConnectionStrings:PortalFile"];
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            if (!string.IsNullOrWhiteSpace(inline))
+                throw new InvalidOperationException("Configure either Portal or PortalFile, never both.");
+            if (!Path.IsPathFullyQualified(path))
+                throw new InvalidOperationException("ConnectionStrings:PortalFile must be an absolute path.");
+            if (!File.Exists(path))
+                throw new InvalidOperationException("The database connection secret file is unavailable.");
+            var secret = File.ReadAllText(path).Trim();
+            if (string.IsNullOrWhiteSpace(secret))
+                throw new InvalidOperationException("The database connection secret file is empty.");
+            return secret;
+        }
+        if (string.IsNullOrWhiteSpace(inline))
+            throw new InvalidOperationException("Configure ConnectionStrings:PortalFile or ConnectionStrings:Portal.");
+        return inline;
+    }
+
     public static PortalOptions ReadPortal(IConfiguration configuration, bool development)
     {
         var options = configuration.GetSection("Portal").Get<PortalOptions>() ?? new PortalOptions();

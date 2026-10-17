@@ -80,3 +80,22 @@ Rotation ist **keine** Garantie einer maximalen Entzugsdauer: Eine
 langlebige Remote-Sperre, ein ausgefallener Worker, mehrere voneinander
 unabhängige Worker-Instanzen oder Backlog oberhalb der tatsächlich gemessenen
 Kapazität benötigen weiterhin Monitoring, Lasttests und Betriebsmaßnahmen.
+
+## Geheimnisdatei statt Konfigurationspasswort
+
+Alle drei Prozesse (API, Worker und Provisioner) unterstützen neben der
+bestehenden Entwicklungsoption `ConnectionStrings:Portal` jetzt
+`ConnectionStrings:PortalFile` mit **absolutem Dateipfad**.
+Die Datei enthält genau **eine vollständige Npgsql-Verbindungszeichenfolge**;
+ein abschließender Zeilenumbruch wird entfernt. Die Anwendung meldet
+fehlende/leere Dateien ohne Offenlegung des Kennworts. Beide Felder
+gleichzeitig sind ausdrücklich verboten. Die veröffentlichte
+Beispielkonfiguration verwendet `/run/secrets/portal-postgres`.
+
+Für jeden Prozess eine separat berechtigte, schreibgeschützte Geheimnisdatei
+bereitstellen und über einen geeigneten Secret-Manager/Orchestrator einhängen.
+Secret-Mounts, minimale Datenbankberechtigungen und Rotation sind
+**Betriebsanforderungen**, keine durch die Leseunterstützung bewiesene
+Produktionshärtung. Die Alternative mit Inline-String bleibt für isolierte
+lokale Entwicklung kompatibel. Niemals produktive Connection-Strings in
+Repository, Actions-Logs oder öffentliche Issues übernehmen.

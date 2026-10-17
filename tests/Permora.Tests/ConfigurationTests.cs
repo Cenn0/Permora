@@ -34,4 +34,64 @@ public sealed class ConfigurationTests
         { ["Portal:Authority"] = Fixture.Issuer, ["Portal:PublicOrigin"] = "https://portal.example.test", ["Portal:DataProtectionPath"] = "/tmp/unused-test-path", ["Portal:EnableDevelopmentLogin"] = "true" }).Build();
         Assert.Throws<InvalidOperationException>(() => ConfigurationChecks.ReadPortal(configuration, false));
     }
+    [Fact]
+    public void File_based_postgresql_connection_string_is_read_without_overriding_inline_values()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "permora-connection-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var file = Path.Combine(directory, "database.secret");
+        try
+        {
+            File.WriteAllText(file, "Host=127.0.0.1;Database=permora_test_example;Username=reader;Password=isolated" + Environment.NewLine);
+            var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:PortalFile"] = file
+            }).Build();
+            Assert.Equal("Host=127.0.0.1;Database=permora_test_example;Username=reader;Password=isolated",
+                ConfigurationChecks.ReadPortalConnectionString(config));
+
+            var conflicting = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:PortalFile"] = file,
+                ["ConnectionStrings:Portal"] = "Host=unexpected"
+            }).Build();
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+                ConfigurationChecks.ReadPortalConnectionString(conflicting));
+            Assert.DoesNotContain("isolated", ex.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("unexpected", ex.Message, StringComparison.Ordinal);
+
+            File.WriteAllText(file, "   ");
+            Assert.Throws<InvalidOperationException>(() => ConfigurationChecks.ReadPortalConnectionString(config));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Invalid_or_missing_database_secret_file_fails_closed()
+    {
+        static IConfiguration Config(string file) => new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            { ["ConnectionStrings:PortalFile"] = file }).Build();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ConfigurationChecks.ReadPortalConnectionString(Config("relative-database.secret")));
+        Assert.Throws<InvalidOperationException>(() =>
+            ConfigurationChecks.ReadPortalConnectionString(Config(
+                Path.Combine(Path.GetTempPath(), "permora-missing-" + Guid.NewGuid().ToString("N")))));
+        Assert.Throws<InvalidOperationException>(() =>
+            ConfigurationChecks.ReadPortalConnectionString(new ConfigurationBuilder().Build()));
+    }
+
+    [Fact]
+    public void Existing_inline_connection_string_remains_supported_for_isolated_development()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["ConnectionStrings:Portal"] = "Host=localhost;Database=permora_test_demo" }).Build();
+        Assert.Equal("Host=localhost;Database=permora_test_demo",
+            ConfigurationChecks.ReadPortalConnectionString(config));
+    }
+
 }
