@@ -37,7 +37,25 @@ jobs:
       - name: Validate fixture syntax
         run: python3 -m py_compile scripts/ci-worker-system.py
       - name: Execute real failure and recovery matrix
-        run: python3 scripts/ci-worker-system.py
+        run: |
+          python3 - <<'PY'
+          import runpy, tempfile
+          from pathlib import Path
+          original = tempfile.TemporaryDirectory
+          class DiagnosedWorkspace(original):
+              def __exit__(self, exc_type, exc, traceback):
+                  if exc_type is not None:
+                      # These worker messages contain only exception TYPES, not SQL,
+                      # tokens, request bodies, secrets or personal credentials.
+                      markers = ('Directory synchronization failed', 'Worker iteration failed', 'could not complete:')
+                      for file in Path(self.name).glob('worker-*.log'):
+                          for line in file.read_text(errors='replace').splitlines()[-80:]:
+                              if any(marker in line for marker in markers):
+                                  print('WORKER-DIAGNOSTIC:', line.strip(), flush=True)
+                  return super().__exit__(exc_type, exc, traceback)
+          tempfile.TemporaryDirectory = DiagnosedWorkspace
+          runpy.run_path('scripts/ci-worker-system.py', run_name='__main__')
+          PY
       - name: Summarize boundaries without retaining secrets or backups
         if: always()
         run: |
