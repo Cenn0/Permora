@@ -180,6 +180,14 @@ app.MapOpenApi().RequireAuthorization("PlatformAdmin");
 app.MapGet("/bff/session", (HttpContext context, IAntiforgery antiforgery) =>
 {
     var authenticated = context.User.Identity?.IsAuthenticated == true;
+    if (app.Environment.IsDevelopment()
+        && Environment.GetEnvironmentVariable("PERMORA_CI_DIAG_ASSURANCE") == "1")
+    {
+        app.Logger.LogInformation("PERMORA-CI-ASSURANCE: session_authenticated={Authenticated} session_acr_match={AcrMatch} session_auth_time_count={AuthCount} session_privileged={Privileged}",
+            authenticated, context.User.FindAll("acr").Any(c => c.Value == options.PrivilegedAcr),
+            context.User.FindAll("auth_time").Count(),
+            SessionAssurance.IsPrivileged(context.User, options, DateTimeOffset.UtcNow));
+    }
     var tokens = antiforgery.GetAndStoreTokens(context);
     context.Response.Cookies.Append("XSRF-TOKEN", tokens.RequestToken!, new CookieOptions
     {
