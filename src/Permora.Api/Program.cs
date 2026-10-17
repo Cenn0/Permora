@@ -20,8 +20,7 @@ ConfigurationChecks.AddLocalFile(builder.Configuration);
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 262144);
 var options = ConfigurationChecks.ReadPortal(builder.Configuration, builder.Environment.IsDevelopment());
 var admins = ConfigurationChecks.Administrators(options);
-var connectionString = builder.Configuration.GetConnectionString("Portal")
-    ?? throw new InvalidOperationException("ConnectionStrings:Portal is required.");
+var connectionString = ConfigurationChecks.ReadPortalConnectionString(builder.Configuration);
 builder.Services.AddSingleton(options);
 builder.Services.AddSingleton<IReadOnlySet<string>>(admins);
 builder.Services.AddSingleton(TimeProvider.System);
@@ -68,22 +67,17 @@ else
         o.ExpireTimeSpan = TimeSpan.FromMinutes(30); o.SlidingExpiration = false;
         o.Events.OnRedirectToLogin = c => { c.Response.StatusCode = 401; return Task.CompletedTask; };
         o.Events.OnRedirectToAccessDenied = c => { c.Response.StatusCode = 403; return Task.CompletedTask; };
-        o.Events.OnSigningIn = context =>
-        {
-            if (builder.Environment.IsDevelopment()
-                && Environment.GetEnvironmentVariable("PERMORA_CI_DIAG_ASSURANCE") == "1")
-                context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>()
-                    .LogInformation("PERMORA-CI-ASSURANCE: cookie_signin_privileged={Privileged} cookie_signin_acr_2={Acr2}",
-                        SessionAssurance.IsPrivileged(context.Principal, options, DateTimeOffset.UtcNow),
-                        context.Principal?.FindAll("acr").Any(c => c.Value == options.PrivilegedAcr));
-            return Task.CompletedTask;
-        };
     })
     .AddOpenIdConnect(o =>
     {
         o.Authority = options.Authority; o.ClientId = options.ClientId;
         o.ClientSecret = File.ReadAllText(options.ClientSecretFile).Trim();
         o.ResponseType = "code"; o.UsePkce = true; o.SaveTokens = false; o.MapInboundClaims = false;
+        // ASP.NET Core's default ClaimActions.DeleteClaim("acr") runs AFTER the
+        // signed ID token was validated. Preserve that validated claim so a
+        // Keycloak LoA2 session cannot be downgraded to an anonymous assurance
+        // level in the server-side cookie. Keep issuer/audience validation.
+        o.ClaimActions.Remove("acr");
         o.RequireHttpsMetadata = !(builder.Environment.IsDevelopment() && options.AllowHttpInDevelopment);
         o.Scope.Clear(); o.Scope.Add("openid"); o.Scope.Add("profile");
         o.TokenValidationParameters.NameClaimType = "name";
@@ -97,27 +91,7 @@ else
             {
                 var actor = CurrentActor(context.Principal, options);
                 identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, actor.Key));
-                if (builder.Environment.IsDevelopment()
-                    && Environment.GetEnvironmentVariable("PERMORA_CI_DIAG_ASSURANCE") == "1")
-                {
-                    var acr = context.Principal.FindAll("acr").ToArray();
-                    var authTime = context.Principal.FindAll("auth_time").ToArray();
-                    context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>()
-                        .LogInformation("PERMORA-CI-ASSURANCE: acr_count={AcrCount} acr_match={AcrMatch} auth_time_count={AuthCount} privileged={Privileged}",
-                            acr.Length, acr.Length == 1 && acr[0].Value == options.PrivilegedAcr,
-                            authTime.Length, SessionAssurance.IsPrivileged(context.Principal, options, DateTimeOffset.UtcNow));
-                }
             }
-            return Task.CompletedTask;
-        };
-        o.Events.OnTicketReceived = context =>
-        {
-            if (builder.Environment.IsDevelopment()
-                && Environment.GetEnvironmentVariable("PERMORA_CI_DIAG_ASSURANCE") == "1")
-                context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>()
-                    .LogInformation("PERMORA-CI-ASSURANCE: oidc_ticket_privileged={Privileged} oidc_ticket_acr_2={Acr2}",
-                        SessionAssurance.IsPrivileged(context.Principal, options, DateTimeOffset.UtcNow),
-                        context.Principal?.FindAll("acr").Any(c => c.Value == options.PrivilegedAcr));
             return Task.CompletedTask;
         };
         o.Events.OnRedirectToIdentityProvider = context =>
@@ -200,14 +174,6 @@ app.MapOpenApi().RequireAuthorization("PlatformAdmin");
 app.MapGet("/bff/session", (HttpContext context, IAntiforgery antiforgery) =>
 {
     var authenticated = context.User.Identity?.IsAuthenticated == true;
-    if (app.Environment.IsDevelopment()
-        && Environment.GetEnvironmentVariable("PERMORA_CI_DIAG_ASSURANCE") == "1")
-    {
-        app.Logger.LogInformation("PERMORA-CI-ASSURANCE: session_authenticated={Authenticated} session_acr_match={AcrMatch} session_auth_time_count={AuthCount} session_privileged={Privileged}",
-            authenticated, context.User.FindAll("acr").Any(c => c.Value == options.PrivilegedAcr),
-            context.User.FindAll("auth_time").Count(),
-            SessionAssurance.IsPrivileged(context.User, options, DateTimeOffset.UtcNow));
-    }
     var tokens = antiforgery.GetAndStoreTokens(context);
     context.Response.Cookies.Append("XSRF-TOKEN", tokens.RequestToken!, new CookieOptions
     {
