@@ -1,0 +1,71 @@
+name: Permora worker and recovery acceptance
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: permora-workers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker-system:
+    name: Two real workers, post-commit crash and two-database restore
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      PERMORA_SYSTEM_TESTS: isolated
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          global-json-file: global.json
+      - name: Locked restore and actual Release worker build
+        run: |
+          dotnet restore src/Permora.Worker/Permora.Worker.csproj --locked-mode
+          dotnet build src/Permora.Worker/Permora.Worker.csproj -c Release --no-restore
+      - name: Validate fixture syntax
+        run: python3 -m py_compile scripts/ci-worker-system.py
+      - name: Execute real failure and recovery matrix
+        run: |
+          python3 - <<'PY'
+          import json, re, runpy, tempfile
+          from pathlib import Path
+          original = tempfile.TemporaryDirectory
+          class DiagnosedWorkspace(original):
+              def __exit__(self, exc_type, exc, traceback):
+                  if exc_type is not None:
+                      root = Path(self.name)
+                      protected = [p.read_text().strip() for p in root.glob('*.secret')]
+                      for config in root.glob('*.json'):
+                          data = json.loads(config.read_text())
+                          for value in data.get('ConnectionStrings', {}).values():
+                              protected.append(value)
+                              match = re.search(r'Password=([^;]+)', value, re.I)
+                              if match: protected.append(match.group(1))
+                      for file in root.glob('worker-*.log'):
+                          text = file.read_text(errors='replace')
+                          for secret in protected:
+                              if secret: text = text.replace(secret, '[REDACTED]')
+                          text = re.sub(r'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+', '[TOKEN]', text)
+                          print('WORKER-LOG:', file.name, 'bytes:', file.stat().st_size, flush=True)
+                          for line in text.splitlines()[-40:]:
+                              print('WORKER-DIAGNOSTIC:', line[:400], flush=True)
+                  return super().__exit__(exc_type, exc, traceback)
+          tempfile.TemporaryDirectory = DiagnosedWorkspace
+          runpy.run_path('scripts/ci-worker-system.py', run_name='__main__')
+          PY
+      - name: Summarize boundaries without retaining secrets or backups
+        if: always()
+        run: |
+          echo 'Actual Permora.Worker processes, actual Keycloak and separate PostgreSQL databases.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A CI measurement is not a production SLO, multi-host HA or an independent release approval.' >> "$GITHUB_STEP_SUMMARY"
