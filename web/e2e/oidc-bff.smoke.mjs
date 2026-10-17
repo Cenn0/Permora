@@ -92,25 +92,27 @@ try {
  // Force a new authorization challenge for an essential ID-token ACR 2.
  // Keycloak's separate condition requires a genuinely configured OTP factor.
  await page.goto(base + '/bff/step-up', {waitUntil:'domcontentloaded', timeout:45000});
- if (await page.locator('#username').isVisible()) {
+ // prompt=login may require another password challenge before the LoA2 OTP form.
+ // Wait for a *visible* form instead of checking #username during the redirect race.
+ await page.locator('#username:visible, #otp:visible').first().waitFor({timeout:45000});
+ if (await page.locator('#username:visible').count()) {
   await page.locator('#username').fill(username);
   await page.locator('#password').fill(password);
   await page.locator('#kc-login').click();
  }
- // Check what Keycloak actually renders: no credential values, tokens, links or request bodies in logs.
+ // Successful LoA2 must come from a real OTP challenge; never accept a password-only
+ // redirect or fallback as evidence of MFA.
  try {
-  await page.locator('#otp').waitFor({timeout:20000});
+  await page.locator('#otp:visible').waitFor({timeout:45000});
  } catch (error) {
-  const inputNames = await page.locator('input').evaluateAll(elements =>
-    elements.map(e => ({id:e.id, type:e.type, name:e.getAttribute('name')}))
-      .filter(e => e.type !== 'hidden' && e.type !== 'password' && e.type !== 'text'));
   const errors = await page.locator('#input-error, #kc-error-message, .alert-error').allTextContents();
   const titles = await page.locator('h1, h2').allTextContents();
   console.error('Keycloak challenge (redacted):', JSON.stringify({
    path: new URL(page.url()).pathname,
    titles: titles.map(s=>s.trim().slice(0,120)),
    errorPresent: errors.some(s=>Boolean(s.trim())),
-   inputNames
+   usernameVisible: await page.locator('#username:visible').count() > 0,
+   otpVisible: await page.locator('#otp:visible').count() > 0
   }));
   throw error;
  }
