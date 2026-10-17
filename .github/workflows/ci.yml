@@ -227,6 +227,8 @@ jobs:
           persist-credentials: false
       - name: Build actual frontend and backend in the locked Docker image
         run: docker build --pull -f deploy/Dockerfile --build-arg PROJECT=Permora.Api -t permora-ci:local .
+      - name: Validate restricted pilot Compose (syntax only, no deployment)
+        run: docker compose -f deploy/compose.pilot.yml --profile provisioning config --quiet
       - name: Verify frontend/backend packaging and non-root runtime user
         shell: bash
         run: |

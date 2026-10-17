@@ -1,0 +1,117 @@
+# NON-PRODUCTION PILOT REFERENCE ONLY.
+# Requires administrator-provisioned files under .local/permora-pilot/
+# and a trusted external Keycloak, PostgreSQL, TLS termination and egress controls.
+# Never expose worker/provisioner or Keycloak Admin REST on a public interface.
+name: permora-pilot
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  init: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *hardening
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        PROJECT: Permora.Api
+    environment:
+      PERMORA_CONFIG: /etc/permora/api.json
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+    volumes:
+      - type: bind
+        source: ../.local/permora-pilot/api.json
+        target: /etc/permora/api.json
+        read_only: true
+      - type: bind
+        source: ../.local/permora-pilot/api-db.secret
+        target: /run/secrets/portal-postgres
+        read_only: true
+      - type: bind
+        source: ../.local/permora-pilot/oidc-client.secret
+        target: /run/secrets/portal-client
+        read_only: true
+      - type: bind
+        source: ../.local/permora-pilot/keys
+        target: /var/lib/permora/keys
+    ports:
+      # Host-local proxy only. Configure HTTPS + trusted proxy headers separately.
+      - "127.0.0.1:18088:8080"
+    networks:
+      - trusted-egress
+
+  worker:
+    <<: *hardening
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        PROJECT: Permora.Worker
+    environment:
+      PERMORA_CONFIG: /etc/permora/worker.json
+      DOTNET_ENVIRONMENT: Production
+    volumes:
+      - type: bind
+        source: ../.local/permora-pilot/worker.json
+        target: /etc/permora/worker.json
+        read_only: true
+      - type: bind
+        source: ../.local/permora-pilot/worker-db.secret
+        target: /run/secrets/portal-postgres
+        read_only: true
+      - type: bind
+        source: ../.local/permora-pilot/role-editor.secret
+        target: /run/secrets/role-editor
+        read_only: true
+      - type: bind
+        source: ../.local/permora-pilot/role-mapper.secret
+        target: /run/secrets/role-mapper
+        read_only: true
+      - type: bind
+        source: ../.local/permora-pilot/directory-reader.secret
+        target: /run/secrets/directory-reader
+        read_only: true
+    networks:
+      - trusted-egress
+
+  provisioner:
+    <<: *hardening
+    profiles:
+      - provisioning
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        PROJECT: Permora.Provisioner
+    environment:
+      PERMORA_CONFIG: /etc/permora/provisioner.json
+      DOTNET_ENVIRONMENT: Production
+    volumes:
+      - type: bind
+        source: ../.local/permora-pilot/provisioner.json
+        target: /etc/permora/provisioner.json
+        read_only: true
+      - type: bind
+        source: ../.local/permora-pilot/provisioner-db.secret
+        target: /run/secrets/portal-postgres
+        read_only: true
+      - type: bind
+        source: ../.local/permora-pilot/client-preparer.secret
+        target: /run/secrets/client-preparer
+        read_only: true
+    networks:
+      - trusted-egress
+
+networks:
+  trusted-egress:
+    driver: bridge
