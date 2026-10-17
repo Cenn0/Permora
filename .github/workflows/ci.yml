@@ -184,6 +184,11 @@ jobs:
           persist-credentials: false
       - name: Require reproducible committed dependency locks
         run: python3 scripts/ci-require-locks.py
+      - name: Verify lockfile SBOM generation (NuGet and npm inventory only)
+        run: |
+          python3 -m unittest discover -s scripts -p "test_sbom.py"
+          python3 scripts/generate_sbom.py --output "$RUNNER_TEMP/permora-lockfile-sbom.cdx.json"
+
 
   scope-summary:
     name: Explicit CI coverage boundaries
