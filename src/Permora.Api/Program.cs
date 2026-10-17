@@ -87,6 +87,16 @@ else
             {
                 var actor = CurrentActor(context.Principal, options);
                 identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, actor.Key));
+                if (builder.Environment.IsDevelopment()
+                    && Environment.GetEnvironmentVariable("PERMORA_CI_DIAG_ASSURANCE") == "1")
+                {
+                    var acr = context.Principal.FindAll("acr").ToArray();
+                    var authTime = context.Principal.FindAll("auth_time").ToArray();
+                    context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>()
+                        .LogInformation("PERMORA-CI-ASSURANCE: acr_count={AcrCount} acr_match={AcrMatch} auth_time_count={AuthCount} privileged={Privileged}",
+                            acr.Length, acr.Length == 1 && acr[0].Value == options.PrivilegedAcr,
+                            authTime.Length, SessionAssurance.IsPrivileged(context.Principal, options, DateTimeOffset.UtcNow));
+                }
             }
             return Task.CompletedTask;
         };
