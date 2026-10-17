@@ -64,3 +64,20 @@ Eine Rollenlöschung liest vor dem DELETE in Keycloak die zugehörigen Benutzer/
 ## Ergänzende Risiko- und Releasefreigabe
 
 [Threat Model](threat-model.md) und [Release-Gate-Matrix](release-checklist.md) trennen getestete Technik von operativer und unabhängiger Sicherheitsfreigabe.
+
+## Unvollständige Gruppenansicht bei bestehenden Freigaben
+
+Reconciliation darf eine zugewiesene Keycloak-Gruppe nicht als **driftfrei** behandeln,
+wenn die effektive Mitgliedschaft unvollständig oder älter als das für
+Rechteänderungen erlaubte Freshness-Fenster ist. Permora meldet dann
+`group_membership_unverified` als Konflikt. Ebenfalls abgewiesen wird ein
+Directory-Prinzipal aus einem fremden Realm, selbst wenn dessen UUID mit der
+gesuchten ID übereinstimmt.
+
+Diese Sicherung ist **kein Beweis für einen vollständigen LDAP-/AD-Lifecycle**:
+Ein unvollständiger Snapshot führt nicht allein zu einer vermuteten Massenlöschung,
+weil unbekannte Mitgliedschaften nicht als belastbare Entzugsentscheidung gelten.
+Die operative Gegenmaßnahme besteht aus Alarmierung, korrigierter vollständiger
+Directory-Synchronisation, anschließender SoD-Prüfung und dokumentierter
+Freigabe des Soll-/Ist-Abgleichs. Bereits ausgestellte JWTs bleiben gesondert zu
+berücksichtigen.
