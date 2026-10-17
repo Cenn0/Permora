@@ -42,7 +42,7 @@ public sealed class ConfigurationTests
         var file = Path.Combine(directory, "database.secret");
         try
         {
-            File.WriteAllText(file, "Host=127.0.0.1;Database=permora_test_example;Username=reader;Password=isolated\\n");
+            File.WriteAllText(file, "Host=127.0.0.1;Database=permora_test_example;Username=reader;Password=isolated" + Environment.NewLine);
             var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:PortalFile"] = file
