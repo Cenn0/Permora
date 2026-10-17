@@ -1,6 +1,6 @@
 {
   "ConnectionStrings": {
-    "Portal": "Host=postgres.internal;Database=permora;Username=permora_app;Password=REPLACE_LOCALLY"
+    "PortalFile": "/run/secrets/portal-postgres"
   },
   "Portal": {
     "Authority": "https://sso.example.org/realms/enterprise",
