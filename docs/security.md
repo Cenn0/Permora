@@ -81,3 +81,21 @@ Die operative Gegenmaßnahme besteht aus Alarmierung, korrigierter vollständige
 Directory-Synchronisation, anschließender SoD-Prüfung und dokumentierter
 Freigabe des Soll-/Ist-Abgleichs. Bereits ausgestellte JWTs bleiben gesondert zu
 berücksichtigen.
+
+## Datenschutz: Minimierte unveränderliche Audit-Einträge
+
+Für neue Anträge, Freigaben/Ablehnungen und zentrale IAM-Attestierungen
+protokolliert das append-only-Audit nur Vorgangskennungen, Aktionstypen und
+SHA-256-Fingerabdrücke frei eingegebener Begründungen bzw. Nachweisreferenzen.
+Klartext-Begründungen und E-Mail-Adressen aus diesen Feldern werden **nicht**
+mehr in die Hashkette kopiert. Regressionstests prüfen diese Grenze und die
+Integrität der Audit-Kette. Bereits existierende ältere Audit-Ereignisse
+werden dadurch nicht rückwirkend bereinigt.
+
+**Grenze:** Hashes sind personenbezogene *pseudonyme* Daten, nicht
+anonymisiert. Freitext in laufenden Operationen und IAM-Evidenz in
+Anwendungsaggregaten braucht weiterhin eine genehmigte Speicherfrist,
+Zugriffs-/Auskunftsprozesse und eine rechtlich geprüfte Lösch-/Archivstrategie.
+Die technischen und organisatorischen Freigabebedingungen stehen unter
+[Privacy and data retention](privacy.md). Es besteht keine behauptete
+vollständige DSGVO-Abnahme.
