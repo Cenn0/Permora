@@ -30,7 +30,7 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
             var operation = new Operation(Guid.NewGuid(), appId, actor, normalized, expectedRevision, idempotencyKey,
                 hash, plan.ApprovalRequired ? OperationStatus.AwaitingApproval : OperationStatus.Queued, now, now, 0);
             await tx.SaveOperationAsync(operation, ct);
-            await tx.AppendAuditAsync(actor, "change.requested", $"{operation.Id}: {plan.Summary}", now, ct);
+            await tx.AppendAuditAsync(actor, "change.requested", AuditDetails.Requested(operation), now, ct);
             return operation;
         }, ct);
     }
@@ -51,10 +51,11 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
             {
                 Status = approve ? OperationStatus.Queued : OperationStatus.Rejected,
                 ApprovedBy = approve ? actor : null,
-                ApprovedAt = approve ? clock.GetUtcNow() : null
+                ApprovedAt = approve ? clock.GetUtcNow() : null,
+                DecisionReason = reason.Trim()
             };
             await tx.SaveOperationAsync(updated, ct);
-            await tx.AppendAuditAsync(actor, approve ? "change.approved" : "change.rejected", $"{operationId}: {reason}", clock.GetUtcNow(), ct);
+            await tx.AppendAuditAsync(actor, approve ? "change.approved" : "change.rejected", AuditDetails.Decision(operationId, reason), clock.GetUtcNow(), ct);
             return updated;
         }, ct);
     }

@@ -10,6 +10,7 @@ Permora is an independent, open-source C# / Angular portal for **delegated Keycl
 | Run a local development environment | [Development](development.md) |
 | Integrate with Keycloak and understand delegated permissions | [Keycloak](keycloak.md) |
 | Review tenant/application isolation and security requirements | [Security model](security.md) |
+| Review personal-data inventory, retention and rights-handling acceptance | [Privacy and data retention](privacy.md) |
 | Learn typed application API contracts | [API](api.md) |
 | Understand deploy, operations and recovery limitations | [Operations](operations.md) |
 | Review isolated single-host pilot reference (not production-ready) | [Pilot deployment](pilot-deployment.md) |
