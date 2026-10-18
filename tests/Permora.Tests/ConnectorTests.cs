@@ -65,6 +65,73 @@ public sealed class ConnectorTests
         Assert.Equal("role_still_assigned", error.Code);
         Assert.DoesNotContain(fixture.Handler.Paths, p => p.Method == HttpMethod.Delete);
     }
+    [Fact]
+    public async Task New_group_grants_are_refused_without_explicit_broad_manage_risk_acceptance()
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group, MembershipComplete = true };
+        var assignment = f.Assignment(principal: group.Id);
+        var after = f.App with { Assignments = [assignment] };
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+            request.RequestUri!.AbsolutePath.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)
+                ? SafeClient(f) : new(HttpStatusCode.NotFound));
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            fixture.Connector.ApplyAsync(f.App, after,
+                new Change { Kind = ChangeKind.GrantAccess, TargetId = assignment.Id,
+                    RoleId = f.Reader.Id, PrincipalId = group.Id, Reason = "Isolated group test" },
+                [group], TestContext.Current.CancellationToken));
+        Assert.Equal("group_mapping_risk_not_approved", error.Code);
+        Assert.Equal(409, error.Status);
+        Assert.DoesNotContain(fixture.Handler.Paths, p => p.Method != HttpMethod.Get
+            && !p.Path.EndsWith("/token", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Group_revocation_must_still_work_when_new_group_grants_are_disabled()
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group, MembershipComplete = true };
+        var assignment = f.Assignment(principal: group.Id);
+        var before = f.App with { Assignments = [assignment] };
+        var mapped = true;
+        var remoteRole = new
+        {
+            id = Guid.NewGuid().ToString(),
+            name = "role.reader", clientRole = true, composite = false,
+            containerId = f.App.KeycloakClientUuid,
+            attributes = new Dictionary<string, string[]>
+            {
+                ["permora.application"] = [f.App.Id.ToString()],
+                ["permora.entity"] = [f.Reader.Id.ToString()]
+            }
+        };
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal))
+                return SafeClient(f);
+            if (path.EndsWith("/roles/role.reader", StringComparison.Ordinal))
+                return Json(remoteRole);
+            if (path.EndsWith("/groups/" + group.KeycloakId + "/role-mappings/clients/"
+                    + f.App.KeycloakClientUuid, StringComparison.Ordinal))
+            {
+                if (request.Method == HttpMethod.Delete)
+                {
+                    mapped = false;
+                    return new HttpResponseMessage(HttpStatusCode.NoContent);
+                }
+                return mapped ? Json(new[] { remoteRole }) : Json(Array.Empty<object>());
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+        await fixture.Connector.ApplyAsync(before, before with { Assignments = [] },
+            new Change { Kind = ChangeKind.RevokeAccess, TargetId = assignment.Id, Reason = "Safety revocation" },
+            [group], TestContext.Current.CancellationToken);
+        Assert.False(mapped);
+        Assert.Contains(fixture.Handler.Paths, p => p.Method == HttpMethod.Delete
+            && p.Path.Contains("/groups/", StringComparison.Ordinal));
+    }
+
     [Fact] public void Stable_directory_identifiers_separate_realm_and_kind()
     { Assert.NotEqual(KeycloakConnector.StableId("one", "user", "123"), KeycloakConnector.StableId("two", "user", "123")); Assert.NotEqual(KeycloakConnector.StableId("one", "user", "123"), KeycloakConnector.StableId("one", "group", "123")); }
     private static HttpResponseMessage SafeClient(Fixture f) => Json(new { id = f.App.KeycloakClientUuid, clientId = f.App.KeycloakClientId, protocol = "openid-connect", enabled = true, fullScopeAllowed = false, serviceAccountsEnabled = false, implicitFlowEnabled = false,
