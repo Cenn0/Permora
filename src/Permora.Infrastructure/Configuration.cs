@@ -55,6 +55,22 @@ public static class ConfigurationChecks
         return inline;
     }
 
+    /// <summary>
+    /// Optional privacy retention for old, unreferenced directory snapshots.
+    /// No automatic deletion occurs without an explicit organizational policy.
+    /// </summary>
+    public static int? ReadDirectoryRetentionDays(IConfiguration configuration)
+    {
+        var raw = configuration["Privacy:UnreferencedDirectoryRetentionDays"];
+        if (raw is null) return null;
+        if (!int.TryParse(raw, System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out var days)
+            || days is < 30 or > 3650)
+            throw new InvalidOperationException(
+                "Privacy:UnreferencedDirectoryRetentionDays must be an integer from 30 to 3650.");
+        return days;
+    }
+
     public static PortalOptions ReadPortal(IConfiguration configuration, bool development)
     {
         var options = configuration.GetSection("Portal").Get<PortalOptions>() ?? new PortalOptions();
