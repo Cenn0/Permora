@@ -1,0 +1,170 @@
+name: Promote independently approved Permora release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New vMAJOR.MINOR.PATCH tag (must match web/package.json)'
+        required: true
+        type: string
+      candidate_tag:
+        description: 'Exact previously signed draft candidate-c0ffee...-run123... from this main SHA'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: permora-public-release
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: github.repository == 'Cenn0/Permora'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    environment: release-approval
+    permissions:
+      contents: write
+      attestations: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.version }}
+      CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+      APPROVED_SHA: ${{ vars.PERMORA_PUBLIC_RELEASE_SHA }}
+      RELEASE_APPROVAL: ${{ vars.PERMORA_RELEASE_ACCEPTANCE_REF }}
+      SECURITY_APPROVAL: ${{ vars.PERMORA_SECURITY_ACCEPTANCE_REF }}
+      LICENSE_APPROVAL: ${{ vars.PERMORA_LICENSE_ACCEPTANCE_REF }}
+      PRIVACY_APPROVAL: ${{ vars.PERMORA_PRIVACY_ACCEPTANCE_REF }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate exact main version, evidence scope and independent release authorizations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          git fetch --no-tags origin main
+          test "$GITHUB_SHA" = "$(git rev-parse FETCH_HEAD)"
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(alpha|beta|rc)\.(0|[1-9][0-9]*))?$ ]] || {
+            echo 'Expected semantic version vMAJOR.MINOR.PATCH[-prerelease].' >&2; exit 1;
+          }
+          [[ "$CANDIDATE_TAG" =~ ^candidate-([0-9a-f]{12})-run([0-9]+)$ ]] || {
+            echo 'Invalid candidate tag.' >&2; exit 1;
+          }
+          [[ "$CANDIDATE_TAG" == "candidate-${GITHUB_SHA:0:12}-run"* ]] || {
+            echo 'Candidate must be built from this exact main commit.' >&2; exit 1;
+          }
+          python3 - <<'PY'
+          import json, os, pathlib
+          version = json.loads(pathlib.Path('web/package.json').read_text())['version']
+          if os.environ['RELEASE_TAG'] != 'v' + version:
+              raise SystemExit(f'Version must match web/package.json v{version}')
+          PY
+          test "$APPROVED_SHA" = "$GITHUB_SHA"
+          test -n "$RELEASE_APPROVAL"
+          test -n "$SECURITY_APPROVAL"
+          test -n "$LICENSE_APPROVAL"
+          test -n "$PRIVACY_APPROVAL"
+          if git ls-remote --tags --exit-code origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'Tag is already in use.' >&2; exit 1
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'Existing public release must never be overwritten.' >&2; exit 1
+          fi
+      - name: Ensure full exact-source CI and signed candidate both succeeded
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess
+          repo, sha = os.environ['GITHUB_REPOSITORY'], os.environ['GITHUB_SHA']
+          required = {'Permora CI', 'Permora system acceptance',
+                      'Permora worker and recovery acceptance',
+                      'Permora accessibility acceptance', 'Permora artifact integrity'}
+          data = json.loads(subprocess.check_output(
+              ['gh','api',f'repos/{repo}/actions/runs?head_sha={sha}&event=push&per_page=100']))
+          by_name = {}
+          for run in sorted(data['workflow_runs'], key=lambda r: r['id']):
+              if run['name'] in required:
+                  by_name[run['name']] = run
+          missing = required - by_name.keys()
+          failed = {name: (r['status'], r['conclusion']) for name, r in by_name.items()
+                    if r['status'] != 'completed' or r['conclusion'] != 'success'}
+          if missing or failed:
+              raise SystemExit(f'Release blocked: missing={sorted(missing)} non-success={failed}')
+          print('Required exact-source workflows passed:', ', '.join(sorted(required)))
+          PY
+          test "$(gh release view "$CANDIDATE_TAG" --json isDraft --jq .isDraft)" = true
+          # Compare the actual remote annotated/lightweight tag object to main.
+          candidate_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$CANDIDATE_TAG" --jq '.object.sha')"
+          test "$candidate_sha" = "$GITHUB_SHA"
+          mkdir -p "$RUNNER_TEMP/permora-candidate"
+          gh release download "$CANDIDATE_TAG" --dir "$RUNNER_TEMP/permora-candidate"
+          (cd "$RUNNER_TEMP/permora-candidate" && sha256sum -c SHA256SUMS)
+          test -s "$RUNNER_TEMP/permora-candidate/provenance.sigstore.json"
+      - name: Verify signed candidate from the trusted workflow and exact revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/permora-candidate"
+          gh attestation verify SHA256SUMS --repo "$GITHUB_REPOSITORY" \
+            --bundle provenance.sigstore.json --source-digest "$GITHUB_SHA" \
+            --source-ref refs/heads/main \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-integrity.yml" \
+            --deny-self-hosted-runners
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'permora-candidate'
+          manifest = json.loads((root / 'build-manifest.json').read_text())
+          if manifest.get('sourceCommit') != os.environ['GITHUB_SHA']:
+              raise SystemExit('Build manifest source SHA mismatch')
+          for name in ('Permora.Api','Permora.Worker','Permora.Provisioner'):
+              if not list(root.glob(name + '-' + os.environ['GITHUB_SHA'][:12] + '.tar.gz')):
+                  raise SystemExit(f'Missing verified application archive: {name}')
+          print('Signed candidate archives, build manifest and SHA256SUMS verified.')
+          PY
+      - name: Preserve original attested artifacts and document public acceptance references
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/permora-published"
+          cp -a "$RUNNER_TEMP/permora-candidate/." "$RUNNER_TEMP/permora-published/"
+          {
+            echo "Permora $RELEASE_TAG"
+            echo "Accepted source revision: $GITHUB_SHA"
+            echo "Previously signed draft candidate: $CANDIDATE_TAG"
+            echo "Release authorization reference: $RELEASE_APPROVAL"
+            echo "Security acceptance reference: $SECURITY_APPROVAL"
+            echo "Third-party license review reference: $LICENSE_APPROVAL"
+            echo "Privacy acceptance reference: $PRIVACY_APPROVAL"
+            echo "All references must identify independently reviewed records kept in private custody."
+            echo "These release archives are framework-dependent and require the matching .NET runtime."
+            echo "The original candidate manifest and README preserve historical preapproval status."
+          } > "$RUNNER_TEMP/permora-published/PUBLIC-RELEASE-ACCEPTANCE.txt"
+          (
+            cd "$RUNNER_TEMP/permora-published"
+            sha256sum ./* > RELEASE-SHA256SUMS.txt
+            sha256sum -c RELEASE-SHA256SUMS.txt
+          )
+      - name: Publish the approved versioned GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          flags=()
+          if [[ "$RELEASE_TAG" == *-* ]]; then flags+=(--prerelease --latest=false); fi
+          gh release create "$RELEASE_TAG" "$RUNNER_TEMP"/permora-published/* \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" "${flags[@]}" \
+            --title "Permora $RELEASE_TAG" --generate-notes \
+            --notes "Reviewed promotion from signed candidate $CANDIDATE_TAG at commit $GITHUB_SHA. Acceptance reference: $RELEASE_APPROVAL. Source and license/security/privacy evidence remains subject to the independent review referenced by this release; see docs/release-checklist.md. No npm publication or OCI image is implied."
+      - name: Verify published release digest inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/permora-public-check"
+          gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/permora-public-check"
+          (cd "$RUNNER_TEMP/permora-public-check" && sha256sum -c RELEASE-SHA256SUMS.txt)
