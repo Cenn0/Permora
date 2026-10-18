@@ -12,6 +12,17 @@ Prozessabbruch nach Remote-Commit und Datenbankwiederherstellung getestet.
 Ein separater, CI-grüner axe-core-Lauf prüft 54 Accessibility-Konstellationen.
 Drei Image-SBOMs und signierte Draft-Artefakte wurden erstellt.
 
+**Neue Tests (vor CI-Abnahme):** `GroupGrantAdmissionTests` prüfen die
+synchronen Gruppen-Grant-Sperren ohne persistierten Auftrag, ausdrückliche
+Realm-Freigabe, Fremdteam-Isolation, unbekannte Directory-Typen und den
+Notfall-Entzug. `scripts/ci-api-smoke.py` ergänzt direkte ASP.NET-HTTP-
+Negativtests in einer isolierten PostgreSQL-Fixture: `403` und keine Queue
+bei Default-Deny, `202` für den Entzug, `404` für fremde Akteure
+und `202 AwaitingApproval` bei API-Opt-in. Diese Fixture besitzt **keine
+echten Keycloak-Grants**; die Connector- und FGAP-Tests sind unabhängige
+Schichten. Erst der erfolgreiche CI-Lauf auf dem neuen Commit belegt diese
+zusätzliche Testabdeckung.
+
 **Nicht damit bewiesen:** Kompatibilität mit echtem Microsoft AD,
 vollständige produktive FGAP-/Identity-Matrix, Multi-Host-Failover,
 Security-/Privacy-Freigabe, manuelle Screenreader-Abnahme oder rechtlich
