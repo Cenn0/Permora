@@ -27,6 +27,7 @@ public sealed class KeycloakConfigurationTests
         Assert.Equal("test-realm", realm.Realm);
         Assert.Equal("role-mapper", realm.Assignments.ClientId);
         Assert.Empty(realm.ProtectedSubjectIds);
+        Assert.False(realm.AllowGroupRoleGrants);
     }
 
     [Theory]
@@ -50,4 +51,27 @@ public sealed class KeycloakConfigurationTests
             pair => "Keycloak:Realms:test:" + pair.Key, pair => pair.Value)).Build();
         Assert.Throws<InvalidOperationException>(() => KeycloakConfiguration.Read(config));
     }
+    [Fact]
+    public void Explicit_group_grant_risk_acceptance_must_be_configured_per_realm()
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Keycloak:Realms:enterprise:BaseUrl"] = "https://keycloak.example.test",
+            ["Keycloak:Realms:enterprise:Realm"] = "enterprise",
+            ["Keycloak:Realms:enterprise:Issuer"] = Fixture.Issuer,
+            ["Keycloak:Realms:enterprise:Roles:ClientId"] = "roles",
+            ["Keycloak:Realms:enterprise:Roles:SecretFile"] = "/run/secrets/roles",
+            ["Keycloak:Realms:enterprise:Assignments:ClientId"] = "assign",
+            ["Keycloak:Realms:enterprise:Assignments:SecretFile"] = "/run/secrets/assign",
+            ["Keycloak:Realms:enterprise:Directory:ClientId"] = "directory",
+            ["Keycloak:Realms:enterprise:Directory:SecretFile"] = "/run/secrets/directory",
+            ["Keycloak:Realms:enterprise:AllowGroupRoleGrants"] = "true"
+        };
+        var config = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        Assert.True(KeycloakConfiguration.Read(config).Realms["enterprise"].AllowGroupRoleGrants);
+        values["Keycloak:Realms:enterprise:AllowGroupRoleGrants"] = "false";
+        config = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        Assert.False(KeycloakConfiguration.Read(config).Realms["enterprise"].AllowGroupRoleGrants);
+    }
+
 }

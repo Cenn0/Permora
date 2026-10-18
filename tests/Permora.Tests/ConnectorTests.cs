@@ -65,6 +65,66 @@ public sealed class ConnectorTests
         Assert.Equal("role_still_assigned", error.Code);
         Assert.DoesNotContain(fixture.Handler.Paths, p => p.Method == HttpMethod.Delete);
     }
+    [Fact] public async Task Delegated_group_grant_is_disabled_by_default_without_remote_mapping_write()
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group };
+        var assignment = f.Assignment(principal: group.Id);
+        var after = f.App with { Assignments = [assignment] };
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+            request.RequestUri!.AbsolutePath.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)
+                ? SafeClient(f) : Json(Array.Empty<object>()));
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            fixture.Connector.ApplyAsync(f.App, after,
+                new Change { Kind = ChangeKind.GrantAccess, TargetId = assignment.Id, RoleId = assignment.RoleId,
+                    PrincipalId = assignment.PrincipalId, Reason = "Denied" },
+                [group], TestContext.Current.CancellationToken));
+        Assert.Equal("group_mapping_disabled", error.Code);
+        Assert.Equal(403, error.Status);
+        Assert.DoesNotContain(fixture.Handler.Paths,
+            p => p.Method == HttpMethod.Post && p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
+    }
+
+    [Fact] public async Task Emergency_group_revocation_remains_available_when_grants_are_disabled()
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group };
+        var assignment = f.Assignment(principal: group.Id);
+        var before = f.App with { Assignments = [assignment] };
+        var role = new { id = Guid.NewGuid().ToString(), name = "role.reader",
+            clientRole = true, containerId = f.App.KeycloakClientUuid, composite = false,
+            attributes = new Dictionary<string, string[]> {
+                ["permora.application"] = [f.App.Id.ToString()],
+                ["permora.entity"] = [f.Reader.Id.ToString()] } };
+        var mapped = true;
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)
+                && !path.Contains("/role-mappings/", StringComparison.Ordinal))
+                return SafeClient(f);
+            if (path.EndsWith("/roles/role.reader", StringComparison.Ordinal))
+                return Json(role);
+            if (path.Contains("/groups/", StringComparison.Ordinal) && path.Contains("/role-mappings/", StringComparison.Ordinal))
+            {
+                if (request.Method == HttpMethod.Delete)
+                {
+                    mapped = false;
+                    return new HttpResponseMessage(HttpStatusCode.NoContent);
+                }
+                return Json(mapped ? new object[] { role } : Array.Empty<object>());
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+        await fixture.Connector.ApplyAsync(before, f.App,
+            new Change { Kind = ChangeKind.RevokeAccess, TargetId = assignment.Id, Reason = "Emergency" },
+            [group], TestContext.Current.CancellationToken);
+        Assert.False(mapped);
+        Assert.Contains(fixture.Handler.Paths, p => p.Method == HttpMethod.Delete
+            && p.Path.Contains("/groups/", StringComparison.Ordinal)
+            && p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
+    }
+
     [Fact] public void Stable_directory_identifiers_separate_realm_and_kind()
     { Assert.NotEqual(KeycloakConnector.StableId("one", "user", "123"), KeycloakConnector.StableId("two", "user", "123")); Assert.NotEqual(KeycloakConnector.StableId("one", "user", "123"), KeycloakConnector.StableId("one", "group", "123")); }
     private static HttpResponseMessage SafeClient(Fixture f) => Json(new { id = f.App.KeycloakClientUuid, clientId = f.App.KeycloakClientId, protocol = "openid-connect", enabled = true, fullScopeAllowed = false, serviceAccountsEnabled = false, implicitFlowEnabled = false,

@@ -75,6 +75,30 @@ und [Keycloak upstream #45269](https://github.com/keycloak/keycloak/issues/45269
 
 FGAP-Policy-Erstellung wird in diesem Stand nicht automatisch ausgerollt. Das ist ein offener Roadmap-Punkt, keine versteckte fertige Funktion.
 
+## Delegierte Gruppen-Rollenzuweisungen: standardmäßig gesperrt
+
+**Security gate:** In Keycloak 26.8.1 gewährt `Groups.manage` mehr Befugnisse als
+das Hinzufügen von Client-Rollen. Der reale FGAP-Test in
+[PR #44](https://github.com/Cenn0/Permora/pull/44) bestätigt, dass das
+delegierte Konto auch Gruppenmetadaten ändern kann. Deshalb verweigert der
+Keycloak-Connector **neue** Gruppenberechtigungen standardmäßig mit
+`403 group_mapping_disabled`.
+
+Eine zentrale IAM-Stelle kann pro Realm nach dokumentierter Freigabe den
+Konfigurationswert `Keycloak:Realms:<realm>:AllowGroupRoleGrants=true`
+setzen. **Dieser Schalter verengt die Keycloak-Befugnisse nicht.**
+Er setzt ausdrücklich die Annahme voraus, dass das breitere Servicekonto
+risikobewertet, auf zulässige Gruppen begrenzt und aktiv überwacht wird.
+Für realen Produktivbetrieb sind alle Scope-/Token-/Admin-REST-Aktionen
+dieses Kontos vollständig abzunehmen.
+
+Sicherheitskritische **RevokeAccess**-Aufträge bleiben auch bei deaktivierten
+Gruppengrants möglich; ein Incident darf nicht daran scheitern, dass die
+Erweiterungssperre aktiv ist. Das Umschalten ändert keine bestehenden
+Keycloak-Rollenzuweisungen rückwirkend. Aufräum-, Drift- und
+Widerrufspflichten bleiben bestehen. Siehe
+[Security-Blocker #46](https://github.com/Cenn0/Permora/issues/46).
+
 ## 4. Ressourcen und Token-Vertrag
 
 Client-Rollen `perm.orders.read` und `role.operator` werden von Permora angelegt. Nur `role.operator` wird zugewiesen; seine eigenen `perm.*`-Kinder werden in Keycloak als Composite definiert. Andere Clients und Realm-Rollen sind ausgeschlossen. `Full Scope Allowed` bleibt deaktiviert.

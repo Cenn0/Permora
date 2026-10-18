@@ -11,7 +11,7 @@ namespace Permora.Infrastructure;
 public sealed record ServiceCredential(string ClientId, string SecretFile);
 public sealed record RealmConnection(string BaseUrl, string Realm, string Issuer,
     ServiceCredential Roles, ServiceCredential Assignments, ServiceCredential Directory,
-    IReadOnlyList<string> ProtectedSubjectIds);
+    IReadOnlyList<string> ProtectedSubjectIds, bool AllowGroupRoleGrants = false);
 public sealed class KeycloakOptions
 {
     public Dictionary<string, RealmConnection> Realms { get; init; } = [];
@@ -171,6 +171,13 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
     {
         var principal = directory.SingleOrDefault(p => p.Id == assignment.PrincipalId && p.RealmKey == app.RealmKey)
             ?? throw new DomainException("identity_missing", "The target identity is missing from the directory snapshot.", 409);
+        // Keycloak 26.8.1 group-role mappings require Groups.manage, which also
+        // permits unrelated group administration. No new delegated group grants
+        // until central IAM expressly accepts that larger privilege surface.
+        // Revocations deliberately remain possible during an incident.
+        if (grant && principal.Kind == PrincipalKind.Group && !Connection(app.RealmKey).AllowGroupRoleGrants)
+            throw new DomainException("group_mapping_disabled",
+                "Delegated group grants require central IAM approval of Keycloak Groups.manage exposure.", 403);
         var role = app.Roles.Single(r => r.Id == assignment.RoleId);
         var mapped = await RequiredRoleAsync(app, role.Id, "role." + role.Key, ct);
         var type = principal.Kind == PrincipalKind.User ? "users" : "groups";

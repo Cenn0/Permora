@@ -27,7 +27,8 @@ public static class KeycloakConfiguration
             if (protectedIds.Any(string.IsNullOrWhiteSpace))
                 throw new InvalidOperationException("Protected Keycloak identities must contain nonempty identifiers.");
             realms.Add(item.Key, new RealmConnection(Required(item, "BaseUrl"), Required(item, "Realm"),
-                Required(item, "Issuer"), Credential("Roles"), Credential("Assignments"), Credential("Directory"), protectedIds));
+                Required(item, "Issuer"), Credential("Roles"), Credential("Assignments"), Credential("Directory"), protectedIds,
+                item.GetValue<bool>("AllowGroupRoleGrants")));
         }
         return new KeycloakOptions
         {
