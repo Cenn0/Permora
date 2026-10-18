@@ -39,6 +39,12 @@ button, .button { max-width: 100%; }
   .profile > span { min-width: 0; overflow-wrap: anywhere; }
   .search-field { width: 100%; }
   .section-heading > a { white-space: normal; }
+  /* Enlarged text must reflow within the viewport, not stretch grid tracks. */
+  .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
+  .main-column, .side-column, .side-column > .panel { min-width: 0; max-width: 100%; }
+  .section-heading h2, .welcome h1, .welcome .eyebrow,
+  .task-card strong, .task-card small { min-width: 0; overflow-wrap: anywhere; }
+  .task-card { min-width: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
