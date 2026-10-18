@@ -24,6 +24,7 @@ USER = os.environ.get("PERMORA_TEST_KC_USERNAME", "")
 PASSWORD = os.environ.get("PERMORA_TEST_KC_PASSWORD", "")
 DB = os.environ.get("PERMORA_TEST_POSTGRES", "")
 APP_URL = "http://127.0.0.1:5082"
+SECONDARY_APP_URL = "http://127.0.0.1:5083"
 REALM = "permora-bff-ci-" + uuid.uuid4().hex[:12]
 LOGIN_CLIENT = "permora-browser-ci"
 if not BASE.startswith("http://127.0.0.1:") or not USER or not PASSWORD or "Database=permora_test_" not in DB:
@@ -107,12 +108,12 @@ def wait_for_idp():
     raise TimeoutError("Disposable Keycloak failed to start")
 
 
-def wait_for_bff(proc):
+def wait_for_bff(proc, url=APP_URL):
     for _ in range(70):
         if proc.poll() is not None:
             raise RuntimeError("ASP.NET BFF terminated prematurely")
         try:
-            with urllib.request.urlopen(APP_URL + "/health/live", timeout=3) as response:
+            with urllib.request.urlopen(url + "/health/live", timeout=3) as response:
                 if response.status == 200:
                     return
         except OSError:
@@ -252,29 +253,43 @@ def run():
                             "-c", "Release", "--no-build", "--", "--migrate"],
                            cwd=ROOT, env=env, check=True, timeout=60,
                            stdout=subprocess.DEVNULL)
-            with (tmp / "api.log").open("w") as logfile:
-                proc = subprocess.Popen(["dotnet", "run", "--project", "src/Permora.Api",
-                                         "-c", "Release", "--no-build", "--no-launch-profile"],
-                                        cwd=ROOT, env=env, stdin=subprocess.DEVNULL,
-                                        stdout=logfile, stderr=subprocess.STDOUT)
+            # Two real ASP.NET API replicas share the PostgreSQL session store and
+            # Data Protection key directory. Both are Development-only, loopback
+            # instances; this is not a multi-host/TLS/production acceptance.
+            env_secondary = env.copy()
+            env_secondary["ASPNETCORE_URLS"] = SECONDARY_APP_URL
+            with (tmp / "api.log").open("w") as primary_log, (tmp / "api-secondary.log").open("w") as secondary_log:
+                primary = subprocess.Popen(["dotnet", "run", "--project", "src/Permora.Api",
+                                            "-c", "Release", "--no-build", "--no-launch-profile"],
+                                           cwd=ROOT, env=env, stdin=subprocess.DEVNULL,
+                                           stdout=primary_log, stderr=subprocess.STDOUT)
+                secondary = subprocess.Popen(["dotnet", "run", "--project", "src/Permora.Api",
+                                              "-c", "Release", "--no-build", "--no-launch-profile"],
+                                             cwd=ROOT, env=env_secondary, stdin=subprocess.DEVNULL,
+                                             stdout=secondary_log, stderr=subprocess.STDOUT)
                 try:
-                    wait_for_bff(proc)
+                    wait_for_bff(primary)
+                    wait_for_bff(secondary, SECONDARY_APP_URL)
                     browser_env = env.copy()
                     browser_env["PERMORA_TEST_BROWSER_USERNAME"] = "bff-ci-user"
                     browser_env["PERMORA_TEST_BROWSER_PASSWORD"] = test_password
+                    browser_env["PERMORA_TEST_SECONDARY_URL"] = SECONDARY_APP_URL
                     subprocess.run(["node", "web/e2e/oidc-bff.smoke.mjs"],
-                                   cwd=ROOT, env=browser_env, check=True, timeout=220)
+                                   cwd=ROOT, env=browser_env, check=True, timeout=250)
                 except BaseException:
-                    # Do not echo request credentials, OIDC codes, or ID tokens into CI logs.
-                    print("BFF test failed; ASP.NET process status:", proc.poll())
+                    # Process exit status only; no tokens, credentials or OIDC
+                    # callback query strings may be emitted to a public CI log.
+                    print("BFF processes:", primary.poll(), secondary.poll(), flush=True)
                     raise
                 finally:
-                    proc.terminate()
-                    try:
-                        proc.wait(timeout=6)
-                    except subprocess.TimeoutExpired:
-                        proc.kill()
-                        proc.wait(timeout=5)
+                    for process in (primary, secondary):
+                        if process.poll() is None:
+                            process.terminate()
+                            try:
+                                process.wait(timeout=6)
+                            except subprocess.TimeoutExpired:
+                                process.kill()
+                                process.wait(timeout=5)
     finally:
         admin_http("DELETE", "/admin/realms/" + REALM, token=token, allowed=(204, 404))
 
