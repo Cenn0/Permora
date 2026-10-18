@@ -68,3 +68,56 @@ with all release requirements being satisfied.
 
 [Release checklist](release-checklist.md) · [Security](security.md) ·
 [Operations](operations.md) · [Architecture](architecture.md).
+
+## Fresh vulnerability scanning before signed draft candidates
+
+The `Permora artifact integrity` workflow additionally installs
+[Anchore Grype](https://github.com/anchore/grype) version **0.120.1**
+with immutable manifest and Linux-amd64 archive SHA-256 pins. Grype is
+an Apache-2.0 open-source scanner and is used as an **ephemeral CI
+tool**, not distributed with the application.
+
+Immediately after generating actual application/image SBOMs, and
+**before** OIDC/Sigstore signing, the scanner:
+
+1. Authenticates the original candidate's checksums and installs a fresh
+   Grype vulnerability database. DB download, staleness or scanner
+   failures **fail closed**; no signed candidate is produced.
+2. Scans the four scoped inventories:
+   `api.image.cdx.json`, `worker.image.cdx.json`,
+   `provisioner.image.cdx.json`, `frontend.cdx.json`.
+3. Writes the complete scanner JSON and a
+   `vulnerability-review.json` summary, including all High/Critical
+   records requiring **manual** assessment, vulnerability/fix metadata
+   and scanner source. Rehashes all evidence into `SHA256SUMS` before
+   any signature is issued.
+4. **Blocks candidate signing** when Grype detects known **fixable
+   High or Critical** vulnerabilities. Items with no published fix,
+   uncertainty about exploitability, affected/distributed scope and
+   other severities are **not** silently approved: they remain listed
+   for review before any production release.
+
+A green scan is **not** a guarantee that there are no vulnerabilities.
+Scanner coverage, advisory feeds, package inventories, false positives,
+non-fixable findings, fix-state classifications and VEX applicability
+need qualified human assessment. Freshness requires a functioning
+network to the trusted Grype database. Existing signed development
+candidates predating this gate do not acquire this evidence retroactively.
+
+The concrete release owner must additionally review license notices,
+other license obligations, threat-model impact, security advisories,
+remaining unresolved findings, image provenance and deployment artifacts.
+
+Local runner reproduction after a candidate is built:
+
+```bash
+python3 -m unittest discover -s scripts -p test_vulnerability_policy.py
+python3 scripts/install-grype.py /tmp/permora-scanner
+python3 scripts/scan-release-vulnerabilities.py \
+  --grype /tmp/permora-scanner/grype \
+  --candidate /tmp/permora-candidate
+(cd /tmp/permora-candidate && sha256sum -c SHA256SUMS)
+```
+
+This check is intentionally independent of a production-release
+authorization and may fail due to genuine actionable findings.
