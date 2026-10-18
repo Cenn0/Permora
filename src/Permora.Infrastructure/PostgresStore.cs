@@ -114,7 +114,8 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
         try { await command.ExecuteNonQueryAsync(ct); }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
         { throw new DomainException("already_exists", "This application already exists in the selected realm and environment.", 409); }
-        await AppendAuditAsync(connection, tx, app.Id, actor, "application.registered", app.Slug, DateTimeOffset.UtcNow, ct);
+        await AppendAuditAsync(connection, tx, app.Id, actor, "application.registered",
+            AuditDetails.ApplicationRegistered(app), DateTimeOffset.UtcNow, ct);
         await tx.CommitAsync(ct);
     }
 
