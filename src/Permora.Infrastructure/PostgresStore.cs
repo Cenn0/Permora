@@ -356,14 +356,31 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
         {
             await using var command = new NpgsqlCommand("""
                 SELECT o.document::text FROM operations o
+
                 WHERE o.application_id=@app AND o.status='Queued' AND o.next_at<=@now
-                  AND (COALESCE((o.document->>'systemRevocation')::boolean, false)
-                    OR NOT EXISTS (
-                        SELECT 1 FROM operations prior
-                        WHERE prior.application_id=o.application_id AND prior.status='Queued'
-                          AND NOT COALESCE((prior.document->>'systemRevocation')::boolean, false)
-                          AND (prior.created_at, prior.id) < (o.created_at, o.id)))
-                ORDER BY COALESCE((o.document->>'systemRevocation')::boolean, false) DESC,
+                  AND (
+                    -- An explicit emergency revoke may bypass earlier queued grants,
+                    -- including grants in network backoff. System revocations stay first.
+                    o.document->'change'->>'kind'='RevokeAccess'
+                    OR (
+                        -- Ordinary writes are blocked while *any* revocation is
+                        -- unresolved, even when that revoke is itself in backoff.
+                        NOT EXISTS (
+                            SELECT 1 FROM operations revoke
+                            WHERE revoke.application_id=o.application_id
+                              AND revoke.status='Queued'
+                              AND revoke.document->'change'->>'kind'='RevokeAccess')
+                        AND NOT EXISTS (
+                            SELECT 1 FROM operations prior
+                            WHERE prior.application_id=o.application_id AND prior.status='Queued'
+                              AND NOT COALESCE((prior.document->>'systemRevocation')::boolean, false)
+                              AND (prior.created_at, prior.id) < (o.created_at, o.id))
+                    )
+                  )
+                ORDER BY
+                    CASE WHEN COALESCE((o.document->>'systemRevocation')::boolean, false) THEN 0
+                         WHEN o.document->'change'->>'kind'='RevokeAccess' THEN 1
+                         ELSE 2 END,
                     o.created_at, o.id LIMIT 1 FOR UPDATE OF o
                 """, connection, transaction);
             command.Parameters.AddWithValue("app", applicationId);
