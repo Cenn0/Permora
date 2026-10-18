@@ -26,7 +26,8 @@
           "SecretFile": "/run/secrets/directory-reader"
         },
         "ProtectedSubjectIds": [],
-        "AllowGroupRoleGrants": false
+        "AllowGroupRoleGrants": false,
+        "ApprovedGroupIds": []
       }
     }
   }
