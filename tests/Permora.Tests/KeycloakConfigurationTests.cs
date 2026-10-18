@@ -74,7 +74,7 @@ public sealed class KeycloakConfigurationTests
         Assert.Empty(KeycloakConfiguration.Read(config).Realms["enterprise"].ApprovedGroupIds ?? []);
         values["Keycloak:Realms:enterprise:ApprovedGroupIds:0"] = "reviewed-group-id";
         config = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
-        Assert.Equal(["reviewed-group-id"], KeycloakConfiguration.Read(config).Realms["enterprise"].ApprovedGroupIds);
+        Assert.Equal(new[] { "reviewed-group-id" }, KeycloakConfiguration.Read(config).Realms["enterprise"].ApprovedGroupIds);
         values["Keycloak:Realms:enterprise:AllowGroupRoleGrants"] = "false";
         config = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         Assert.False(KeycloakConfiguration.Read(config).Realms["enterprise"].AllowGroupRoleGrants);
