@@ -64,7 +64,7 @@ public sealed record Operation(
     string IdempotencyKey, string RequestHash, OperationStatus Status,
     DateTimeOffset CreatedAt, DateTimeOffset NextAttemptAt, int Attempts,
     Actor? ApprovedBy = null, DateTimeOffset? ApprovedAt = null, string? ErrorCode = null,
-    bool SystemRevocation = false);
+    bool SystemRevocation = false, string? DecisionReason = null);
 public sealed record AuditEvent(Guid Id, Guid ApplicationId, string ActorKey, string Action,
     string Detail, DateTimeOffset At, long Sequence, string PreviousHash, string Hash);
 public sealed record ReviewItem(Guid AssignmentId, string Decision, string? ReviewedBy = null);
