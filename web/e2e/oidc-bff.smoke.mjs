@@ -162,19 +162,40 @@ try {
   throw new Error('Strong session did not pass the assurance gate before scoped app validation');
  console.log('PASS: LoA2 session passes the assurance gate but still respects application authorization');
 
- const logout = await page.evaluate(async () => {
-  const xsrf = document.cookie.split('; ').find(x => x.startsWith('XSRF-TOKEN='))?.split('=')[1];
-  return (await fetch('/bff/logout',{
-   method:'POST',credentials:'same-origin',
-   headers:{'Content-Type':'application/json','X-XSRF-TOKEN':decodeURIComponent(xsrf || '')},
-   body:'{}'
-  })).status;
+ const secondary = process.env.PERMORA_TEST_SECONDARY_URL;
+ if (!secondary?.startsWith('http://127.0.0.1:'))
+  throw new Error('Missing isolated secondary BFF replica');
+ const originalSessionCookie=(await context.cookies(base)).find(c=>c.name==='Permora.Session');
+ if (!originalSessionCookie?.value) throw new Error('No protected server-side session cookie');
+
+ // The second *real* API process must decrypt the first process's session
+ // ticket, find it in the shared PostgreSQL store, and preserve the stronger
+ // signed-ID-token assurance established by genuine TOTP.
+ const other=await context.request.get(secondary+'/bff/session');
+ const otherState=await other.json();
+ if (other.status()!==200 || !otherState.authenticated || !otherState.strongAuthentication)
+  throw new Error('A second real BFF replica could not recover the strong authenticated session');
+ console.log('PASS: Second BFF process reads the same strong session without sticky routing');
+
+ const xsrf=(await context.cookies(base)).find(c=>c.name==='XSRF-TOKEN');
+ if (!xsrf?.value) throw new Error('No antiforgery token after replica switch');
+ const logout=await context.request.post(secondary+'/bff/logout',{
+  headers:{'Content-Type':'application/json','X-XSRF-TOKEN':decodeURIComponent(xsrf.value)},
+  data:'{}'
  });
- if(logout!==204) throw new Error('Local server-side logout failed');
+ if(logout.status()!==204) throw new Error('Replica-B local server-side logout failed');
  const after=await getSession();
- if(after.status!==200||after.body.authenticated)
-  throw new Error('Local logout retained authenticated browser session');
- console.log('PASS: BFF local logout invalidates the server-side session');
+ if(after.status!==200 || after.body.authenticated)
+  throw new Error('Replica-A continued to serve an authenticated session after replica-B logout');
+
+ // Even replaying the old HttpOnly cookie on replica A cannot resurrect the
+ // deleted PostgreSQL ticket. Never log the key, ticket, cookie or token.
+ const stale=await context.request.get(base+'/api/v1/applications',{
+  headers:{Cookie:'Permora.Session='+originalSessionCookie.value}
+ });
+ if(stale.status()!==401)
+  throw new Error('Revoked session ticket was accepted by another BFF replica');
+ console.log('PASS: Cross-replica logout invalidates the original cookie and denies replay');
 
  // No production or real-user credentials are ever used.
 } catch (error) {
