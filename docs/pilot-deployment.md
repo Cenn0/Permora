@@ -46,9 +46,12 @@ IAM-Freigabe. Der Pilotbetrieb darf diese Rechte nicht selbst erraten.
    **Keine Worker-Admin-Credentials in die API übernehmen.** Die API
    liest lediglich den nicht geheimen
    `Keycloak:Realms:<realm>:AllowGroupRoleGrants`-Schalter (Standard:
-   `false`). Nach zentraler IAM-Risikofreigabe ist der Schalter in API
-   und Worker **getrennt** zu konfigurieren; er verengt die upstream
-   `Groups.manage`-Berechtigung nicht.
+   `false`). Zusätzlich müssen exakt freigegebene Keycloak-Gruppen-IDs
+   unter `Keycloak:Realms:<realm>:ApprovedGroupIds` eingetragen werden.
+   Eine Realm-Freigabe ohne diese Liste ist wirkungslos. Nach zentraler
+   IAM-Risikofreigabe müssen Flag **und** Liste in API und Worker separat
+   und konsistent konfiguriert werden. Weder Flag noch Liste verengen die
+   tatsächlich vergebenen upstream `Groups.manage`-Rechte.
 2. `api-db.secret`, `worker-db.secret` und optional
    `provisioner-db.secret` als jeweils **eine vollständige** Npgsql-
    Verbindungszeichenfolge hinterlegen; pro Prozess eigene DB-Rolle mit
