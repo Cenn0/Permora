@@ -1,6 +1,6 @@
 # Betrieb und Wiederherstellung
 
-**Keine Produktionsfreigabe.** Die Compose-Datei startet ausschließlich lokale Abhängigkeiten mit Loopback-Ports und Development-Keycloak. Sie ist weder HA-Deployment noch produktiver Secrets-/Netzwerkstandard. Das Dockerfile ist eine noch nicht ausgeführte Buildvorlage; Images und Lockfiles vor Release tatsächlich prüfen und auf freigegebene Digests festlegen.
+**Keine Produktionsfreigabe.** `deploy/compose.local.yml` startet nur lokale Abhängigkeiten. `deploy/compose.pilot.yml` ist eine separate eingeschränkte Single-Host-Referenz, kein HA-Deployment. Die drei tatsächlichen Anwendungsimages wurden für den [signierten Draft-Kandidaten](https://github.com/Cenn0/Permora/actions/runs/39117753278) gebaut und gescannt; TLS- und Clusterbetrieb bleiben extern abnahmepflichtig.
 
 ## Prozesse und Berechtigungen
 
@@ -12,7 +12,7 @@ DB-Schemaänderungen mit gesonderter Migrationsidentität ausführen: `dotnet ru
 
 Öffentlich ausschließlich TLS-Reverse-Proxy/Ingress für Angular+BFF, gleicher Origin. Admin-API-Host ausschließlich intern aus Worker/Provisioner erreichbar. PostgreSQL nicht öffentlich. `PublicOrigin` fest konfigurieren, Callback-URIs exakt erlauben. Die Anwendung vertraut nicht pauschal beliebigen Forwarded-Headers. Vertrauenswürdige Proxy-Netze und TLS-/Header-Verhalten vor Deployment gezielt konfigurieren und testen; nicht blind `KnownNetworks` leeren.
 
-Die .NET-Session ist absolut auf 30 Minuten begrenzt. Lokaler Logout beendet nicht die unternehmensweite SSO-Sitzung. MFA muss am Identity Provider eingerichtet werden; separate Portal-Step-up-Erzwingung ist noch offen.
+Die .NET-Session ist absolut auf 30 Minuten begrenzt. Lokaler Logout beendet nicht die unternehmensweite SSO-Sitzung. Der Portalserver verlangt für mutierende API-Aufrufe `acr` und frisches `auth_time`; ein echter Keycloak-26.8.1-TOTP-/LoA2-Test ist [bestanden](https://github.com/Cenn0/Permora/actions/runs/39011230492). Der produktive Unternehmens-IdP muss MFA und Assurance-Level gesondert sicher konfigurieren und abnehmen.
 
 ## Health und Fehler
 
@@ -20,7 +20,7 @@ Die .NET-Session ist absolut auf 30 Minuten begrenzt. Lokaler Logout beendet nic
 
 Aufträge und Fehlercodes im Portal kontrollieren. Fehlgeschlagene Erweiterungen nicht mit direkten Datenbankänderungen als erfolgreich markieren. Bei unklarem Remote-Zustand erst Keycloak-Istzustand und genehmigten Portalzustand vergleichen; danach kontrolliert wiederholen oder korrigieren. Queue-Retry bleibt auditierbar. Monitoringsysteme müssen Failed/Conflict, alte Queued-Aufträge, überfällige Entzüge, Directory-Alter und Drift alarmieren; fertige Prometheus-/OpenTelemetry-/SIEM-Integration ist noch nicht enthalten.
 
-Directory-Sync ist periodisch; fehlende Einträge werden nicht als Löschung gedeutet. Große oder unvollständig sichtbare Verzeichnisse blockieren Erweiterungen statt Teilbestände als vollständig auszugeben. Group-/Page-/App-Sicherheitslimits und DB-Lockhaltezeit begrenzen derzeit die Skalierung. Worker-Fairness unter großem Backlog wurde noch nicht vermessen.
+Directory-Sync ist periodisch; fehlende Einträge werden nicht als Löschung gedeutet. Große oder unvollständig sichtbare Verzeichnisse blockieren Erweiterungen statt Teilbestände als vollständig auszugeben. Group-/Page-/App-Sicherheitslimits und DB-Lockhaltezeit begrenzen derzeit die Skalierung. UUID-rotierender Queue-Polling-Code wurde gegen PostgreSQL und das Worker-Failover mit vier Anwendungen und 32 realen Entzügen getestet. **Produktive** Backlog-Fairness, maximale Entzugszeit und Multi-Host-SLO wurden noch nicht vermessen.
 
 ## Backup / Restore
 
@@ -99,3 +99,26 @@ Secret-Mounts, minimale Datenbankberechtigungen und Rotation sind
 Produktionshärtung. Die Alternative mit Inline-String bleibt für isolierte
 lokale Entwicklung kompatibel. Niemals produktive Connection-Strings in
 Repository, Actions-Logs oder öffentliche Issues übernehmen.
+
+## Echte isolierte Mehrprozess-/Recovery-Evidenz
+
+[Workflow #39117753047](https://github.com/Cenn0/Permora/actions/runs/39117753047)
+hat **zwei echte Worker-Prozesse** mit PostgreSQL 18 und Keycloak 26.8.1
+ausgeführt. Die Testdaten umfassen vier Anwendungen und 32 abgelaufene
+Zuweisungen. Die Tests erzwingen eine vorübergehende Keycloak-503-Störung,
+verlieren eine erfolgreiche Remote-Antwort nach dem Rechteentzug, beenden den
+zuständigen Worker und verifizieren, dass der Überlebende alle Entzüge
+abschließt, ohne ungewollte Rechte erneut zu vergeben. Anschließend werden
+die isolierten PostgreSQL-/Keycloak-Datenbanken wiederhergestellt, und
+Keycloak-Signaturschlüssel sowie effektive Rollenzuweisungen geprüft.
+
+Die gesonderten [Data-Protection-Tests](session-ha-and-rotation.md) prüfen
+zwei unabhängige Sitzungsanbieter, verschlüsselte Schlüsselablage,
+Zertifikatswechsel mit alten Decryption-Zertifikaten und die gegenseitige
+Logout-Wirksamkeit gegen dieselbe Datenbank.
+
+**Nicht nachgewiesen:** Mehrstandort-HA, Live-TLS-Endpunkt- und
+Proxy-Failover, Secret-Manager-Rotation, vollständiger Backup-PITR,
+verbindliche RPO-/RTO-Werte oder funktionale Wiederanlauf-Garantien einer
+konkreten produktiven IAM-/AD-Installation. Den Entwickler-Systemtest
+nicht als operativen Abnahmebericht eines Rechenzentrums ausgeben.
