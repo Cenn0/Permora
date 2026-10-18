@@ -3,6 +3,21 @@
 **Assessment date:** 18 October 2026. **Verified baseline commit:**
 `c0a5e0eed07006c20373ea08ff9b162ef831da52`.
 
+**Latest CI checkpoint (18 October 2026):** `main` at
+`2499f863521b1a3b42d2768a93849ed001e2941f` passed six completed
+workflows: [core CI](https://github.com/Cenn0/Permora/actions/runs/39120692954),
+[system](https://github.com/Cenn0/Permora/actions/runs/39120692850),
+[worker/recovery](https://github.com/Cenn0/Permora/actions/runs/39120692981),
+[accessibility](https://github.com/Cenn0/Permora/actions/runs/39120692887),
+[artifact integrity](https://github.com/Cenn0/Permora/actions/runs/39120693032)
+and [documentation](https://github.com/Cenn0/Permora/actions/runs/39120692930).
+The earlier `c0a5e0ee` evidence table below is retained as a scoped
+release-artifact baseline, **not** the latest source HEAD. The new
+[18 October audit](evidence/roadmap-audit-2026-10-18.md) separates tested
+engineering controls from missing external/operator acceptance. The unresolved
+Groups.manage blast radius is documented in
+[issue #46](https://github.com/Cenn0/Permora/issues/46).
+
 A green development CI, a signed development candidate, an automated WCAG scan
 and an isolated successful restore do **not** constitute production approval,
 Microsoft AD certification, GDPR compliance or a penetration test.

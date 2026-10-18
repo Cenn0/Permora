@@ -1,5 +1,18 @@
 # Permora – Product & Engineering Roadmap (V2)
 
+> **Stand der Abnahme am 18.10.2026:** Die nachfolgende V2-Roadmap enthält
+> noch ihren **historischen Ist-Stand vom 17.10.2026** und bewusst offene
+> Plan-Checkboxen. Sie sind **keine aktuelle Aussage, dass alle darunter
+> genannten Tests fehlen**. Für den aktuellen Status gelten vorrangig
+> [Roadmap-Audit vom 18.10.2026](evidence/roadmap-audit-2026-10-18.md),
+> [Release-Gates](release-checklist.md) und die offenen Issues
+> [#3](https://github.com/Cenn0/Permora/issues/3) und
+> [#46](https://github.com/Cenn0/Permora/issues/46).
+> Sechs Workflows auf `main` / `2499f863` waren erfolgreich;
+> weder die 1.0-Produktionsfreigabe noch die FGAP-Gruppenscope-Abnahme sind erfolgt.
+> Ein grünes CI-Ergebnis ersetzt keine reale AD-/Multi-Host-/Penetrations-/
+> Datenschutzabnahme.
+
 **Stand:** 17.10.2026 · **Basis:** Repository `Cenn0/Permora`, Branch `main`, Commit `dc7b7d8ef223f42d9a4b451850b97bd3b04cf5c1`.  
 **Status:** CI-verifizierter Entwicklungsstand; **keine** Produktionsfreigabe.  
 **Leitprinzip:** Erst die tatsächliche Sicherheitsgrenze und den gesamten Rechte-Lebenszyklus nachweisen, danach Komfort, Integration und Skalierung ausbauen.

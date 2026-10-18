@@ -171,6 +171,12 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
     {
         var principal = directory.SingleOrDefault(p => p.Id == assignment.PrincipalId && p.RealmKey == app.RealmKey)
             ?? throw new DomainException("identity_missing", "The target identity is missing from the directory snapshot.", 409);
+        // A corrupted/unknown principal kind must never bypass the Groups.manage
+        // risk gate by falling through the implicit "not User => Group" branch.
+        // This applies to revocations too: never mutate a guessed remote resource.
+        if (!Enum.IsDefined(principal.Kind))
+            throw new DomainException("unsupported_principal_kind",
+                "The directory principal kind is not recognized. Reconcile before changing access.", 409);
         // Keycloak 26.8.1 group-role mappings require Groups.manage, which also
         // permits unrelated group administration. No new delegated group grants
         // until central IAM expressly accepts that larger privilege surface.
