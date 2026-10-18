@@ -39,8 +39,16 @@ IAM-Freigabe. Der Pilotbetrieb darf diese Rechte nicht selbst erraten.
 1. Unter dem Repository-Root `.local/permora-pilot/` die **nicht
    versionierten** Dateien `api.json`, `worker.json` und bei Bedarf
    `provisioner.json` anlegen. Die Beispiele unter `config/` als
-   Ausgangspunkt **separat pro Prozess minimieren**. Die API benötigt
-   keine Worker- oder Provisioner-Client-Credentials.
+   Ausgangspunkt **separat pro Prozess minimieren**:
+   `config/portal.example.json` für die API,
+   `config/worker.example.json` für den Worker und
+   `config/provisioner.example.json` für den Provisioner.
+   **Keine Worker-Admin-Credentials in die API übernehmen.** Die API
+   liest lediglich den nicht geheimen
+   `Keycloak:Realms:<realm>:AllowGroupRoleGrants`-Schalter (Standard:
+   `false`). Nach zentraler IAM-Risikofreigabe ist der Schalter in API
+   und Worker **getrennt** zu konfigurieren; er verengt die upstream
+   `Groups.manage`-Berechtigung nicht.
 2. `api-db.secret`, `worker-db.secret` und optional
    `provisioner-db.secret` als jeweils **eine vollständige** Npgsql-
    Verbindungszeichenfolge hinterlegen; pro Prozess eigene DB-Rolle mit
