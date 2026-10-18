@@ -28,6 +28,9 @@ on:
       - 'tools/accessibility/**'
       - 'scripts/*release*'
       - 'scripts/install-syft.py'
+      - 'scripts/install-grype.py'
+      - 'scripts/vulnerability_policy.py'
+      - 'scripts/test_vulnerability_policy.py'
       - '.github/workflows/ci.yml'
       - '.github/workflows/system-acceptance.yml'
       - '.github/workflows/worker-system.yml'
@@ -60,6 +63,7 @@ jobs:
       - name: Verify SBOM, vulnerability policy and safe archive regressions
         run: |
           python3 -m unittest discover -s scripts -p test_release_evidence.py
+          python3 -m unittest discover -s scripts -p test_release_workflow.py
           python3 -m unittest discover -s scripts -p test_vulnerability_policy.py
       - name: Install checksum-verified scanner
         run: python3 scripts/install-syft.py "$RUNNER_TEMP/scanner"
@@ -122,6 +126,7 @@ jobs:
       - name: Verify SBOM, vulnerability policy and safe archive regressions
         run: |
           python3 -m unittest discover -s scripts -p test_release_evidence.py
+          python3 -m unittest discover -s scripts -p test_release_workflow.py
           python3 -m unittest discover -s scripts -p test_vulnerability_policy.py
       - name: Install checksum-verified scanner
         run: python3 scripts/install-syft.py "$RUNNER_TEMP/scanner"
