@@ -45,6 +45,11 @@ button, .button { max-width: 100%; }
   .section-heading h2, .welcome h1, .welcome .eyebrow,
   .task-card strong, .task-card small { min-width: 0; overflow-wrap: anywhere; }
   .task-card { min-width: 0; }
+  /* Long dashboard headings and status descriptions must wrap at 200% text. */
+  .two-columns .panel { overflow-wrap: anywhere; }
+  .two-columns .bar-row > div:first-child { flex-wrap: wrap; }
+  .two-columns .bar-row span, .two-columns .bar-row strong { min-width: 0; }
+  .status-number { gap: 10px; flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
