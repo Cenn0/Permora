@@ -29,6 +29,50 @@ Drei Profile konfigurieren: Rollenbearbeitung, Rollenzuweisung, Directory-Lesen.
 
 **Nicht ungeprüft `realm-admin` vergeben, um Tests „grün“ zu bekommen.** Client-`manage` ist weiter als reine Rollenverwaltung. Die Portal-Endpunktbegrenzung ist deshalb unverzichtbar. Vollständige relevante Listen müssen lesbar sein: Eine FGAP-gefilterte leere Antwort darf keine falsche „saubere“ Reconciliation vortäuschen.
 
+### Kritischer FGAP-v2-Gruppen-Scope: Rolle zuweisen ≠ Gruppe verwalten
+
+**Release-Grenze (Keycloak 26.8.1):** Die dokumentierten `Groups`-Scopes
+enthalten derzeit `view`, `manage`, `view-members` und weitere
+Mitgliedschaftsoperationen, aber **keinen dedizierten
+`Groups.map-role`-Scope**. Die für Permora notwendige delegierte
+Gruppenrollenzuweisung wird in den isolierten Vertragstests daher mit
+`Groups.manage` an der konkreten Zielgruppe freigegeben. Dieser Scope
+berechtigt nach Herstellerdokumentation zur Gruppenverwaltung, **nicht
+ausschließlich** zur Rollenzuweisung. Ein berechtigter bzw. kompromittierter
+Connector kann dadurch potenziell weitere Gruppenoperationen ausführen.
+
+Der Keycloak-Issue [#45269](https://github.com/keycloak/keycloak/issues/45269)
+fordert explizit `Groups.map-role` und wurde als Duplikat zu
+[#38806](https://github.com/keycloak/keycloak/issues/38806) geschlossen.
+Daraus folgt **nicht**, dass die Funktion in der getesteten Version
+verfügbar wäre. Das neue echte
+`scripts/ci-keycloak-contract.py`-Sicherheitsszenario prüft mit dem
+delegierten Gruppen-Mapping-Konto eine von Rollenmapping unabhängige
+Gruppenänderung und stellt die Testgruppe gegebenenfalls mit dem
+isolierten Bootstrap-Admin wieder her. Das testet den tatsächlichen
+Berechtigungsumfang statt ihn aus einer scheinbar minimalen Policy
+abzuleiten.
+
+**Sicherheitsbewertung:**
+
+- *Technisch funktionsfähig:* Rollenmapping eigener Gruppen funktioniert
+  in den nachgewiesenen isolierten Positivtests.
+- *Offiziell unterstützt:* Keycloak dokumentiert den breiten
+  `Groups.manage`-Scope, **nicht** einen separaten reinen
+  Gruppen-Rollenmapping-Scope in 26.8.1.
+- *Best Practice:* getrennte Worker-Serviceidentität mit möglichst
+  gruppenbezogenem FGAP, kein direkter Browser-/Anwenderzugriff auf das
+  Connector-Token; echte negative API- und Keycloak-Tests.
+- *Sicherheitsseitig empfehlenswert:* Für Produktion das zusätzliche
+  Gruppenverwaltungsrisiko bewerten und zentral freigeben, Alternativen
+  mit feinerer Berechtigungsgrenze oder das Abwarten eines offiziell
+  verfügbaren `map-role`-Scopes prüfen. Das Portal-API-Whitelisting
+  begrenzt normale Befehle, **nicht** die Wirkung eines kompromittierten
+  Servicekontos. Keine Produktionsfreigabe als `map-roles-only` ausgeben.
+
+Primärquellen: [Keycloak 26.8.1 Server Administration – Groups Resource Type](https://www.keycloak.org/docs/26.8.1/server_admin/)
+und [Keycloak upstream #45269](https://github.com/keycloak/keycloak/issues/45269).
+
 FGAP-Policy-Erstellung wird in diesem Stand nicht automatisch ausgerollt. Das ist ein offener Roadmap-Punkt, keine versteckte fertige Funktion.
 
 ## 4. Ressourcen und Token-Vertrag
