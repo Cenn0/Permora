@@ -122,7 +122,7 @@ def main():
         frontend.mkdir()
         for name in ('package.json', 'package-lock.json'): shutil.copyfile(ROOT / 'web' / name, frontend / name)
         run(['npm', 'ci', '--omit=dev', '--ignore-scripts', '--no-audit'], cwd=frontend)
-        run([args.syft, 'scan', 'dir:' + str(frontend), '-o', 'cyclonedx-json=' + str(output / 'frontend.cdx.json')])
+        run([args.syft, 'scan', 'dir:' + str(frontend), '-o', 'cyclonedx-json@1.6=' + str(output / 'frontend.cdx.json')])
         notices = temporary / 'notices'
         notices.mkdir()
         shutil.copyfile(ROOT / 'LICENSE', notices / 'Permora-LICENSE')
@@ -148,7 +148,7 @@ def main():
             inspect = json.loads(run(['docker', 'image', 'inspect', image]))[0]
             if inspect.get('Config', {}).get('User') in (None, '', 'root', '0'): raise SystemExit('Root runtime forbidden')
             run([args.syft, 'scan', 'docker:' + image,
-                 '-o', 'cyclonedx-json=' + str(output / (label + '.image.cdx.json')),
+                 '-o', 'cyclonedx-json@1.6=' + str(output / (label + '.image.cdx.json')),
                  '-o', 'spdx-json=' + str(output / (label + '.image.spdx.json'))])
             container = run(['docker', 'create', image])
             application = temporary / label
