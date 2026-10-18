@@ -51,7 +51,8 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
             {
                 Status = approve ? OperationStatus.Queued : OperationStatus.Rejected,
                 ApprovedBy = approve ? actor : null,
-                ApprovedAt = approve ? clock.GetUtcNow() : null
+                ApprovedAt = approve ? clock.GetUtcNow() : null,
+                DecisionReason = reason.Trim()
             };
             await tx.SaveOperationAsync(updated, ct);
             await tx.AppendAuditAsync(actor, approve ? "change.approved" : "change.rejected", AuditDetails.Decision(operationId, reason), clock.GetUtcNow(), ct);
