@@ -18,7 +18,19 @@
 
 Permora ist ein eigenständiges, quelloffenes **C#-/Angular-Portal** für die eingeschränkte Verwaltung eigener Anwendungen. Anwendungsteams können fachliche Rollen, Einzelberechtigungen und Zugriffsanträge bearbeiten, ohne die zentrale Realm-Verwaltung zu erhalten.
 
-> **Status: technischer Entwicklungsstand mit erfolgreicher CI, nicht produktionsfreigegeben.** Die aktuelle CI umfasst .NET-/Angular-Builds, echte PostgreSQL-/xUnit- und Browserprüfungen, ausgewählte FGAP-v2-Zielbenutzer-/Gruppenprüfungen mit Keycloak 26.8.1 und einen **echten Chromium-/Keycloak-/ASP.NET-BFF-Login mit Cookie-/CSRF-Prüfung und Ablehnung privilegierter Änderungen nach reiner Passwortanmeldung**. Dazu kommen ein Docker-Build, ein begrenztes CycloneDX-Paketinventar aus NuGet/npm-Lockfiles und eine isolierte PostgreSQL-Wiederherstellungsprobe. **Positives MFA-Step-up in produktionsnaher Konfiguration, Unternehmens-AD/LDAP, vollständige Rechteisolation, Mehrsystem-Recovery, vollständige Lizenz-/SBOM-/Sicherheitsbewertung, Last/HA und ein unabhängiger Penetrationstest bleiben offen.** [CI-Nachweise](docs/ci.md) · [Release-Gates](docs/release-checklist.md) · [Roadmap](docs/roadmap.md).
+> **Status: umfangreich CI-geprüfter Entwicklungsstand, NICHT produktionsfreigegeben.**
+> Die aktuelle [Abnahmematrix](docs/release-checklist.md) belegt echte
+> Keycloak-26.8.1-FGAP- und LoA2/TOTP-Browserprüfungen, OpenLDAP/LDAPS mit
+> importierten und nicht importierten Identitäten, zwei reale Worker unter
+> Netz-/Absturzfehlern, isolierte Keycloak-/PostgreSQL-Wiederherstellung,
+> verschlüsselte BFF-Sitzungen über mehrere Instanzen, automatisierte
+> WCAG-A/AA-Prüfungen sowie CycloneDX-/SPDX-Inventare tatsächlich gebauter
+> Container. Ein signierter **Draft-Entwicklungskandidat** existiert, aber
+> kein produktionsfreigegebener Release.
+> **Microsoft-AD-spezifische Integration, echter Multi-Host-TLS-/HA-Betrieb,
+> produktive Schlüssel-/Secret-Rotation und RPO/RTO, manuelle Accessibility,
+> rechtliche Lizenzprüfung, Datenschutz-Retention/WORM und ein unabhängiger
+> Penetrationstest bleiben offen.**
 
 ## Was Permora abdeckt
 
@@ -30,7 +42,7 @@ Permora ist ein eigenständiges, quelloffenes **C#-/Angular-Portal** für die ei
 
 Die wesentliche Sicherheitsgrenze bleibt **zentral**: Realm-Einstellungen, übergreifende Berechtigungen, IAM-Sicherheitsrichtlinien und die Freigabe neuer Clients/Delegationsrechte gehören nicht zum Self-Service. Neu vorbereitete Clients bleiben bis zur dokumentierten IAM-Abnahme deaktiviert. Eine API-Antwort `202 Accepted` bedeutet **nicht**, dass eine Änderung bereits in Keycloak wirksam ist.
 
-**Noch nicht umgesetzt oder abgenommen** sind insbesondere automatisiertes FGAP-Provisioning, vollständige externe Identitätskorrelation, ABAC, vollständige HR-/AD-Konnektoren, externe unveränderliche Audit-Speicherung sowie Last-, Wiederanlauf- und Penetrationstests. Die [Roadmap](docs/roadmap.md) unterscheidet Quellcode, ausgeführte Tests und offene Abnahmekriterien.
+**Noch nicht umgesetzt oder vollständig abgenommen** sind automatisches FGAP-Provisioning, vollständige externe Identitätskorrelation, ABAC, HR-/Microsoft-AD-spezifische Integration sowie externe unveränderliche Audit-Speicherung. Isolierte Last- und Wiederanlaufprüfungen wurden erfolgreich ausgeführt; produktiver Multi-Host-Betrieb, verbindliche Recovery-Ziele und die unabhängige Sicherheits-/Datenschutzfreigabe bleiben offen. Die [Roadmap](docs/roadmap.md) unterscheidet Quellcode, ausgeführte Tests und offene Abnahmekriterien.
 
 ## Vertrauensgrenzen
 

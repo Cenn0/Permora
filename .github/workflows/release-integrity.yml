@@ -80,7 +80,7 @@ jobs:
           python3 - <<'PY'
           import json, os, subprocess, time
           sha, repo = os.environ['GITHUB_SHA'], os.environ['GITHUB_REPOSITORY']
-          required = {'Permora CI', 'Permora system acceptance', 'Permora worker and recovery acceptance'}
+          required = {'Permora CI', 'Permora system acceptance', 'Permora worker and recovery acceptance', 'Permora accessibility acceptance'}
           deadline = time.monotonic() + 900
           while time.monotonic() < deadline:
               data = json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/actions/runs?head_sha={sha}&event=push&per_page=100']))

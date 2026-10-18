@@ -80,4 +80,34 @@ Für **alle mutierenden** Portal-API-Endpunkte unter `/api/v1` verlangt die API 
 
 **Betriebsgrenzen:** Eine OIDC-Anforderung allein erzwingt keine MFA in einem ungeeigneten Keycloak-Browser-Flow; der Flow muss unter Keycloak 26.8.1 als höheres Level konfiguriert und durch einen **positiven** echten MFA-End-to-End-Test abgenommen werden. Die Isolation `EnableDevelopmentLogin = true` ist ausschließlich für Development auf Loopback zugelassen und **simuliert keine MFA**. Auch MFA verhindert weder einen kompromittierten BFF noch die Weiterverwendung bereits ausgegebener JWTs.
 
-**Teststand:** `SessionAssuranceTests` prüfen die lokale fail-closed Claim-Policy. `scripts/ci-oidc-bff.py` versucht den echten Keycloak-OIDC-Code-Flow mit Passwort-only und die Zurückweisung mutierender Requests; ein positiver realer MFA-Step-up bleibt Release-Blocker. Siehe [Teststrategie](testing.md) und [Security](security.md).
+**Historischer Teststand:** `SessionAssuranceTests` prüfen die lokale fail-closed Claim-Policy. Der zunächst fehlende positive LoA2-/OTP-Test ist seitdem für die isolierte Keycloak-26.8.1-Testumgebung [erfolgreich](https://github.com/Cenn0/Permora/actions/runs/39011230492). Das positive Produktions-LoA einer realen Unternehmensumgebung muss weiterhin gesondert nachgewiesen werden. Siehe [Teststrategie](testing.md) und [Security](security.md).
+
+## Nachgewiesene LDAPS-Föderation und FGAP-Abgrenzung (18.10.2026)
+
+Der [echte Systemtest](https://github.com/Cenn0/Permora/actions/runs/39117753117)
+startet einen temporären OpenLDAP-Server mit geprüftem LDAPS-Zertifikat,
+konfiguriert Keycloak 26.8.1 als LDAP-Föderation und prüft **beide**
+Keycloak-Modi:
+
+- Importierte LDAP-Benutzer: Paging, direkte delegierte Client-Rollen-Zuweisung
+  und -Entzug, verschachtelte Gruppen und effektive Gruppenrollen.
+- Nicht importierte Benutzer mit `READ_ONLY`: Fremd-ID-Ablehnung, dynamische
+  Gruppenmitgliedschaft und Rollenvererbung. **Direktes Rollenmapping auf
+  einen solchen Benutzer ist mit der geprüften Keycloak-Konfiguration nicht
+  unterstützt; der Test verlangt die tatsächliche Ablehnung.**
+- Delegierte Servicekonten: eigenes Client-Ziel positiv; fremde Benutzer,
+  Clientrollen, Gruppen, Realmänderungen, Impersonation und Passwort-Reset
+  negativ.
+- Das Keycloak-Gruppenrecht `manage` ist **umfangreicher** als eine
+  ausschließliche Rollen-Mapping-Berechtigung. Dies ist ein residualer
+  Vertrauensbereich, keine nachgewiesene gruppenspezifische Minimalrechtelösung.
+
+**Microsoft Active Directory wurde damit NICHT getestet.** AD-spezifische
+Account-Flags, MSAD-Mapper, Kerberos/SPNEGO, Domänen-/Forest-Trusts,
+Gruppenrichtlinien, gesperrte/abgelaufene Konten und reale Enterprise-Readbacks
+müssen gegen eine dafür freigegebene Testdomäne verifiziert werden.
+
+Ein unter OpenLDAP erfolgreiches Szenario darf nicht als offiziell bestätigte
+Microsoft-AD-Kompatibilität, produktive Rechteisolation oder vollständige
+FGAP-Matrix gekennzeichnet werden. Siehe
+[Release-Gates](release-checklist.md).

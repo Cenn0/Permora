@@ -1,5 +1,25 @@
 # Teststrategie und Ausführung
 
+## Neuester nachgewiesener Integrationsumfang (18.10.2026)
+
+Maßgeblich ist der getestete Commit
+[`c0a5e0eed070`](https://github.com/Cenn0/Permora/commit/c0a5e0eed07006c20373ea08ff9b162ef831da52)
+und die [vollständige technische Evidenz](release-checklist.md). Reale
+Keycloak-LoA2/TOTP-Positiv- und Passwort-Negativtests sind bestanden; die
+OpenLDAP-Föderation deckt importierte und nicht importierte, verschachtelte
+und wechselnde Gruppen ab. Zwei reale Worker wurden bei Keycloak-Ausfall,
+Prozessabbruch nach Remote-Commit und Datenbankwiederherstellung getestet.
+Ein separater, CI-grüner axe-core-Lauf prüft 54 Accessibility-Konstellationen.
+Drei Image-SBOMs und signierte Draft-Artefakte wurden erstellt.
+
+**Nicht damit bewiesen:** Kompatibilität mit echtem Microsoft AD,
+vollständige produktive FGAP-/Identity-Matrix, Multi-Host-Failover,
+Security-/Privacy-Freigabe, manuelle Screenreader-Abnahme oder rechtlich
+freigegebene Lizenz- und Release-Unterlagen. Nachfolgende ältere Testzahlen
+und offenen Punkte sind historische Teilberichte; bei Widersprüchen gilt
+diese aktuelle Abgrenzung.
+
+
 ## Technischer Testnachweis – 17. Oktober 2026
 
 [Integrierter OIDC-/MFA-Negativlauf](https://github.com/Cenn0/Permora/actions/runs/38985065471): Echter Chromium-Browser mit Keycloak-26.8.1-Login, Cookies, ASP.NET-BFF-Sitzung und serverseitigem `403 step_up_required` bei Passwort-only; dazu Builds, xUnit/PostgreSQL, Angular/Playwright, FGAP-Contract, Docker und Lockfile-Gates. [Cross-Team-IDOR-Lauf](https://github.com/Cenn0/Permora/actions/runs/38985300214): direkter REST-Zugriff auf fremde Anwendungs-/Operation-/Audit-/Review-IDs führt in den getesteten Fällen zu HTTP 404, verbotene zentrale Administration zu 403. Das Validierungs-Reihenfolgeproblem wurde korrigiert. Die CI enthält außerdem den isolierten PostgreSQL-Restore- und den offline SBOM-Komponententest.
