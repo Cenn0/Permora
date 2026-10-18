@@ -1,0 +1,36 @@
+name: Permora Kubernetes deployment reference
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'deploy/k8s/**'
+      - 'scripts/check-k8s-reference.py'
+      - '.github/workflows/k8s-reference.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/k8s/**'
+      - 'scripts/check-k8s-reference.py'
+      - '.github/workflows/k8s-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Validate YAML composition and fail-closed security invariants
+        run: |
+          kubectl version --client
+          yq --version
+          python3 scripts/check-k8s-reference.py
+      - name: Explicit non-production scope
+        run: |
+          echo 'Kubernetes reference syntax/security invariants verified. No Kubernetes cluster was created, no secrets or production images deployed, and no TLS/HA/DR production acceptance occurred.' >> "$GITHUB_STEP_SUMMARY"
