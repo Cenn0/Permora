@@ -28,7 +28,18 @@ ROOT = Path(__file__).resolve().parents[1]
 KEYCLOAK = 'http://127.0.0.1:18085'
 PROXY = 'http://127.0.0.1:19085'
 PGPORT = 15439
-APPLICATIONS, USERS = 4, 8
+# The stress fixture runs only with explicit GITHUB_ACTIONS and isolated guards
+# below. Bound input size so a malicious workflow cannot exhaust a public runner.
+def isolated_test_size(name, default, low, high):
+    value = os.environ.get(name, str(default))
+    if not value.isdecimal() or not low <= int(value) <= high:
+        raise SystemExit(f'{name} must be an integer between {low} and {high}')
+    return int(value)
+
+APPLICATIONS = isolated_test_size('PERMORA_CI_APPLICATIONS', 4, 2, 12)
+USERS = isolated_test_size('PERMORA_CI_USERS', 8, 2, 24)
+if APPLICATIONS * USERS > 192:
+    raise SystemExit('Refusing oversized isolated worker load fixture')
 
 
 def check(condition, message):
@@ -330,7 +341,7 @@ def run():
                 sql('permora_test_portal','INSERT INTO directory(id,realm_key,name,document) VALUES ('+
                     ','.join(quote(principal[k]) for k in ('id','realmKey','name'))+','+quote(compact(principal))+'::jsonb);')
             check(count("SELECT sum(jsonb_array_length(document->'assignments')) FROM applications")==APPLICATIONS*USERS,
-                  'Real Keycloak and portal start with the same 32 expired assignments')
+                  'Real Keycloak and portal start with exactly '+str(APPLICATIONS * USERS)+' expired assignments')
             proxy=ThreadingHTTPServer(('127.0.0.1',19085),FaultProxy)
             threading.Thread(target=proxy.serve_forever,daemon=True).start()
             for worker,configuration in configurations.items():
@@ -352,7 +363,10 @@ def run():
             check(victim in processes,'Committed DELETE identifies the actual responsible worker')
             processes[victim].kill(); processes[victim].wait(timeout=10); faults.release.set()
             survivor=next(name for name in processes if name!=victim)
-            deadline=time.monotonic()+180
+            # Bound the stress acceptance by work size while retaining the
+            # original small-fixture upper bound. This is CI-specific,
+            # never a production revocation SLO.
+            deadline=time.monotonic()+max(180, APPLICATIONS * USERS * 5)
             while time.monotonic()<deadline:
                 if processes[survivor].poll() is not None: raise RuntimeError('Surviving worker exited')
                 if count("SELECT count(*) FROM operations WHERE status='Applied'")==APPLICATIONS*USERS: break
@@ -382,7 +396,9 @@ def run():
                 for user in users:
                     check(not recovered.request('GET',base+'/users/'+user['id']+'/role-mappings/clients/'+cid),'Restored Keycloak does not resurrect revoked access')
             print(json.dumps({'scope':'two-real-worker-processes-real-keycloak','applications':APPLICATIONS,
-                'revocations':APPLICATIONS*USERS,'elapsedSeconds':round(elapsed,3),'outageResponses':faults.outages,
+                'revocations':APPLICATIONS*USERS,'users':USERS,'elapsedSeconds':round(elapsed,3),
+                'throughputRevocationsPerSecond':round(APPLICATIONS*USERS/max(elapsed,0.001),3),
+                'outageResponses':faults.outages,
                 'postCommitWorkerKills':1,'databaseRestores':2,'productionSlo':None,'multiHostHaApproval':False}),flush=True)
         finally:
             faults.release.set(); stop_workers()
