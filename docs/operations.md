@@ -18,6 +18,17 @@ Die .NET-Session ist absolut auf 30 Minuten begrenzt. Lokaler Logout beendet nic
 
 `/health/live`: Prozess erreichbar. `/health/ready`: DB erreichbar und Schema v1 vorhanden. Readiness prüft derzeit **nicht** die vollständige Keycloak-/FGAP-Funktion oder alle Worker-Profile. Ein grüner HTTP-Healthcheck ist kein IAM-Gesundheitsnachweis.
 
+**Entzugspriorität:** Automatische Entzüge laufen zuerst; manuell
+ausgelöste `RevokeAccess`-Aufträge dürfen ebenfalls ältere noch wartende
+Vergaben überholen. Auch während ein Entzug wegen eines Remote-Timeouts im
+Backoff liegt, führt die Queue **keine** anderen Erweiterungen der
+betroffenen Anwendung aus. Ein manueller Entzug bleibt über zwischenzeitliche
+Aggregate-Revisionen und die Sieben-Tage-Altersgrenze hinweg gültig,
+aber Berechtigung des Anforderers, Vorhandensein der Zielzuweisung und
+Remote-Readback werden beim Worker-Lauf erneut geprüft. Fehler/Conflicts
+sind sichtbar zu eskalieren; diese Warteschlangenregel ist keine Garantie
+für sofortigen Widerruf bereits ausgegebener JWTs.
+
 Aufträge und Fehlercodes im Portal kontrollieren. Fehlgeschlagene Erweiterungen nicht mit direkten Datenbankänderungen als erfolgreich markieren. Bei unklarem Remote-Zustand erst Keycloak-Istzustand und genehmigten Portalzustand vergleichen; danach kontrolliert wiederholen oder korrigieren. Queue-Retry bleibt auditierbar. Monitoringsysteme müssen Failed/Conflict, alte Queued-Aufträge, überfällige Entzüge, Directory-Alter und Drift alarmieren; fertige Prometheus-/OpenTelemetry-/SIEM-Integration ist noch nicht enthalten.
 
 Directory-Sync ist periodisch; fehlende Einträge werden nicht als Löschung gedeutet. Große oder unvollständig sichtbare Verzeichnisse blockieren Erweiterungen statt Teilbestände als vollständig auszugeben. Group-/Page-/App-Sicherheitslimits und DB-Lockhaltezeit begrenzen derzeit die Skalierung. UUID-rotierender Queue-Polling-Code wurde gegen PostgreSQL und das Worker-Failover mit vier Anwendungen und 32 realen Entzügen getestet. **Produktive** Backlog-Fairness, maximale Entzugszeit und Multi-Host-SLO wurden noch nicht vermessen.

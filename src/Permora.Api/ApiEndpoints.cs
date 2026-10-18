@@ -112,7 +112,9 @@ public static class ApiEndpoints
                 if (Policy.Role(actor, tx.Team, administrators) != ManagementRole.Owner) throw new DomainException("forbidden", "Only owners may retry.", 403);
                 var operation = await tx.OperationAsync(operationId, ct) ?? throw new DomainException("not_found", "Operation not found.", 404);
                 if (operation.Status is not (OperationStatus.Failed or OperationStatus.Conflict)
-                    || operation.Attempts == 0 || (!operation.SystemRevocation && operation.ExpectedRevision != tx.Application.Revision))
+                    || operation.Attempts == 0
+                    || (!operation.SystemRevocation && operation.Change.Kind != ChangeKind.RevokeAccess
+                        && operation.ExpectedRevision != tx.Application.Revision))
                     throw new DomainException("not_retryable", "Reconcile and resubmit this request.", 409);
                 var updated = operation with { Status = OperationStatus.Queued, Attempts = 0, NextAttemptAt = DateTimeOffset.UtcNow, ErrorCode = null };
                 await tx.SaveOperationAsync(updated, ct);

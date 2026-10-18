@@ -31,6 +31,21 @@ und offenen Punkte sind historische Teilberichte; bei Widersprüchen gilt
 diese aktuelle Abgrenzung.
 
 
+## Ergänzende Revocation-Queue-Regressionen (vor CI-Abnahme)
+
+`RevocationPriorityTests` ergänzen die bereits getesteten automatischen
+Entzüge um **manuelle** Notfall-Entzüge: Vorrang auch vor älteren Grants im
+Backoff, Stopp aller anderen Writes bei noch offener Revocation, Fortführung
+trotz zwischenzeitlich geänderter Revisionsnummer und erneute Prüfung des
+aktuellen Team-Mandats. Mindestens ein Test verwendet eine **echte isolierte
+PostgreSQL-Transaktion** mit dem produktiven Queue-SQL; der Remote-Connector
+ist in diesem Test simuliert. Ein echter Keycloak-Gegencheck und ein
+produktives p95/p99-SLO werden dadurch nicht ersetzt.
+
+Die getrennte Gruppen-Grant-HTTP-Regression aus PR #49 wurde im
+[erfolgreichen CI-Lauf #39171097527](https://github.com/Cenn0/Permora/actions/runs/39171097527)
+getestet und gemergt; sie ist keine produktive FGAP-Betriebsfreigabe.
+
 ## Technischer Testnachweis – 17. Oktober 2026
 
 [Integrierter OIDC-/MFA-Negativlauf](https://github.com/Cenn0/Permora/actions/runs/38985065471): Echter Chromium-Browser mit Keycloak-26.8.1-Login, Cookies, ASP.NET-BFF-Sitzung und serverseitigem `403 step_up_required` bei Passwort-only; dazu Builds, xUnit/PostgreSQL, Angular/Playwright, FGAP-Contract, Docker und Lockfile-Gates. [Cross-Team-IDOR-Lauf](https://github.com/Cenn0/Permora/actions/runs/38985300214): direkter REST-Zugriff auf fremde Anwendungs-/Operation-/Audit-/Review-IDs führt in den getesteten Fällen zu HTTP 404, verbotene zentrale Administration zu 403. Das Validierungs-Reihenfolgeproblem wurde korrigiert. Die CI enthält außerdem den isolierten PostgreSQL-Restore- und den offline SBOM-Komponententest.
