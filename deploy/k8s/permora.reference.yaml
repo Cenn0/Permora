@@ -288,12 +288,12 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-bounded-permora-traffic
+  name: allow-only-api-ingress
   namespace: permora
 spec:
   podSelector:
-    matchLabels: {app.kubernetes.io/name: permora}
-  policyTypes: [Ingress, Egress]
+    matchLabels: {app.kubernetes.io/name: permora, app.kubernetes.io/component: api}
+  policyTypes: [Ingress]
   ingress:
     - from:
         - namespaceSelector:
@@ -302,6 +302,16 @@ spec:
             matchLabels: {app.kubernetes.io/name: ingress-nginx}
       ports:
         - {protocol: TCP, port: 8080}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-bounded-permora-egress
+  namespace: permora
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: permora}
+  policyTypes: [Egress]
   egress:
     # DNS is needed for Keycloak / PostgreSQL hostnames.
     - to:
