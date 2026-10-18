@@ -26,9 +26,14 @@ public static class KeycloakConfiguration
             var protectedIds = item.GetSection("ProtectedSubjectIds").Get<string[]>() ?? [];
             if (protectedIds.Any(string.IsNullOrWhiteSpace))
                 throw new InvalidOperationException("Protected Keycloak identities must contain nonempty identifiers.");
+            var approvedGroupIds = item.GetSection("ApprovedGroupIds").Get<string[]>() ?? [];
+            if (approvedGroupIds.Any(string.IsNullOrWhiteSpace)
+                || approvedGroupIds.Any(id => id != id.Trim())
+                || approvedGroupIds.Distinct(StringComparer.Ordinal).Count() != approvedGroupIds.Length)
+                throw new InvalidOperationException("Approved Keycloak group IDs must be nonempty, unique and untrimmed.");
             realms.Add(item.Key, new RealmConnection(Required(item, "BaseUrl"), Required(item, "Realm"),
                 Required(item, "Issuer"), Credential("Roles"), Credential("Assignments"), Credential("Directory"), protectedIds,
-                item.GetValue<bool>("AllowGroupRoleGrants")));
+                item.GetValue<bool>("AllowGroupRoleGrants"), approvedGroupIds));
         }
         return new KeycloakOptions
         {
