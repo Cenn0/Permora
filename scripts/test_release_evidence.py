@@ -87,4 +87,30 @@ class ReleaseEvidenceTests(unittest.TestCase):
                 self.assertEqual(b'actual-shipped-bytes', archive.extractfile('binary.dll').read())
 
 
+
+class ReleaseWorkflowGatesTests(unittest.TestCase):
+    def test_each_source_change_on_main_triggers_a_new_signed_draft(self):
+        workflow = (Path(__file__).resolve().parents[1] /
+                    '.github/workflows/release-integrity.yml').read_text()
+        self.assertIn("on:", workflow)
+        self.assertIn("  push:", workflow)
+        self.assertIn("  pull_request:", workflow)
+        push = workflow.split('  push:', 1)[1].split('  workflow_dispatch:', 1)[0]
+        for path in (
+            "'src/**'", "'web/**'", "'deploy/Dockerfile'",
+            "'Directory.*.props'", "'global.json'",
+            "'.github/workflows/release-integrity.yml'",
+        ):
+            self.assertIn(path, push, 'Missing main-branch candidate trigger: ' + path)
+        self.assertIn("github.ref == 'refs/heads/main'", workflow)
+        self.assertIn("github.event_name != 'pull_request'", workflow)
+        self.assertIn("'Permora accessibility acceptance'", workflow)
+        self.assertIn("'Permora system acceptance'", workflow)
+        self.assertIn("'Permora worker and recovery acceptance'", workflow)
+        self.assertIn("'Permora CI'", workflow)
+        self.assertIn('--draft --prerelease', workflow)
+        self.assertIn('--source-digest "$GITHUB_SHA"', workflow)
+
+
+
 if __name__ == '__main__': unittest.main()
