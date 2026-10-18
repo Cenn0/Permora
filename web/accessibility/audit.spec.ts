@@ -59,7 +59,7 @@ async function audit(page:Page) {
   target:n.target,html:n.html.slice(0,180),reason:n.failureSummary?.slice(0,280)
  }))}));
  const layout=await page.evaluate(()=>({width:window.innerWidth,documentWidth:document.documentElement.scrollWidth,
-  overflow:[...document.querySelectorAll('main *,header *')].filter(e=>{
+  overflow:[...document.querySelectorAll('*')].filter(e=>{
    const r=e.getBoundingClientRect();return r.width>0&&r.right>window.innerWidth+1;
   }).slice(0,12).map(e=>({tag:e.tagName,className:e.className,width:Math.round(e.getBoundingClientRect().width)}))}));
  console.log('A11Y',JSON.stringify({route:new URL(page.url()).pathname,issues,layout,manualReviewChecks:result.incomplete.length}));
