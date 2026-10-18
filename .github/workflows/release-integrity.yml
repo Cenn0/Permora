@@ -10,6 +10,10 @@ on:
       - 'Directory.*.props'
       - 'scripts/*release*'
       - 'scripts/install-syft.py'
+      - 'scripts/install-grype.py'
+      - 'scripts/scan-release-vulnerabilities.py'
+      - 'scripts/vulnerability_policy.py'
+      - 'scripts/test_vulnerability_policy.py'
       - '.github/workflows/release-integrity.yml'
   push:
     branches: [main]
@@ -41,12 +45,18 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Verify SBOM graph and safe archive regressions
-        run: python3 -m unittest discover -s scripts -p test_release_evidence.py
+      - name: Verify SBOM, vulnerability policy and safe archive regressions
+        run: |
+          python3 -m unittest discover -s scripts -p test_release_evidence.py
+          python3 -m unittest discover -s scripts -p test_vulnerability_policy.py
       - name: Install checksum-verified scanner
         run: python3 scripts/install-syft.py "$RUNNER_TEMP/scanner"
       - name: Build and inventory actual application artifacts
         run: python3 scripts/build-release-evidence.py --syft "$RUNNER_TEMP/scanner/syft" --output "$RUNNER_TEMP/candidate"
+      - name: Install immutable checksum-verified Grype scanner
+        run: python3 scripts/install-grype.py "$RUNNER_TEMP/scanner"
+      - name: Scan actual image and frontend SBOMs against a fresh vulnerability database
+        run: python3 scripts/scan-release-vulnerabilities.py --grype "$RUNNER_TEMP/scanner/grype" --candidate "$RUNNER_TEMP/candidate"
       - name: Validate checksums and inventory without publishing
         run: |
           cd "$RUNNER_TEMP/candidate"
@@ -97,12 +107,18 @@ jobs:
           else:
               raise SystemExit('Exact-source acceptance was not proven; no candidate will be signed.')
           PY
-      - name: Verify SBOM graph and safe archive regressions
-        run: python3 -m unittest discover -s scripts -p test_release_evidence.py
+      - name: Verify SBOM, vulnerability policy and safe archive regressions
+        run: |
+          python3 -m unittest discover -s scripts -p test_release_evidence.py
+          python3 -m unittest discover -s scripts -p test_vulnerability_policy.py
       - name: Install checksum-verified scanner
         run: python3 scripts/install-syft.py "$RUNNER_TEMP/scanner"
       - name: Build exact trusted-main source into candidate artifacts
         run: python3 scripts/build-release-evidence.py --syft "$RUNNER_TEMP/scanner/syft" --output "$RUNNER_TEMP/candidate"
+      - name: Install immutable checksum-verified Grype scanner
+        run: python3 scripts/install-grype.py "$RUNNER_TEMP/scanner"
+      - name: Scan current images and fail on remediable High/Critical findings
+        run: python3 scripts/scan-release-vulnerabilities.py --grype "$RUNNER_TEMP/scanner/grype" --candidate "$RUNNER_TEMP/candidate"
       - name: Attest actual candidate bytes using GitHub OIDC
         id: provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
