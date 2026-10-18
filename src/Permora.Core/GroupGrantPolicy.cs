@@ -6,14 +6,19 @@ namespace Permora.Core;
 /// </summary>
 public interface IGroupGrantPolicy
 {
-    bool Allows(string realmKey);
+    bool Allows(string realmKey, string keycloakGroupId);
 }
 
 /// <summary>
-/// Snapshot of realm approvals loaded from the API's non-secret configuration.
-/// Missing realms are denied. Keep the worker's separate connector gate enabled.
+/// Snapshot of explicit per-realm Keycloak group IDs admitted for grants.
+/// Neither a blanket realm approval nor a missing allowlist authorizes a group.
+/// This guard does not reduce the Keycloak service token's actual privileges.
 /// </summary>
-public sealed class GroupGrantPolicy(IReadOnlySet<string> approvedRealms) : IGroupGrantPolicy
+public sealed class GroupGrantPolicy(
+    IReadOnlyDictionary<string, IReadOnlySet<string>> allowedGroupIds) : IGroupGrantPolicy
 {
-    public bool Allows(string realmKey) => approvedRealms.Contains(realmKey);
+    public bool Allows(string realmKey, string keycloakGroupId) =>
+        allowedGroupIds.TryGetValue(realmKey, out var allowed)
+        && !string.IsNullOrWhiteSpace(keycloakGroupId)
+        && allowed.Contains(keycloakGroupId);
 }
