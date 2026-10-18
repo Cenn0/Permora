@@ -183,8 +183,8 @@ public sealed class ConnectorTests
                 RoleId = assignment.RoleId, PrincipalId = assignment.PrincipalId,
                 Reason = "Approved group" }, [group], TestContext.Current.CancellationToken);
         Assert.True(mapped);
-        Assert.Single(fixture.Handler.Paths.Where(p => p.Method == HttpMethod.Post
-            && p.Path.Contains("/role-mappings/", StringComparison.Ordinal)));
+        Assert.Single(fixture.Handler.Paths, p => p.Method == HttpMethod.Post
+            && p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
         Assert.Contains(fixture.Handler.Paths, p => p.Method == HttpMethod.Get
             && p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
     }
