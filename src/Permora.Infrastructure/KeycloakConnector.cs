@@ -11,7 +11,13 @@ namespace Permora.Infrastructure;
 public sealed record ServiceCredential(string ClientId, string SecretFile);
 public sealed record RealmConnection(string BaseUrl, string Realm, string Issuer,
     ServiceCredential Roles, ServiceCredential Assignments, ServiceCredential Directory,
-    IReadOnlyList<string> ProtectedSubjectIds);
+    IReadOnlyList<string> ProtectedSubjectIds)
+{
+    // Keycloak 26.8.1 grants group mapping via the broader FGAP Groups.manage
+    // permission (also allowing group metadata changes). Explicitly opt in only
+    // after central IAM has approved that additional blast radius.
+    public bool AllowBroadGroupRoleMapping { get; init; }
+}
 public sealed class KeycloakOptions
 {
     public Dictionary<string, RealmConnection> Realms { get; init; } = [];
@@ -171,6 +177,13 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
     {
         var principal = directory.SingleOrDefault(p => p.Id == assignment.PrincipalId && p.RealmKey == app.RealmKey)
             ?? throw new DomainException("identity_missing", "The target identity is missing from the directory snapshot.", 409);
+        // Do not turn an implicit, overbroad Keycloak Group.manage permission
+        // into a supposedly narrow delegated role mapping. Only new grants
+        // require explicit opt-in: emergency revocations must remain possible.
+        if (grant && principal.Kind == PrincipalKind.Group
+            && !Connection(app.RealmKey).AllowBroadGroupRoleMapping)
+            throw new DomainException("group_mapping_risk_not_approved",
+                "Delegated group grants require central IAM approval of Keycloak Groups.manage scope.", 409);
         var role = app.Roles.Single(r => r.Id == assignment.RoleId);
         var mapped = await RequiredRoleAsync(app, role.Id, "role." + role.Key, ct);
         var type = principal.Kind == PrincipalKind.User ? "users" : "groups";
