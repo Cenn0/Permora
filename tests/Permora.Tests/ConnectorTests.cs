@@ -85,6 +85,52 @@ public sealed class ConnectorTests
             p => p.Method == HttpMethod.Post && p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Realm_opt_in_without_explicit_group_id_does_not_write_to_keycloak()
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group };
+        var assignment = f.Assignment(principal: group.Id);
+        var after = f.App with { Assignments = [assignment] };
+        using var fixture = new ConnectorFixture(f,
+            (request, _) => request.RequestUri!.AbsolutePath.EndsWith(
+                "/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)
+                ? SafeClient(f) : Json(Array.Empty<object>()),
+            allowGroupRoleGrants: true, approvedGroupIds: []);
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            fixture.Connector.ApplyAsync(f.App, after,
+                new Change { Kind = ChangeKind.GrantAccess, TargetId = assignment.Id,
+                    RoleId = assignment.RoleId, PrincipalId = assignment.PrincipalId,
+                    Reason = "Missing group allowlist" },
+                [group], TestContext.Current.CancellationToken));
+        Assert.Equal("group_mapping_disabled", error.Code);
+        Assert.DoesNotContain(fixture.Handler.Paths,
+            p => p.Method == HttpMethod.Post && p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Unlisted_group_cannot_be_granted_even_when_realm_is_approved()
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group };
+        var assignment = f.Assignment(principal: group.Id);
+        var after = f.App with { Assignments = [assignment] };
+        using var fixture = new ConnectorFixture(f,
+            (request, _) => request.RequestUri!.AbsolutePath.EndsWith(
+                "/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)
+                ? SafeClient(f) : Json(Array.Empty<object>()),
+            allowGroupRoleGrants: true, approvedGroupIds: ["some-other-group"]);
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            fixture.Connector.ApplyAsync(f.App, after,
+                new Change { Kind = ChangeKind.GrantAccess, TargetId = assignment.Id,
+                    RoleId = assignment.RoleId, PrincipalId = assignment.PrincipalId,
+                    Reason = "Unlisted group" },
+                [group], TestContext.Current.CancellationToken));
+        Assert.Equal("group_mapping_disabled", error.Code);
+        Assert.DoesNotContain(fixture.Handler.Paths,
+            p => p.Method == HttpMethod.Post && p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
+    }
+
     [Fact] public async Task Emergency_group_revocation_remains_available_when_grants_are_disabled()
     {
         var f = new Fixture();
@@ -198,11 +244,12 @@ public sealed class ConnectorTests
         private readonly string secretPath = Path.GetTempFileName(); private readonly HttpClient client;
         public RecordingHandler Handler { get; }
         public KeycloakConnector Connector { get; }
-        public ConnectorFixture(Fixture f, Func<HttpRequestMessage,CancellationToken,HttpResponseMessage> handler)
+        public ConnectorFixture(Fixture f, Func<HttpRequestMessage,CancellationToken,HttpResponseMessage> handler,
+            bool allowGroupRoleGrants = false, IReadOnlyList<string>? approvedGroupIds = null)
         {
             File.WriteAllText(secretPath, "test-only-credential-not-a-real-secret"); Handler = new(handler); client = new(Handler);
             var credential = new ServiceCredential("test-service", secretPath);
-            var options = new KeycloakOptions { Realms = new() { ["enterprise"] = new("https://keycloak.example.test", "enterprise", Fixture.Issuer, credential, credential, credential, []) } };
+            var options = new KeycloakOptions { Realms = new() { ["enterprise"] = new("https://keycloak.example.test", "enterprise", Fixture.Issuer, credential, credential, credential, [], allowGroupRoleGrants, approvedGroupIds) } };
             Connector = new(client, options, f.Clock);
         }
         public void Dispose() { client.Dispose(); File.Delete(secretPath); }
