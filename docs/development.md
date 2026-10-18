@@ -24,9 +24,14 @@ Die Beispiele sind pro Prozess getrennt:
 `config/provisioner.example.json` für das Onboarding. Die API liest
 ausschließlich den nicht geheimen
 `Keycloak:Realms:<realm>:AllowGroupRoleGrants`-Schalter, standardmäßig
-`false`. Ein freigegebener Gruppen-Opt-in muss separat in API und Worker
-gesetzt sein. Die tatsächliche Remote-Autorisierung und Readback-Prüfung
-bleiben Aufgabe des Workers.
+`false`. Zusätzlich prüft die API
+`Keycloak:Realms:<realm>:ApprovedGroupIds` mit exakten Keycloak-Gruppen-
+IDs (keine Permora-GUIDs). Ein freigegebener Gruppen-Opt-in muss als
+Flag **und** Allowlist separat in API und Worker gesetzt sein.
+Eine Realm-weite Flag-Freigabe ohne zulässige Gruppen-IDs genügt nicht.
+Die tatsächliche Remote-Autorisierung und Readback-Prüfung bleiben
+Aufgabe des Workers. Anwendungsseitige Allowlist und Servicekonto-FGAP
+sind getrennte Sicherheitsgrenzen.
 
 `python3 scripts/init-local.py` erzeugt ignorierte, lokale Zufallsgeheimnisse und einen Development-only-Katalogzugang. Vorhandene Dateien werden nicht überschrieben. Nicht in einer produktiven Umgebung ausführen. Demo-Anwendungen besitzen bewusst keine fingierten effektiven Rechte.
 
