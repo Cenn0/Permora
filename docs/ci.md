@@ -1,5 +1,26 @@
 # Permora CI: Tests, Belege und Grenzen
 
+## Verbindliche aktuelle Evidenz – 18.10.2026
+
+**Prüfstand:** [Produktionsfreigabe- und Testmatrix](release-checklist.md),
+Commit `c0a5e0eed07006c20373ea08ff9b162ef831da52`.
+
+Die fünf **erfolgreichen** `main`-Workflows dieses Commits:
+
+- [Basis-CI](https://github.com/Cenn0/Permora/actions/runs/39117753038): .NET/Angular, PostgreSQL, OIDC-BFF, Keycloak-FGAP.
+- [System-/LDAPS-Abnahme](https://github.com/Cenn0/Permora/actions/runs/39117753117): OpenLDAP über echtes TLS, importierte/nicht importierte Identitäten, Gruppenänderungen und FGAP-Negativfälle.
+- [Worker-/Recovery-Abnahme](https://github.com/Cenn0/Permora/actions/runs/39117753047): zwei reale Worker, Keycloak-Netzausfälle, verlorene Antwort nach Remote-Commit, Wiederanlauf, Keycloak-/PostgreSQL-Restore.
+- [Accessibility-Automatik](https://github.com/Cenn0/Permora/actions/runs/39117753107): 54 Fälle in Desktop-, Mobil- und 320px-Ansichten; kein unabhängiger Screenreader-Nachweis.
+- [Artifact Integrity](https://github.com/Cenn0/Permora/actions/runs/39117753278): tatsächliche Image-/OS- und Laufzeitinventare, NuGet-/npm-Lizenzbelege, verifizierte Sigstore-Herkunft, signierter **Draft**, keine Produktionsfreigabe.
+
+Eine echte **positive** LoA2/TOTP-Browserprüfung einschließlich starker BFF-Sitzung
+ist zusätzlich durch [Run #39011230492](https://github.com/Cenn0/Permora/actions/runs/39011230492) belegt.
+Ältere Aussagen in diesem Dokument über fehlendes positives MFA, sieben statt acht
+Pflichtjobs oder ausschließlich vorhandene Lockfile-SBOMs beschreiben
+**historische Zwischenstände**. Eine grüne CI ersetzt nicht die externe AD-,
+Datenschutz-, Lizenz-, Produktions-HA- oder unabhängige Security-Abnahme.
+
+
 ## Nachtrag: integrierte CI, 17. Oktober 2026
 
 **Neu:** Die nachträgliche technische CI umfasst neben der bisherigen siebenstufigen Prüfung einen achten Pflichtjob für echten Chromium-/Keycloak-/ASP.NET-BFF-OIDC-Login. Der separate [erfolgreiche PR-#13-Lauf](https://github.com/Cenn0/Permora/actions/runs/38985065471) bestätigt den **Passwort-only-Negativtest** gegen das serverseitige ACR-/auth_time-Gate, echte BFF-Sitzung und CSRF-Verarbeitung. Die [erfolgreiche PR-#18-CI](https://github.com/Cenn0/Permora/actions/runs/38985300214) enthält weitere echte HTTP-Tests gegen Cross-Team-IDORs und die Korrektur, die Fremd-App-Sichtbarkeit vor fachlicher Payload-Validierung prüft.
