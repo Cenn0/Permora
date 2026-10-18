@@ -42,6 +42,7 @@ public sealed class AuditPrivacyTests
         Assert.Contains("reasonSha256=" + Wire.Hash(reason), entry.Detail);
         Assert.Contains(operation.Id.ToString("D"), entry.Detail);
         Assert.Equal(OperationStatus.Queued, store.Operations[operation.Id].Status);
+        Assert.Equal(reason, store.Operations[operation.Id].DecisionReason);
         Assert.True(AuditChain.Verify(store.Audit));
     }
 
