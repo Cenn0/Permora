@@ -7,7 +7,10 @@ using Permora.Infrastructure;
 
 namespace Permora.Worker;
 
-public sealed class PortalWorker(IServiceProvider services, KeycloakOptions options, ILogger<PortalWorker> logger) : BackgroundService
+public sealed record DirectoryRetentionPolicy(int? Days);
+
+public sealed class PortalWorker(IServiceProvider services, KeycloakOptions options,
+    DirectoryRetentionPolicy retention, ILogger<PortalWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
