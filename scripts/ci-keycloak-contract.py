@@ -387,6 +387,32 @@ def run():
         actual = request("GET", group_path, token=master_token)[1]
         check(any(role["id"] == new_roles["A"]["id"] for role in actual),
               "Team A can map its own client role onto its explicitly allowed group")
+
+        # IMPORTANT SECURITY CONTRACT: in Keycloak 26.8.1 the FGAP group
+        # 'manage' privilege is broader than role mapping alone. Probe an
+        # unrelated group modification using the SAME delegated credential
+        # to determine the actual extra authority, rather than calling this
+        # service account 'map-roles-only' or least privilege.
+        allowed_group_path = admin_path("/groups/" + group)
+        group_before = request("GET", allowed_group_path, token=master_token)[1]
+        group_name = group_before["name"]
+        widened_name = "ci-group-manage-breadth-probe"
+        edit_status, _, _ = request("PUT", allowed_group_path,
+            {"id": group, "name": widened_name}, token=delegated_a,
+            expected=(204, 403, 404))
+        group_after = request("GET", allowed_group_path, token=master_token)[1]
+        if edit_status == 204:
+            check(group_after["name"] == widened_name,
+                "FGAP Group.manage can also rename a mapped group (non-mapping authority)")
+            request("PUT", allowed_group_path, {"id": group, "name": group_name}, token=master_token)
+            check(request("GET", allowed_group_path, token=master_token)[1]["name"] == group_name,
+                "Temporary group metadata restored after blast-radius test")
+        else:
+            check(group_after["name"] == group_name,
+                "FGAP denied non-mapping group modification in this isolated setup")
+        print("GROUP FGAP: map-roles on Groups currently needs manage; its wider operation surface must be individually audited.",
+              flush=True)
+
         status, _, _ = request("POST", forbidden_group_path, [new_roles["A"]], token=delegated_a,
                                expected=(401, 403, 404))
         check(status in (401, 403, 404),
