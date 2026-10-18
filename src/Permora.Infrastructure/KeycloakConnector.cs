@@ -11,7 +11,7 @@ namespace Permora.Infrastructure;
 public sealed record ServiceCredential(string ClientId, string SecretFile);
 public sealed record RealmConnection(string BaseUrl, string Realm, string Issuer,
     ServiceCredential Roles, ServiceCredential Assignments, ServiceCredential Directory,
-    IReadOnlyList<string> ProtectedSubjectIds);
+    IReadOnlyList<string> ProtectedSubjectIds, bool AllowGroupRoleGrants = false);
 public sealed class KeycloakOptions
 {
     public Dictionary<string, RealmConnection> Realms { get; init; } = [];
