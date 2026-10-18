@@ -57,6 +57,12 @@ public sealed class MemoryStore(Fixture fixture) : IPortalStore
             var urgent = pending.Where(o => o.SystemRevocation && o.NextAttemptAt <= now)
                 .OrderBy(o => o.CreatedAt).ThenBy(o => o.Id).FirstOrDefault();
             if (urgent is not null) return Task.FromResult<Operation?>(urgent);
+            var revocations = pending.Where(o => o.Change.Kind == ChangeKind.RevokeAccess).ToArray();
+            var manualRevoke = revocations.Where(o => !o.SystemRevocation && o.NextAttemptAt <= now)
+                .OrderBy(o => o.CreatedAt).ThenBy(o => o.Id).FirstOrDefault();
+            if (manualRevoke is not null) return Task.FromResult<Operation?>(manualRevoke);
+            // An unconfirmed revoke in backoff must never allow fresh grants past it.
+            if (revocations.Length > 0) return Task.FromResult<Operation?>(null);
             var firstMutation = pending.Where(o => !o.SystemRevocation)
                 .OrderBy(o => o.CreatedAt).ThenBy(o => o.Id).FirstOrDefault();
             return Task.FromResult(firstMutation?.NextAttemptAt <= now ? firstMutation : null);
