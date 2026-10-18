@@ -1,0 +1,57 @@
+/* Accessibility refinements for the actual application, not scanner-only styles. */
+:root { --muted: #43536b; --blue: #155dcc; }
+.eyebrow, .page-heading p, .top-search, .profile small,
+.application-card > small, .feed-item small, .task-card small,
+.tabs button, th, td small, .empty, label small, .details dt,
+.login p { color: #405371; }
+.purple { color: #6336b5; }
+.green { color: #096537; }
+.coral { color: #b52c48; }
+.application-card { color: var(--ink); }
+code, input[readonly] { color: #354865; }
+button.primary, .button.primary { background: #155dcc; color: #fff; }
+button.primary:hover, .button.primary:hover { background: #104ea9; }
+::placeholder { color: #485973; opacity: 1; }
+
+main, .panel, .form-panel, .page-heading > div, .section-heading > div,
+.metric > div, .quick-actions a > div, .content-shell, .main-column, .side-column { min-width: 0; }
+.page-heading, .section-heading, .toolbar, .search-inline { flex-wrap: wrap; }
+.application-cards.wide { grid-template-columns: repeat(auto-fit,minmax(min(240px,100%),1fr)); }
+.application-card h2, .application-card h3, .page-heading h1 { overflow-wrap: anywhere; }
+.review-line code { min-width: 0; overflow-wrap: anywhere; }
+.details dd, .metric div > span, .quick-actions a > div { overflow-wrap: anywhere; }
+button, .button { max-width: 100%; }
+@media (max-width: 420px) {
+  main { padding: 16px 12px 28px; }
+  .panel { padding: 14px; }
+  .welcome { padding: 18px 14px; gap: 10px; }
+  .welcome img { display: none; }
+  .metrics, .two-columns, .side-column, .quick-actions,
+  .application-cards, .application-cards.wide { grid-template-columns: minmax(0,1fr); }
+  .metric { min-height: 76px; }
+  .details { grid-template-columns: minmax(0,1fr); gap: 7px; }
+  .details dd { margin-bottom: 12px; }
+  .compact-form { padding: 12px; }
+  .compact-form label { min-width: 0; flex-basis: 100%; }
+  .review-card { padding: 12px; }
+  .topbar { padding: 10px 12px; height: auto; min-height: 76px; gap: 8px; flex-wrap: wrap; }
+  .profile { min-width: 0; }
+  .profile > span { min-width: 0; overflow-wrap: anywhere; }
+  .search-field { width: 100%; }
+  .section-heading > a { white-space: normal; }
+  /* Enlarged text must reflow within the viewport, not stretch grid tracks. */
+  .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
+  .main-column, .side-column, .side-column > .panel { min-width: 0; max-width: 100%; }
+  .section-heading h2, .welcome h1, .welcome .eyebrow,
+  .task-card strong, .task-card small { min-width: 0; overflow-wrap: anywhere; }
+  .task-card { min-width: 0; }
+  /* Long dashboard headings and status descriptions must wrap at 200% text. */
+  .panel h2, .panel p, .panel .section-heading { overflow-wrap: anywhere; }
+  .two-columns .panel { overflow-wrap: anywhere; }
+  .two-columns .bar-row > div:first-child { flex-wrap: wrap; }
+  .two-columns .bar-row span, .two-columns .bar-row strong { min-width: 0; }
+  .status-number { gap: 10px; flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}
