@@ -74,6 +74,22 @@ if workflow.exists():
         check(marker in ci, 'Missing CI verification contract: ' + marker)
     check('pull_request_target:' not in ci and 'permissions: write' not in ci,
           'Unsafe privileged CI trigger or permissions')
+release_workflow = root/'.github/workflows/release-integrity.yml'
+check(release_workflow.is_file(), 'Release candidate evidence workflow must exist')
+if release_workflow.is_file():
+    release = release_workflow.read_text(encoding='utf-8')
+    for required_gate in ('Permora CI', 'Permora system acceptance',
+                          'Permora worker and recovery acceptance',
+                          'Permora accessibility acceptance'):
+        check("'" + required_gate + "'" in release,
+              'Signed candidate must require the exact-commit gate: ' + required_gate)
+    check("github.ref == 'refs/heads/main'" in release
+          and "event_name == 'pull_request'" in release
+          and 'pull_request_target:' not in release,
+          'Signed candidates must not come from untrusted PR execution')
+    check('--draft --prerelease' in release,
+          'Candidate artifacts must never be published as production releases by CI')
+
 check((root/'scripts/ci-keycloak-contract.py').is_file(), 'Missing live Keycloak contract')
 check((root/'scripts/ci-verify-trx.py').is_file(), 'Missing TRX evidence checker')
 check((root/'scripts/ci-require-locks.py').is_file(), 'Missing dependency lock gate')
