@@ -1,5 +1,6 @@
 using Npgsql;
 using Permora.Infrastructure;
+using Permora.Core;
 
 namespace Permora.Tests;
 
@@ -22,6 +23,11 @@ public sealed class PostgresTests
             await store.MigrateAsync(TestContext.Current.CancellationToken); await store.MigrateAsync(TestContext.Current.CancellationToken);
             await store.SaveTeamAsync(f.Team, null, f.Owner, TestContext.Current.CancellationToken);
             await store.CreateApplicationAsync(f.App, f.Owner, TestContext.Current.CancellationToken);
+            var registered = Assert.Single(await store.AuditAsync(f.App.Id, 0, 100,
+                TestContext.Current.CancellationToken));
+            Assert.Equal("application.registered", registered.Action);
+            Assert.Contains("slugSha256=" + Wire.Hash(f.App.Slug), registered.Detail);
+            Assert.DoesNotContain(f.App.Slug, registered.Detail, StringComparison.Ordinal);
             await store.ReplaceDirectoryAsync("enterprise", f.Directory, TestContext.Current.CancellationToken);
             await store.ReplaceDirectoryAsync("enterprise", [], TestContext.Current.CancellationToken);
             var retained = await store.DirectoryAsync("enterprise", TestContext.Current.CancellationToken);
