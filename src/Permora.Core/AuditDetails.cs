@@ -16,4 +16,16 @@ public static class AuditDetails
 
     public static string IamApproval(string clientId, string evidenceReference) =>
         $"clientIdSha256={Wire.Hash(clientId.Trim())};evidenceSha256={Wire.Hash(evidenceReference.Trim())}";
+
+    // Application names, slugs, policy descriptions and Keycloak client IDs
+    // remain in the separately protected business state, not an append-only
+    // audit detail which cannot be selectively amended after a DSAR.
+    public static string ApplicationRegistered(ApplicationDocument app) =>
+        $"application={app.Id:D};slugSha256={Wire.Hash(app.Slug)}";
+
+    public static string ClientBinding(string clientId) =>
+        $"clientIdSha256={Wire.Hash(clientId.Trim())}";
+
+    public static string PolicyChanged(AppPolicy policy, long revision) =>
+        $"revision={revision};policySha256={Wire.Hash(Wire.Serialize(policy))}";
 }
