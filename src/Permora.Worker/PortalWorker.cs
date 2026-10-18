@@ -50,6 +50,17 @@ public sealed class PortalWorker(IServiceProvider services, KeycloakOptions opti
                                         await ChangeService.QueueRevocationAsync(tx, assignmentId, "External group membership violates separation of duties", now, budget.Token);
                                     return true;
                                 }, budget.Token);
+                            // Retention operates only after a successful directory refresh.
+                            // The store itself also checks all application, operation and
+                            // membership references before removing any stale identity.
+                            if (retention.Days is int retentionDays)
+                            {
+                                var removed = await scope.ServiceProvider.GetRequiredService<PostgresStore>()
+                                    .PruneUnreferencedDirectoryAsync(realm,
+                                        DateTimeOffset.UtcNow.AddDays(-retentionDays), 250, budget.Token);
+                                if (removed > 0)
+                                    logger.LogInformation("Privacy retention purged {Count} unreferenced stale directory records.", removed);
+                            }
                         }
                         catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
                         { logger.LogWarning("Directory synchronization failed for {Realm}: {Type}", realm, ex.GetType().Name); }
