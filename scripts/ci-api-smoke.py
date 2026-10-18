@@ -4,6 +4,7 @@
 Uses the explicit Development/loopback authentication mode. This does not prove OIDC/MFA.
 """
 import http.cookiejar
+from datetime import datetime, timedelta, timezone
 import json
 import os
 import subprocess
@@ -19,6 +20,75 @@ DB = os.environ.get("PERMORA_TEST_POSTGRES", "")
 if "Database=permora_test_" not in DB:
     raise SystemExit("PERMORA_TEST_POSTGRES must select an isolated permora_test_* database")
 TEAM = "10000000-0000-4000-8000-000000000001"
+
+
+def seed_isolated_group_gate_fixture():
+    """Insert an Active test app and group into the isolated PostgreSQL test DB.
+
+    This deliberately bypasses real IAM onboarding *only in an isolated test
+    database* so HTTP admission can be tested without Keycloak Admin secrets.
+    It does not assert that these grants exist in Keycloak.
+    """
+    connection = dict(part.split("=", 1) for part in DB.split(";") if "=" in part)
+    host = connection.get("Host", "")
+    database = connection.get("Database", "")
+    if host not in ("127.0.0.1", "localhost") or not database.startswith("permora_test_"):
+        raise RuntimeError("Refusing to prepare group gate fixture outside a loopback test database")
+
+    app_id, assigned_role, new_role, group_id, assignment_id = (str(uuid.uuid4()) for _ in range(5))
+    now = datetime.now(timezone.utc)
+    document = {
+        "id": app_id, "teamId": TEAM, "realmKey": "enterprise",
+        "slug": "ci-group-admission", "name": "CI Group Admission",
+        "description": "No actual Keycloak credentials or remote group grants",
+        "environment": "Test", "status": "Active", "revision": 1,
+        "keycloakClientUuid": str(uuid.uuid4()), "keycloakClientId": "ci-only-app",
+        "loginClientUuid": None,
+        "policy": {"requireApproval": True, "maxGrantDays": 90, "separationRules": []},
+        "permissions": [],
+        "roles": [
+            {"id": assigned_role, "key": "reader", "name": "Reader",
+             "description": "Previously assigned synthetic role", "permissionIds": []},
+            {"id": new_role, "key": "writer", "name": "Writer",
+             "description": "Prohibited new group assignment", "permissionIds": []}
+        ],
+        "assignments": [{"id": assignment_id, "roleId": assigned_role,
+                         "principalId": group_id, "grantedBy": "isolated-fixture",
+                         "grantedAt": now.isoformat(),
+                         "expiresAt": (now + timedelta(days=7)).isoformat()}]
+    }
+    group = {
+        "id": group_id, "realmKey": "enterprise", "subjectKey": "ci-synthetic-group",
+        "keycloakId": "ci-synthetic-group", "name": "CI Test Group",
+        "kind": "Group", "enabled": True, "protected": False,
+        "membershipComplete": True, "effectiveMemberKeys": [],
+        "syncedAt": now.isoformat()
+    }
+
+    def quoted_json(value):
+        return "'" + json.dumps(value, separators=(",", ":")).replace("'", "''") + "'::jsonb"
+
+    sql = f"""
+      INSERT INTO applications(id, team_id, realm_key, slug, environment, revision, document)
+      VALUES ('{app_id}'::uuid, '{TEAM}'::uuid, 'enterprise', 'ci-group-admission',
+              'Test', 1, {quoted_json(document)});
+      INSERT INTO directory(id, realm_key, name, document)
+      VALUES ('{group_id}'::uuid, 'enterprise', 'CI Test Group', {quoted_json(group)});
+    """
+    docker_env = os.environ.copy()
+    docker_env.update({
+        "PGHOST": host, "PGPORT": connection.get("Port", "5432"),
+        "PGUSER": connection["Username"], "PGPASSWORD": connection["Password"],
+        "PGDATABASE": database
+    })
+    subprocess.run(
+        ["docker", "run", "--rm", "-i", "--network", "host",
+         "-e", "PGHOST", "-e", "PGPORT", "-e", "PGUSER", "-e", "PGPASSWORD",
+         "-e", "PGDATABASE", "postgres:18", "psql", "-X", "-v", "ON_ERROR_STOP=1"],
+        input=sql, text=True, capture_output=True, check=True, timeout=60, env=docker_env)
+
+    return app_id, new_role, group_id, assignment_id
+
 
 
 def request_http(port, method, path, jar, body=None, xsrf=None, extra_headers=None):
@@ -118,8 +188,9 @@ def main():
                             "--configuration", "Release", "--no-build", "--", flag],
                            cwd=ROOT, env=env, check=True, timeout=30)
 
+        group_app, group_role, group_id, existing_assignment = seed_isolated_group_gate_fixture()
         processes = []
-        with (tmp / "api.log").open("w") as owner_log, (tmp / "foreign.log").open("w") as foreign_log:
+        with (tmp / "api.log").open("w") as owner_log, (tmp / "foreign.log").open("w") as foreign_log, (tmp / "approved.log").open("w") as approved_log:
             try:
                 owner = launch(env, 5080, owner_log)
                 processes.append(owner)
@@ -169,6 +240,36 @@ def main():
                                  jar, body=request, xsrf=token,
                                  extra_headers={"Idempotency-Key": "ci-smoke-request-0001"})
                 assert_status(status, 409, "Pending IAM application refuses a new permission")
+
+                # A real ASP.NET HTTP request must receive 403 *before* an operation
+                # is saved. No real Keycloak grant is made by this isolated fixture.
+                group_url = "/api/v1/applications/" + group_app
+                status, details = request_http(5080, "GET", group_url, jar)
+                assert_status(status, 200, "Isolated active group fixture is visible to the owner")
+                if details["application"]["status"] != "Active":
+                    raise AssertionError("Group grant HTTP fixture must be Active")
+                group_grant = {"expectedRevision": 1, "change": {
+                    "kind": "GrantAccess", "roleId": group_role, "principalId": group_id,
+                    "expiresAt": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+                    "reason": "Isolated negative group grant test"}}
+                status, _ = request_http(5080, "POST", group_url + "/changes", jar,
+                    body=group_grant, xsrf=token,
+                    extra_headers={"Idempotency-Key": "ci-deny-group-grant"})
+                assert_status(status, 403, "Default-deny rejects group grant synchronously over HTTP")
+                status, operations = request_http(5080, "GET", group_url + "/operations", jar)
+                assert_status(status, 200, "Group grant operations are queryable by the owner")
+                if operations:
+                    raise AssertionError("Denied group grant must not be queued or audited as accepted")
+
+                group_revoke = {"expectedRevision": 1, "change": {
+                    "kind": "RevokeAccess", "targetId": existing_assignment,
+                    "reason": "Emergency revoke must remain available"}}
+                status, revoke_operation = request_http(5080, "POST", group_url + "/changes", jar,
+                    body=group_revoke, xsrf=token,
+                    extra_headers={"Idempotency-Key": "ci-allow-group-revoke"})
+                assert_status(status, 202, "Emergency group revocation can still be queued")
+                if revoke_operation.get("status") != "Queued":
+                    raise AssertionError("Emergency group revocation must enter the normal worker queue")
 
                 # Start a second real API process under a different Development subject.
                 foreign_env = env.copy()
@@ -231,8 +332,30 @@ def main():
                                  body={"name": "Forbidden", "members": [], "expectedRevision": 0},
                                  xsrf=foreign_csrf)
                 assert_status(status, 403, "Foreign actor cannot enter central administrative endpoint")
+
+                status, _ = request_http(5081, "POST", group_url + "/changes", foreign_jar,
+                    body=group_grant, xsrf=foreign_csrf,
+                    extra_headers={"Idempotency-Key": "ci-foreign-group-probe"})
+                assert_status(status, 404, "Foreign actor cannot probe group policy or application existence")
+
+                # Explicit opt-in at API admission does not enable the worker, grant
+                # Keycloak credentials, or pretend that a queued grant was applied.
+                approved_env = env.copy()
+                approved_env["Keycloak__Realms__enterprise__AllowGroupRoleGrants"] = "true"
+                approved = launch(approved_env, 5082, approved_log)
+                processes.append(approved)
+                approved_jar = http.cookiejar.CookieJar()
+                status, _ = request_http(5082, "GET", "/bff/session", approved_jar)
+                assert_status(status, 200, "Approved-realm API session starts")
+                approved_csrf = csrf(approved_jar)
+                status, accepted = request_http(5082, "POST", group_url + "/changes", approved_jar,
+                    body=group_grant, xsrf=approved_csrf,
+                    extra_headers={"Idempotency-Key": "ci-approved-group-grant"})
+                assert_status(status, 202, "Explicit per-realm API opt-in admits an approval request")
+                if accepted.get("status") != "AwaitingApproval":
+                    raise AssertionError("API opt-in must not claim the group grant was remotely applied")
             except BaseException:
-                for path in (tmp / "api.log", tmp / "foreign.log"):
+                for path in (tmp / "api.log", tmp / "foreign.log", tmp / "approved.log"):
                     if path.exists():
                         print(f"--- {path.name}: last 30 lines (isolated test only) ---")
                         print("\n".join(path.read_text(errors="replace").splitlines()[-30:]))

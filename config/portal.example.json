@@ -25,22 +25,7 @@
     "AllowHttpInDevelopment": false,
     "Realms": {
       "enterprise": {
-        "BaseUrl": "https://sso-admin.example.org",
-        "Realm": "enterprise",
-        "Issuer": "https://sso.example.org/realms/enterprise",
-        "Roles": {
-          "ClientId": "permora-role-editor",
-          "SecretFile": "/run/secrets/role-editor"
-        },
-        "Assignments": {
-          "ClientId": "permora-role-mapper",
-          "SecretFile": "/run/secrets/role-mapper"
-        },
-        "Directory": {
-          "ClientId": "permora-directory-reader",
-          "SecretFile": "/run/secrets/directory-reader"
-        },
-        "ProtectedSubjectIds": []
+        "AllowGroupRoleGrants": false
       }
     }
   }
