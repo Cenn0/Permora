@@ -59,6 +59,7 @@ async function audit(page:Page) {
   target:n.target,html:n.html.slice(0,180),reason:n.failureSummary?.slice(0,280)
  }))}));
  const layout=await page.evaluate(()=>({width:window.innerWidth,documentWidth:document.documentElement.scrollWidth,
+  scrollContainers:[...document.querySelectorAll('*')].filter(e=>e.scrollWidth>e.clientWidth+1).slice(0,24).map(e=>({tag:e.tagName,className:String(e.className),clientWidth:e.clientWidth,scrollWidth:e.scrollWidth})),
   overflow:[...document.querySelectorAll('*')].filter(e=>{
    const r=e.getBoundingClientRect();return r.width>0&&r.right>window.innerWidth+1;
   }).slice(0,12).map(e=>({tag:e.tagName,className:e.className,width:Math.round(e.getBoundingClientRect().width)}))}));
