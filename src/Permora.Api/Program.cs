@@ -23,13 +23,16 @@ var admins = ConfigurationChecks.Administrators(options);
 var connectionString = ConfigurationChecks.ReadPortalConnectionString(builder.Configuration);
 builder.Services.AddSingleton(options);
 builder.Services.AddSingleton<IReadOnlySet<string>>(admins);
-// Read only the per-realm boolean gate; the API must never receive the
-// worker's Keycloak Admin REST credentials. The worker enforces the same
-// option again immediately before any remote mutation.
-var approvedGroupGrantRealms = builder.Configuration.GetSection("Keycloak:Realms").GetChildren()
+// The API consumes only non-secret per-realm group IDs and explicit opt-in;
+// Keycloak Admin REST credentials remain in the worker-only configuration.
+// Empty/missing per-group allowlists always deny new group grants.
+var approvedGroupIds = builder.Configuration.GetSection("Keycloak:Realms").GetChildren()
     .Where(section => section.GetValue<bool>("AllowGroupRoleGrants"))
-    .Select(section => section.Key).ToHashSet(StringComparer.Ordinal);
-builder.Services.AddSingleton<IGroupGrantPolicy>(new GroupGrantPolicy(approvedGroupGrantRealms));
+    .ToDictionary(section => section.Key,
+        section => (IReadOnlySet<string>)(section.GetSection("ApprovedGroupIds")
+            .Get<string[]>() ?? []).ToHashSet(StringComparer.Ordinal),
+        StringComparer.Ordinal);
+builder.Services.AddSingleton<IGroupGrantPolicy>(new GroupGrantPolicy(approvedGroupIds));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(NpgsqlDataSource.Create(connectionString));
 builder.Services.AddSingleton<PostgresStore>();
