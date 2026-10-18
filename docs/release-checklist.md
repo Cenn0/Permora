@@ -19,6 +19,28 @@ This file distinguishes development CI evidence from independent security and op
 
 Only label a stable 1.0 release after the narrowly supported setup passes all applicable security, recovery, privacy and usability gates with immutable artifacts and recorded reviewer decisions. Unsupported scenarios must be excluded from the release claim rather than silently deemed complete.
 
+## Scope-Grenze für delegierte Gruppenrollen (Keycloak 26.8.1)
+
+**Nicht als erledigte Least-Privilege-Abnahme werten:** Die dokumentierten
+Keycloak-26.8.1-Scopes für Realm-Gruppen enthalten kein
+`Groups.map-role`. Die aktuelle isolierte Permora-FGAP-Konfiguration
+verwendet für Gruppenrollen-Mapping daher `Groups.manage`; dieser
+Scope umfasst mehr als das bloße Rollenmapping. Das echte
+`ci-keycloak-contract.py`-Szenario überprüft zusätzlich, ob das
+selbe Servicekonto eine Gruppe unabhängig vom Rollenmapping ändern
+kann. Unabhängig vom tatsächlichen Serverergebnis müssen Betreiber
+die **gesamte** Gruppen-Admin-API und kompromittierte Servicekonten
+in ihrer Threat-Model-/IAM-Abnahme berücksichtigen.
+
+Quellen: [Keycloak FGAP-V2-Serverhandbuch](https://www.keycloak.org/docs/26.8.1/server_admin/)
+und [Keycloak GROUPS.map-role Feature-Issue #45269](https://github.com/keycloak/keycloak/issues/45269).
+Bis ein engerer **nachweislich offiziell verfügbarer** Scope
+oder eine unabhängig abgenommene alternative Sicherheitsgrenze
+vorliegt, bleibt produktives Gruppenrollen-Mapping ein **Sicherheitsrisiko
+mit notwendiger expliziter IAM-Risikoentscheidung**; ein grüner
+Test ist keine Erlaubnis, die Berechtigung als rein rollenbezogen
+zu kennzeichnen.
+
 ## Four distinct conclusions
 
 - **Technically functional:** selected .NET, Angular, Keycloak and PostgreSQL paths have successful actual CI execution.
