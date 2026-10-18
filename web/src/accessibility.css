@@ -46,6 +46,7 @@ button, .button { max-width: 100%; }
   .task-card strong, .task-card small { min-width: 0; overflow-wrap: anywhere; }
   .task-card { min-width: 0; }
   /* Long dashboard headings and status descriptions must wrap at 200% text. */
+  .panel h2, .panel p, .panel .section-heading { overflow-wrap: anywhere; }
   .two-columns .panel { overflow-wrap: anywhere; }
   .two-columns .bar-row > div:first-child { flex-wrap: wrap; }
   .two-columns .bar-row span, .two-columns .bar-row strong { min-width: 0; }
