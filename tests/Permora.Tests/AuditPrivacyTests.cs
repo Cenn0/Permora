@@ -37,7 +37,7 @@ public sealed class AuditPrivacyTests
         var reason = "Private review by analyst@permora.invalid";
         await service.DecideAsync(f.App.Id, operation.Id, f.Approver, true, reason, Ct);
 
-        var entry = Assert.Single(store.Audit.Where(a => a.Action == "change.approved"));
+        var entry = Assert.Single(store.Audit, a => a.Action == "change.approved");
         Assert.DoesNotContain(reason, entry.Detail);
         Assert.Contains("reasonSha256=" + Wire.Hash(reason), entry.Detail);
         Assert.Contains(operation.Id.ToString("D"), entry.Detail);
