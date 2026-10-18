@@ -215,7 +215,8 @@ public static class ApiEndpoints
                         || !tx.Application.Roles.Any(r => r.Id == rule.SecondRoleId))
                         throw new DomainException("invalid_separation_rule", "Separation rules must reference different roles of this application.");
                 tx.Application = tx.Application with { Policy = input.Policy, Revision = tx.Application.Revision + 1 };
-                await tx.AppendAuditAsync(Actor(user, options), "policy.updated", Wire.Serialize(input.Policy), DateTimeOffset.UtcNow, ct);
+                await tx.AppendAuditAsync(Actor(user, options), "policy.updated",
+                    AuditDetails.PolicyChanged(input.Policy, tx.Application.Revision), DateTimeOffset.UtcNow, ct);
                 return tx.Application;
             }, ct));
         admin.MapPut("/applications/{id:guid}/state", async (Guid id, UpdateState input, ClaimsPrincipal user, IPortalStore store, CancellationToken ct) =>
