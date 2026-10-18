@@ -134,6 +134,9 @@ public static partial class Policy
             case ChangeKind.GrantAccess:
                 var assignedRole = Get(app.Roles, r => r.Id == change.RoleId);
                 var target = Get(directory, p => p.Id == change.PrincipalId && p.RealmKey == app.RealmKey);
+                if (!Enum.IsDefined(target.Kind))
+                    throw new DomainException("unsupported_principal_kind",
+                        "The directory principal kind is not recognized.", 409);
                 if (!target.Enabled || target.Protected)
                     throw new DomainException("protected_identity", "This identity cannot receive delegated access.", 403);
                 Fresh(target, now);
