@@ -131,6 +131,64 @@ public sealed class ConnectorTests
             p => p.Method == HttpMethod.Post && p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Exactly_allowlisted_group_can_be_granted_after_full_remote_postcondition_check()
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group, EffectiveMemberKeys = [] };
+        var assignment = f.Assignment(principal: group.Id);
+        var after = f.App with { Assignments = [assignment] };
+        var role = new { id = Guid.NewGuid().ToString(), name = "role.reader",
+            clientRole = true, containerId = f.App.KeycloakClientUuid, composite = false,
+            attributes = new Dictionary<string, string[]> {
+                ["permora.application"] = [f.App.Id.ToString()],
+                ["permora.entity"] = [f.Reader.Id.ToString()] } };
+        var permission = new { id = Guid.NewGuid().ToString(), name = "perm.orders.read",
+            clientRole = true, containerId = f.App.KeycloakClientUuid, composite = false,
+            attributes = new Dictionary<string, string[]> {
+                ["permora.application"] = [f.App.Id.ToString()],
+                ["permora.entity"] = [f.Read.Id.ToString()] } };
+        var mapped = false;
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)
+                && !path.Contains("/role-mappings/", StringComparison.Ordinal))
+                return SafeClient(f);
+            if (path.EndsWith("/roles/role.reader", StringComparison.Ordinal))
+                return Json(role);
+            if (path.EndsWith("/roles/perm.orders.read", StringComparison.Ordinal))
+                return Json(permission);
+            if (path.EndsWith("/roles/role.reader/composites", StringComparison.Ordinal))
+                return Json(new[] { permission });
+            if (path.EndsWith("/groups/" + group.KeycloakId + "/role-mappings/clients/" +
+                f.App.KeycloakClientUuid, StringComparison.Ordinal))
+            {
+                if (request.Method == HttpMethod.Post)
+                {
+                    mapped = true;
+                    return new HttpResponseMessage(HttpStatusCode.NoContent);
+                }
+                return Json(mapped ? new object[] { role } : Array.Empty<object>());
+            }
+            if (path.Contains("/groups/", StringComparison.Ordinal) &&
+                (path.EndsWith("/members", StringComparison.Ordinal) ||
+                 path.EndsWith("/children", StringComparison.Ordinal)))
+                return Json(Array.Empty<object>());
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }, allowGroupRoleGrants: true, approvedGroupIds: [group.KeycloakId]);
+
+        await fixture.Connector.ApplyAsync(f.App, after,
+            new Change { Kind = ChangeKind.GrantAccess, TargetId = assignment.Id,
+                RoleId = assignment.RoleId, PrincipalId = assignment.PrincipalId,
+                Reason = "Approved group" }, [group], TestContext.Current.CancellationToken);
+        Assert.True(mapped);
+        Assert.Single(fixture.Handler.Paths.Where(p => p.Method == HttpMethod.Post
+            && p.Path.Contains("/role-mappings/", StringComparison.Ordinal)));
+        Assert.Contains(fixture.Handler.Paths, p => p.Method == HttpMethod.Get
+            && p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
+    }
+
     [Fact] public async Task Emergency_group_revocation_remains_available_when_grants_are_disabled()
     {
         var f = new Fixture();
