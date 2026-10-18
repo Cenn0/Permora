@@ -73,4 +73,37 @@ public sealed class AuditPrivacyTests
         Assert.DoesNotContain("internal-client-name", detail);
         Assert.NotEqual(detail, AuditDetails.IamApproval("internal-client-name", "another evidence"));
     }
+    [Fact]
+    public void New_audit_details_do_not_embed_raw_client_or_application_identifiers()
+    {
+        var fixture = new Fixture();
+        var app = fixture.App with { Slug = "alice-sensitive-team" };
+        var registered = AuditDetails.ApplicationRegistered(app);
+        Assert.Contains(app.Id.ToString("D"), registered);
+        Assert.Contains("slugSha256=" + Wire.Hash(app.Slug), registered);
+        Assert.DoesNotContain(app.Slug, registered);
+        var binding = AuditDetails.ClientBinding("sensitive-client-alice");
+        Assert.DoesNotContain("sensitive-client-alice", binding);
+        Assert.Contains(Wire.Hash("sensitive-client-alice"), binding);
+        var events = new[]
+        {
+            AuditChain.Create(app.Id, fixture.Owner.Key, "application.registered",
+                registered, fixture.Clock.Now, null)
+        };
+        Assert.True(AuditChain.Verify(events));
+    }
+
+    [Fact]
+    public void Policy_update_audit_has_revision_and_digest_not_sensitive_rule_explanations()
+    {
+        var policy = new AppPolicy(true, 30,
+            [new SeparationRule(Guid.NewGuid(), Guid.NewGuid(),
+                "Security review for staff@permora.invalid")]);
+        var detail = AuditDetails.PolicyChanged(policy, revision: 13);
+        Assert.Contains("revision=13", detail);
+        Assert.Contains("policySha256=" + Wire.Hash(Wire.Serialize(policy)), detail);
+        Assert.DoesNotContain("staff@permora.invalid", detail);
+        Assert.DoesNotContain("Security review", detail);
+    }
+
 }

@@ -32,6 +32,15 @@ text into the **append-only audit chain**. Regression tests inject synthetic
 email addresses and prove those literals are absent from resulting audit
 entries while the chain still verifies.
 
+Additional application events also use identifiers and SHA-256 fingerprints
+rather than unfiltered business strings: `application.registered` records the
+application UUID and hash of its slug; `binding.approved` records the hash of
+the Keycloak client ID; and `policy.updated` records the revision and hash of
+the complete policy rather than exposing separation-rule explanations.
+This removes raw information from **new** immutable entries only. Existing
+historical audit records are unchanged; their lawful retention and any
+migration/archive decisions remain a separate controller responsibility.
+
 These digests remain pseudonymous; common explanations may be guessed.
 **This is data minimization, not anonymization, an erasure feature, a WORM system
 or legal approval.** Free-form request reasons remain in the operation record
