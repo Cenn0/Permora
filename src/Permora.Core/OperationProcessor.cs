@@ -18,9 +18,14 @@ public sealed class OperationProcessor(IPortalStore store, IAccessConnector conn
             var externalStarted = false;
             try
             {
-                if (!operation.SystemRevocation && operation.ExpectedRevision != tx.Application.Revision)
+                // Only grant-like mutations require an unchanged aggregate revision and
+                // seven-day request expiry. A manual revocation still rechecks the
+                // current assignment and the requester's *current* authorization,
+                // but must not become invalid solely because a grant changed revision.
+                var isRevocation = operation.Change.Kind == ChangeKind.RevokeAccess;
+                if (!operation.SystemRevocation && !isRevocation && operation.ExpectedRevision != tx.Application.Revision)
                     throw new DomainException("revision_conflict", "Application changed after the request.", 409);
-                if (!operation.SystemRevocation && now - operation.CreatedAt > TimeSpan.FromDays(7))
+                if (!operation.SystemRevocation && !isRevocation && now - operation.CreatedAt > TimeSpan.FromDays(7))
                     throw new DomainException("request_expired", "The change request expired.", 409);
                 if (operation.Change.Kind is not (ChangeKind.Reconcile or ChangeKind.RevokeAccess)
                     && (await tx.UnresolvedMutationsAsync(ct)).Any(o => o.Id != operation.Id))
