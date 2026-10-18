@@ -199,7 +199,7 @@ public static class ApiEndpoints
                 var operation = new Operation(Guid.NewGuid(), id, actor, change, tx.Application.Revision,
                     $"iam-approval:{Guid.NewGuid()}", Wire.Hash(Wire.Serialize(change)), OperationStatus.Queued, now, now, 0);
                 await tx.SaveOperationAsync(operation, ct);
-                await tx.AppendAuditAsync(actor, "iam.approved", $"{tx.Application.KeycloakClientId}: {input.EvidenceReference.Trim()}", now, ct);
+                await tx.AppendAuditAsync(actor, "iam.approved", AuditDetails.IamApproval(tx.Application.KeycloakClientId!, input.EvidenceReference), now, ct);
                 return tx.Application;
             }, ct));
         admin.MapPut("/applications/{id:guid}/policy", async (Guid id, UpdatePolicy input, ClaimsPrincipal user, IPortalStore store, CancellationToken ct) =>
