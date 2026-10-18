@@ -100,7 +100,8 @@ public sealed class ConnectorTests
         using var fixture = new ConnectorFixture(f, (request, _) =>
         {
             var path = request.RequestUri!.AbsolutePath;
-            if (path.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal))
+            if (path.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)
+                && !path.Contains("/role-mappings/", StringComparison.Ordinal))
                 return SafeClient(f);
             if (path.EndsWith("/roles/role.reader", StringComparison.Ordinal))
                 return Json(role);
