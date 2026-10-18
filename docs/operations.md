@@ -132,3 +132,27 @@ Proxy-Failover, Secret-Manager-Rotation, vollständiger Backup-PITR,
 verbindliche RPO-/RTO-Werte oder funktionale Wiederanlauf-Garantien einer
 konkreten produktiven IAM-/AD-Installation. Den Entwickler-Systemtest
 nicht als operativen Abnahmebericht eines Rechenzentrums ausgeben.
+
+## Bounded multiworker load and failure injection
+
+The optional [load workflow](../.github/workflows/multiworker-load.yml)
+runs **two actual Permora.Worker processes** against an entirely disposable
+PostgreSQL 18 instance and Keycloak 26.8.1 with **eight applications and
+12 principals each**. It creates 96 real remote role mappings and expired
+assignments and verifies eventual revocation under deliberately injected
+Keycloak 503 responses, a remote DELETE committed without returning to the
+caller, and termination of the responsible worker. It then compares effective
+Keycloak mappings and restores both isolated Keycloak and portal PostgreSQL
+databases. The fixture outputs the actual elapsed time and aggregate
+revocations-per-second observed on the ephemeral GitHub runner.
+
+The workload is **bounded** (2–12 applications, 2–24 users, maximum 192
+assignments) and refuses nonisolated execution. The extra load workflow runs
+when its fixture/workflow changes or when manually dispatched; the smaller
+default (4 apps × 8 principals) remains in the normal worker-acceptance
+workflow. Neither configuration demonstrates a production workload,
+multi-host topology, a specific percentile latency, or a guaranteed
+revocation SLO. Real production baseline/load measurements, degraded-mode
+capacity planning, independently reviewed chaos tests and a controlled
+incident procedure remain hard acceptance gates.
+
