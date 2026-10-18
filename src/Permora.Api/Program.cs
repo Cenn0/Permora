@@ -23,6 +23,13 @@ var admins = ConfigurationChecks.Administrators(options);
 var connectionString = ConfigurationChecks.ReadPortalConnectionString(builder.Configuration);
 builder.Services.AddSingleton(options);
 builder.Services.AddSingleton<IReadOnlySet<string>>(admins);
+// Read only the per-realm boolean gate; the API must never receive the
+// worker's Keycloak Admin REST credentials. The worker enforces the same
+// option again immediately before any remote mutation.
+var approvedGroupGrantRealms = builder.Configuration.GetSection("Keycloak:Realms").GetChildren()
+    .Where(section => section.GetValue<bool>("AllowGroupRoleGrants"))
+    .Select(section => section.Key).ToHashSet(StringComparer.Ordinal);
+builder.Services.AddSingleton<IGroupGrantPolicy>(new GroupGrantPolicy(approvedGroupGrantRealms));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(NpgsqlDataSource.Create(connectionString));
 builder.Services.AddSingleton<PostgresStore>();
