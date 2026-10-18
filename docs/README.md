@@ -13,6 +13,7 @@ Permora is an independent, open-source C# / Angular portal for **delegated Keycl
 | Learn typed application API contracts | [API](api.md) |
 | Understand deploy, operations and recovery limitations | [Operations](operations.md) |
 | Review isolated single-host pilot reference (not production-ready) | [Pilot deployment](pilot-deployment.md) |
+| Privacy inventory, retention and DSAR acceptance | [Privacy and retention](privacy-and-retention.md) |
 | Check which tests were actually executed | [CI scope](ci.md) · [Testing](testing.md) · [Evidence](evidence/ci-2026-10-16-final.md) |
 | Track outstanding work and acceptance criteria | [Roadmap](roadmap.md) |
 | Contribute or report vulnerabilities | [Contributing](../CONTRIBUTING.md) · [Security policy](../SECURITY.md) |
