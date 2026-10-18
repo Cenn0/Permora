@@ -81,6 +81,16 @@ langlebige Remote-Sperre, ein ausgefallener Worker, mehrere voneinander
 unabhängige Worker-Instanzen oder Backlog oberhalb der tatsächlich gemessenen
 Kapazität benötigen weiterhin Monitoring, Lasttests und Betriebsmaßnahmen.
 
+## Directory-Privacy-Retention
+
+Die optionale Einstellung `Privacy:UnreferencedDirectoryRetentionDays` (30–3650 Tage)
+aktiviert eine begrenzte Bereinigung nicht mehr benötigter Directory-Snapshots
+**nur nach erfolgreicher Synchronisation**. Ohne explizite Einstellung erfolgt
+keine automatische Löschung. Eine PostgreSQL-Transaktion schützt alle noch
+referenzierten Identitäten, insbesondere Teammitglieder, aktive Zuweisungen,
+ausstehende Anträge und Mitglieder berechtigter Gruppen. Das ist keine
+DSAR- oder gesetzliche Retention-Freigabe; siehe [Privacy](privacy-and-retention.md).
+
 ## Geheimnisdatei statt Konfigurationspasswort
 
 Alle drei Prozesse (API, Worker und Provisioner) unterstützen neben der
