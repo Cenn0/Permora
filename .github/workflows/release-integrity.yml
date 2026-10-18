@@ -14,8 +14,20 @@ on:
   push:
     branches: [main]
     paths:
+      # A signed candidate must be built from the exact newly merged source;
+      # the previous candidate must never stand in for changed binaries.
+      - 'src/**'
+      - 'web/**'
+      - 'deploy/Dockerfile'
+      - 'Directory.*.props'
+      - 'global.json'
+      - 'tools/accessibility/**'
       - 'scripts/*release*'
       - 'scripts/install-syft.py'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/system-acceptance.yml'
+      - '.github/workflows/worker-system.yml'
+      - '.github/workflows/accessibility.yml'
       - '.github/workflows/release-integrity.yml'
   workflow_dispatch:
 
