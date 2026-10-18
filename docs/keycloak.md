@@ -84,9 +84,17 @@ delegierte Konto auch Gruppenmetadaten ändern kann. Deshalb verweigert der
 Keycloak-Connector **neue** Gruppenberechtigungen standardmäßig mit
 `403 group_mapping_disabled`.
 
-Eine zentrale IAM-Stelle kann pro Realm nach dokumentierter Freigabe den
-Konfigurationswert `Keycloak:Realms:<realm>:AllowGroupRoleGrants=true`
-setzen. **Dieser Schalter verengt die Keycloak-Befugnisse nicht.**
+Eine zentrale IAM-Stelle kann nach dokumentierter Risikofreigabe pro
+Realm `Keycloak:Realms:<realm>:AllowGroupRoleGrants=true` setzen.
+**Zusätzlich ist `Keycloak:Realms:<realm>:ApprovedGroupIds` mit den exakt
+zugelassenen Keycloak-Gruppen-IDs erforderlich** (kein Gruppenname, kein
+Permora-interner Identifier). Fehlende/leere Listen blockieren alle neuen
+Gruppengrants trotz aktiviertem Realm-Schalter. API und Worker müssen die
+identische Liste über getrennte nicht geheime Konfigurationen erhalten.
+Entzüge bleiben auch für Gruppen außerhalb der Allowlist möglich.
+**Diese beiden Schalter verengen ausdrücklich nicht den tatsächlich von
+Keycloak erteilten `Groups.manage`-Token-Scope.** Das ist nur eine
+zusätzliche anwendungsseitige Kontrollschicht; #46 bleibt offen.
 Er setzt ausdrücklich die Annahme voraus, dass das breitere Servicekonto
 risikobewertet, auf zulässige Gruppen begrenzt und aktiv überwacht wird.
 Für realen Produktivbetrieb sind alle Scope-/Token-/Admin-REST-Aktionen

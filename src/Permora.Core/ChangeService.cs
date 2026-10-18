@@ -36,7 +36,7 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
                 var principal = directory.SingleOrDefault(p => p.Id == normalized.PrincipalId
                     && p.RealmKey == tx.Application.RealmKey);
                 if (principal?.Kind == PrincipalKind.Group
-                    && groupGrants?.Allows(tx.Application.RealmKey) != true)
+                    && groupGrants?.Allows(tx.Application.RealmKey, principal.KeycloakId) != true)
                     throw new DomainException("group_mapping_disabled",
                         "Delegated group grants require central IAM approval of Keycloak Groups.manage exposure.", 403);
             }

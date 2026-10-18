@@ -190,7 +190,7 @@ def main():
 
         group_app, group_role, group_id, existing_assignment = seed_isolated_group_gate_fixture()
         processes = []
-        with (tmp / "api.log").open("w") as owner_log, (tmp / "foreign.log").open("w") as foreign_log, (tmp / "approved.log").open("w") as approved_log:
+        with (tmp / "api.log").open("w") as owner_log, (tmp / "foreign.log").open("w") as foreign_log, (tmp / "approved.log").open("w") as approved_log, (tmp / "allowlisted.log").open("w") as allowlisted_log:
             try:
                 owner = launch(env, 5080, owner_log)
                 processes.append(owner)
@@ -348,14 +348,29 @@ def main():
                 status, _ = request_http(5082, "GET", "/bff/session", approved_jar)
                 assert_status(status, 200, "Approved-realm API session starts")
                 approved_csrf = csrf(approved_jar)
-                status, accepted = request_http(5082, "POST", group_url + "/changes", approved_jar,
+                status, _ = request_http(5082, "POST", group_url + "/changes", approved_jar,
                     body=group_grant, xsrf=approved_csrf,
+                    extra_headers={"Idempotency-Key": "ci-realm-only-denied"})
+                assert_status(status, 403, "Realm-only opt-in without group ID is denied over real HTTP")
+
+                # The group ID is exact and non-secret. This does not grant
+                # Keycloak privileges; the worker must validate it again.
+                allowlisted_env = approved_env.copy()
+                allowlisted_env["Keycloak__Realms__enterprise__ApprovedGroupIds__0"] = "ci-synthetic-group"
+                allowlisted = launch(allowlisted_env, 5083, allowlisted_log)
+                processes.append(allowlisted)
+                allowlisted_jar = http.cookiejar.CookieJar()
+                status, _ = request_http(5083, "GET", "/bff/session", allowlisted_jar)
+                assert_status(status, 200, "Allowlisted-group API session starts")
+                allowlisted_csrf = csrf(allowlisted_jar)
+                status, accepted = request_http(5083, "POST", group_url + "/changes", allowlisted_jar,
+                    body=group_grant, xsrf=allowlisted_csrf,
                     extra_headers={"Idempotency-Key": "ci-approved-group-grant"})
-                assert_status(status, 202, "Explicit per-realm API opt-in admits an approval request")
+                assert_status(status, 202, "Exact realm and Keycloak-group opt-in admits an approval request")
                 if accepted.get("status") != "AwaitingApproval":
-                    raise AssertionError("API opt-in must not claim the group grant was remotely applied")
+                    raise AssertionError("Group allowlist must not claim a grant was remotely applied")
             except BaseException:
-                for path in (tmp / "api.log", tmp / "foreign.log", tmp / "approved.log"):
+                for path in (tmp / "api.log", tmp / "foreign.log", tmp / "approved.log", tmp / "allowlisted.log"):
                     if path.exists():
                         print(f"--- {path.name}: last 30 lines (isolated test only) ---")
                         print("\n".join(path.read_text(errors="replace").splitlines()[-30:]))

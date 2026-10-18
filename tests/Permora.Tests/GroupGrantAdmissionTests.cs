@@ -40,7 +40,7 @@ public sealed class GroupGrantAdmissionTests
     {
         var fixture = new Fixture();
         var store = StoreWithGroup(fixture);
-        var policy = new GroupGrantPolicy(new HashSet<string>(StringComparer.Ordinal) { "other-realm" });
+        var policy = new GroupGrantPolicy(new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal) { ["other-realm"] = new HashSet<string>(StringComparer.Ordinal) { fixture.Employee.KeycloakId } });
         var service = new ChangeService(store, fixture.Admins, fixture.Clock, policy);
 
         var error = await Assert.ThrowsAsync<DomainException>(() =>
@@ -56,7 +56,7 @@ public sealed class GroupGrantAdmissionTests
     {
         var fixture = new Fixture();
         var store = StoreWithGroup(fixture);
-        var policy = new GroupGrantPolicy(new HashSet<string>(StringComparer.Ordinal) { "enterprise" });
+        var policy = new GroupGrantPolicy(new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal) { ["enterprise"] = new HashSet<string>(StringComparer.Ordinal) { fixture.Employee.KeycloakId } });
         var service = new ChangeService(store, fixture.Admins, fixture.Clock, policy);
 
         var operation = await service.RequestAsync(fixture.App.Id, fixture.Owner, fixture.Grant(), 1,
@@ -65,6 +65,40 @@ public sealed class GroupGrantAdmissionTests
         Assert.Equal(OperationStatus.AwaitingApproval, operation.Status);
         Assert.Single(store.Operations);
         Assert.Empty(store.App.Assignments); // Never equate queued/approved with a remote grant.
+    }
+
+    [Fact]
+    public async Task Realm_wide_opt_in_without_group_allowlist_does_not_admit_a_grant()
+    {
+        var fixture = new Fixture();
+        var store = StoreWithGroup(fixture);
+        var policy = new GroupGrantPolicy(new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+        {
+            ["enterprise"] = new HashSet<string>(StringComparer.Ordinal)
+        });
+        var service = new ChangeService(store, fixture.Admins, fixture.Clock, policy);
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            service.RequestAsync(fixture.App.Id, fixture.Owner, fixture.Grant(), 1,
+                "group-realm-without-id", Ct));
+        Assert.Equal("group_mapping_disabled", error.Code);
+        Assert.Empty(store.Operations);
+    }
+
+    [Fact]
+    public async Task Another_allowed_group_id_does_not_authorize_this_group()
+    {
+        var fixture = new Fixture();
+        var store = StoreWithGroup(fixture);
+        var policy = new GroupGrantPolicy(new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+        {
+            ["enterprise"] = new HashSet<string>(StringComparer.Ordinal) { "other-keycloak-group-id" }
+        });
+        var service = new ChangeService(store, fixture.Admins, fixture.Clock, policy);
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            service.RequestAsync(fixture.App.Id, fixture.Owner, fixture.Grant(), 1,
+                "group-foreign-id-denied", Ct));
+        Assert.Equal("group_mapping_disabled", error.Code);
+        Assert.Empty(store.Operations);
     }
 
     [Fact]

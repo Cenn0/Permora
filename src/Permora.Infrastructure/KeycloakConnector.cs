@@ -11,7 +11,8 @@ namespace Permora.Infrastructure;
 public sealed record ServiceCredential(string ClientId, string SecretFile);
 public sealed record RealmConnection(string BaseUrl, string Realm, string Issuer,
     ServiceCredential Roles, ServiceCredential Assignments, ServiceCredential Directory,
-    IReadOnlyList<string> ProtectedSubjectIds, bool AllowGroupRoleGrants = false);
+    IReadOnlyList<string> ProtectedSubjectIds, bool AllowGroupRoleGrants = false,
+    IReadOnlyList<string>? ApprovedGroupIds = null);
 public sealed class KeycloakOptions
 {
     public Dictionary<string, RealmConnection> Realms { get; init; } = [];
@@ -181,9 +182,14 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
         // permits unrelated group administration. No new delegated group grants
         // until central IAM expressly accepts that larger privilege surface.
         // Revocations deliberately remain possible during an incident.
-        if (grant && principal.Kind == PrincipalKind.Group && !Connection(app.RealmKey).AllowGroupRoleGrants)
-            throw new DomainException("group_mapping_disabled",
-                "Delegated group grants require central IAM approval of Keycloak Groups.manage exposure.", 403);
+        if (grant && principal.Kind == PrincipalKind.Group)
+        {
+            var connection = Connection(app.RealmKey);
+            if (!connection.AllowGroupRoleGrants
+                || connection.ApprovedGroupIds?.Contains(principal.KeycloakId, StringComparer.Ordinal) != true)
+                throw new DomainException("group_mapping_disabled",
+                    "Delegated group grants require central IAM approval of the exact Keycloak group and Groups.manage exposure.", 403);
+        }
         var role = app.Roles.Single(r => r.Id == assignment.RoleId);
         var mapped = await RequiredRoleAsync(app, role.Id, "role." + role.Key, ct);
         var type = principal.Kind == PrincipalKind.User ? "users" : "groups";

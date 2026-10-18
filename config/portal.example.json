@@ -25,7 +25,8 @@
     "AllowHttpInDevelopment": false,
     "Realms": {
       "enterprise": {
-        "AllowGroupRoleGrants": false
+        "AllowGroupRoleGrants": false,
+        "ApprovedGroupIds": []
       }
     }
   }

@@ -18,7 +18,11 @@ Realm-Freigabe, Fremdteam-Isolation, unbekannte Directory-Typen und den
 Notfall-Entzug. `scripts/ci-api-smoke.py` ergänzt direkte ASP.NET-HTTP-
 Negativtests in einer isolierten PostgreSQL-Fixture: `403` und keine Queue
 bei Default-Deny, `202` für den Entzug, `404` für fremde Akteure
-und `202 AwaitingApproval` bei API-Opt-in. Diese Fixture besitzt **keine
+und `202 AwaitingApproval` nur bei **Realm- plus exakter
+Keycloak-Gruppen-ID-Freigabe**. Realm-only-Opt-in wird ebenfalls
+mit `403` abgewiesen. Der Worker prüft die Group-ID zusätzlich
+unabhängig; falsche oder fehlende IDs sind regressionsgetestet.
+Diese Fixture besitzt **keine
 echten Keycloak-Grants**; die Connector- und FGAP-Tests sind unabhängige
 Schichten. Erst der erfolgreiche CI-Lauf auf dem neuen Commit belegt diese
 zusätzliche Testabdeckung.

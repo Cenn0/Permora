@@ -28,6 +28,7 @@ public sealed class KeycloakConfigurationTests
         Assert.Equal("role-mapper", realm.Assignments.ClientId);
         Assert.Empty(realm.ProtectedSubjectIds);
         Assert.False(realm.AllowGroupRoleGrants);
+        Assert.Empty(realm.ApprovedGroupIds ?? []);
     }
 
     [Theory]
@@ -69,9 +70,59 @@ public sealed class KeycloakConfigurationTests
         };
         var config = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         Assert.True(KeycloakConfiguration.Read(config).Realms["enterprise"].AllowGroupRoleGrants);
+        // Realm-wide opt-in alone never authorizes an individual group.
+        Assert.Empty(KeycloakConfiguration.Read(config).Realms["enterprise"].ApprovedGroupIds ?? []);
+        values["Keycloak:Realms:enterprise:ApprovedGroupIds:0"] = "reviewed-group-id";
+        config = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        Assert.Equal(new[] { "reviewed-group-id" }, KeycloakConfiguration.Read(config).Realms["enterprise"].ApprovedGroupIds);
         values["Keycloak:Realms:enterprise:AllowGroupRoleGrants"] = "false";
         config = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         Assert.False(KeycloakConfiguration.Read(config).Realms["enterprise"].AllowGroupRoleGrants);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" group-id")]
+    [InlineData("group-id ")]
+    public void Invalid_approved_group_ids_fail_configuration_validation(string badId)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Keycloak:Realms:enterprise:BaseUrl"] = "https://keycloak.example.test",
+            ["Keycloak:Realms:enterprise:Realm"] = "enterprise",
+            ["Keycloak:Realms:enterprise:Issuer"] = Fixture.Issuer,
+            ["Keycloak:Realms:enterprise:Roles:ClientId"] = "roles",
+            ["Keycloak:Realms:enterprise:Roles:SecretFile"] = "/run/secrets/roles",
+            ["Keycloak:Realms:enterprise:Assignments:ClientId"] = "assign",
+            ["Keycloak:Realms:enterprise:Assignments:SecretFile"] = "/run/secrets/assign",
+            ["Keycloak:Realms:enterprise:Directory:ClientId"] = "directory",
+            ["Keycloak:Realms:enterprise:Directory:SecretFile"] = "/run/secrets/directory",
+            ["Keycloak:Realms:enterprise:AllowGroupRoleGrants"] = "true",
+            ["Keycloak:Realms:enterprise:ApprovedGroupIds:0"] = badId
+        };
+        var config = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        Assert.Throws<InvalidOperationException>(() => KeycloakConfiguration.Read(config));
+    }
+
+    [Fact]
+    public void Duplicate_approved_group_ids_are_not_accepted()
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Keycloak:Realms:enterprise:BaseUrl"] = "https://keycloak.example.test",
+            ["Keycloak:Realms:enterprise:Realm"] = "enterprise",
+            ["Keycloak:Realms:enterprise:Issuer"] = Fixture.Issuer,
+            ["Keycloak:Realms:enterprise:Roles:ClientId"] = "roles",
+            ["Keycloak:Realms:enterprise:Roles:SecretFile"] = "/run/secrets/roles",
+            ["Keycloak:Realms:enterprise:Assignments:ClientId"] = "assign",
+            ["Keycloak:Realms:enterprise:Assignments:SecretFile"] = "/run/secrets/assign",
+            ["Keycloak:Realms:enterprise:Directory:ClientId"] = "directory",
+            ["Keycloak:Realms:enterprise:Directory:SecretFile"] = "/run/secrets/directory",
+            ["Keycloak:Realms:enterprise:ApprovedGroupIds:0"] = "duplicated-group",
+            ["Keycloak:Realms:enterprise:ApprovedGroupIds:1"] = "duplicated-group"
+        };
+        var config = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        Assert.Throws<InvalidOperationException>(() => KeycloakConfiguration.Read(config));
     }
 
 }
