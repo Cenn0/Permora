@@ -1,6 +1,7 @@
 namespace Permora.Core;
 
-public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> administrators, TimeProvider clock)
+public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> administrators, TimeProvider clock,
+    IGroupGrantPolicy? groupGrants = null)
 {
     public async Task<Operation> RequestAsync(Guid appId, Actor actor, Change change, long expectedRevision,
         string idempotencyKey, CancellationToken ct)
@@ -27,6 +28,18 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
             var normalized = change.Kind is ChangeKind.CreatePermission or ChangeKind.CreateRole or ChangeKind.GrantAccess
                 ? change with { TargetId = Guid.NewGuid() } : change;
             var plan = Policy.Plan(tx.Application, tx.Team, actor, normalized, directory, administrators, now);
+            // Reject prohibited group grants before an operation is queued or an approval
+            // is requested. The worker's independent Keycloak connector retains its
+            // fail-closed enforcement if a config changes after request submission.
+            if (normalized.Kind == ChangeKind.GrantAccess)
+            {
+                var principal = directory.SingleOrDefault(p => p.Id == normalized.PrincipalId
+                    && p.RealmKey == tx.Application.RealmKey);
+                if (principal?.Kind == PrincipalKind.Group
+                    && groupGrants?.Allows(tx.Application.RealmKey) != true)
+                    throw new DomainException("group_mapping_disabled",
+                        "Delegated group grants require central IAM approval of Keycloak Groups.manage exposure.", 403);
+            }
             var operation = new Operation(Guid.NewGuid(), appId, actor, normalized, expectedRevision, idempotencyKey,
                 hash, plan.ApprovalRequired ? OperationStatus.AwaitingApproval : OperationStatus.Queued, now, now, 0);
             await tx.SaveOperationAsync(operation, ct);
