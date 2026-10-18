@@ -47,6 +47,21 @@ public sealed class AuditPrivacyTests
     }
 
     [Fact]
+    public void Existing_operations_without_new_optional_decision_reason_remain_deserializable()
+    {
+        var f = new Fixture();
+        var operation = new Operation(Guid.NewGuid(), f.App.Id, f.Owner, f.Grant(),
+            f.App.Revision, "legacy-idempotency", "original-hash",
+            OperationStatus.AwaitingApproval, f.Clock.Now, f.Clock.Now, 0);
+        var data = System.Text.Json.Nodes.JsonNode.Parse(Wire.Serialize(operation))!.AsObject();
+        data.Remove("decisionReason");
+        var restored = Wire.Deserialize<Operation>(data.ToJsonString());
+        Assert.Null(restored.DecisionReason);
+        Assert.Equal(operation.Id, restored.Id);
+        Assert.Equal(operation.Status, restored.Status);
+    }
+
+    [Fact]
     public void Central_iam_evidence_is_not_embedded_verbatim_in_immutable_audit_metadata()
     {
         var value = "SEC-1234 / alice.personal@permora.invalid / internal case";
