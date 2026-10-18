@@ -17,7 +17,16 @@ Primärquellen, am 16.10.2026 geprüft: [Microsoft .NET 10 Downloads](https://do
 
 Alle Prozesse lesen die normale .NET-Konfiguration. Optional lädt `PERMORA_CONFIG` eine explizit angegebene JSON-Datei; Umgebungsvariablen überschreiben deren Werte. `ConnectionStrings__Portal` oder `Portal__Authority` sind entsprechende Environment-Overrides. Keine vom Browser stammenden Pfade/URLs als Connector-Konfiguration verwenden.
 
-`config/portal.example.json` enthält dokumentierte Platzhalter für API/Worker. Der API-Prozess benötigt keine administrativen Keycloak-Service-Geheimnisse; nur der Worker erhält diese gemountet. Für den Provisioner eine **separate** Datei aus `config/provisioner.example.json` und einen separaten Secret-Mount verwenden.
+Die Beispiele sind pro Prozess getrennt:
+`config/portal.example.json` für die API ohne Keycloak-Admin-Secrets,
+`config/worker.example.json` mit getrennten administrativen
+`Roles`-, `Assignments`- und `Directory`-Serviceidentitäten und
+`config/provisioner.example.json` für das Onboarding. Die API liest
+ausschließlich den nicht geheimen
+`Keycloak:Realms:<realm>:AllowGroupRoleGrants`-Schalter, standardmäßig
+`false`. Ein freigegebener Gruppen-Opt-in muss separat in API und Worker
+gesetzt sein. Die tatsächliche Remote-Autorisierung und Readback-Prüfung
+bleiben Aufgabe des Workers.
 
 `python3 scripts/init-local.py` erzeugt ignorierte, lokale Zufallsgeheimnisse und einen Development-only-Katalogzugang. Vorhandene Dateien werden nicht überschrieben. Nicht in einer produktiven Umgebung ausführen. Demo-Anwendungen besitzen bewusst keine fingierten effektiven Rechte.
 
