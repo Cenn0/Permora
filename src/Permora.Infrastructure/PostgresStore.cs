@@ -180,6 +180,73 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
         await tx.CommitAsync(ct);
     }
 
+    /// <summary>
+    /// Purge only sufficiently old, unreferenced directory search snapshots.
+    /// Never delete audit records, active grants, group members with effective
+    /// assigned group roles, team members or principals in open operations.
+    /// Caller must have completed a successful authoritative directory sync.
+    /// Disabled by default unless an organization explicitly sets retention.
+    /// </summary>
+    public async Task<int> PruneUnreferencedDirectoryAsync(
+        string realm, DateTimeOffset olderThan, int limit, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(realm) || limit is < 1 or > 1000
+            || olderThan > DateTimeOffset.UtcNow.AddDays(-30))
+            throw new ArgumentException("A realm, bounded batch and minimum 30-day retention are required.");
+
+        await using var connection = await source.OpenConnectionAsync(ct);
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+        // The same per-realm lock is taken by ReplaceDirectoryAsync.
+        await using (var gate = new NpgsqlCommand(
+            "SELECT pg_advisory_xact_lock(hashtextextended(@realm, 11))", connection, transaction))
+        {
+            gate.Parameters.AddWithValue("realm", realm);
+            await gate.ExecuteNonQueryAsync(ct);
+        }
+        await using var command = new NpgsqlCommand("""
+            WITH candidates AS (
+                SELECT d.id FROM directory d
+                WHERE d.realm_key=@realm
+                  AND (d.document->>'syncedAt')::timestamptz < @cutoff
+                  AND NOT EXISTS (
+                    SELECT 1 FROM teams t
+                    CROSS JOIN LATERAL jsonb_array_elements(t.document->'members') m
+                    WHERE m->>'subjectKey' = d.document->>'subjectKey')
+                  AND NOT EXISTS (
+                    SELECT 1 FROM applications a
+                    CROSS JOIN LATERAL jsonb_array_elements(a.document->'assignments') assigned
+                    WHERE a.realm_key=d.realm_key
+                      AND assigned->>'principalId'=d.id::text)
+                  AND NOT EXISTS (
+                    SELECT 1 FROM operations o
+                    JOIN applications a ON a.id=o.application_id
+                    WHERE a.realm_key=d.realm_key
+                      AND o.status IN ('AwaitingApproval', 'Queued', 'Applying', 'Conflict', 'Failed')
+                      AND (o.document->'change'->>'principalId'=d.id::text
+                           OR o.actor_key=d.document->>'subjectKey'
+                           OR o.document->'approvedBy'->>'key'=d.document->>'subjectKey'))
+                  AND NOT EXISTS (
+                    SELECT 1 FROM directory grp
+                    JOIN applications a ON a.realm_key=d.realm_key
+                    WHERE grp.realm_key=d.realm_key AND grp.document->>'kind'='Group'
+                      AND COALESCE(grp.document->'effectiveMemberKeys','[]'::jsonb)
+                          ? (d.document->>'subjectKey')
+                      AND EXISTS (
+                        SELECT 1 FROM jsonb_array_elements(a.document->'assignments') ga
+                        WHERE ga->>'principalId'=grp.id::text))
+                ORDER BY (d.document->>'syncedAt')::timestamptz, d.id
+                LIMIT @limit FOR UPDATE OF d
+            )
+            DELETE FROM directory d USING candidates c WHERE d.id=c.id
+            """, connection, transaction);
+        command.Parameters.AddWithValue("realm", realm);
+        command.Parameters.AddWithValue("cutoff", olderThan);
+        command.Parameters.AddWithValue("limit", limit);
+        var deleted = await command.ExecuteNonQueryAsync(ct);
+        await transaction.CommitAsync(ct);
+        return deleted;
+    }
+
     public async Task<IReadOnlyList<Guid>> DueApplicationsAsync(DateTimeOffset now, int limit, Guid afterId, CancellationToken ct)
     {
         await using var connection = await source.OpenConnectionAsync(ct);

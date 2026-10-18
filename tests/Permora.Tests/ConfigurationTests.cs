@@ -94,4 +94,30 @@ public sealed class ConfigurationTests
             ConfigurationChecks.ReadPortalConnectionString(config));
     }
 
+    [Fact]
+    public void Directory_retention_requires_an_explicit_privacy_policy()
+    {
+        Assert.Null(ConfigurationChecks.ReadDirectoryRetentionDays(
+            new ConfigurationBuilder().Build()));
+        var enabled = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["Privacy:UnreferencedDirectoryRetentionDays"] = "180" }).Build();
+        Assert.Equal(180, ConfigurationChecks.ReadDirectoryRetentionDays(enabled));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("0")]
+    [InlineData("29")]
+    [InlineData("-90")]
+    [InlineData("3651")]
+    [InlineData("never")]
+    [InlineData("90.5")]
+    public void Invalid_retention_cannot_silently_delete_personal_directory_data(string days)
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["Privacy:UnreferencedDirectoryRetentionDays"] = days }).Build();
+        Assert.Throws<InvalidOperationException>(() =>
+            ConfigurationChecks.ReadDirectoryRetentionDays(config));
+    }
+
 }

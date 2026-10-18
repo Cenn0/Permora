@@ -26,6 +26,8 @@ builder.Services.AddSingleton<IPortalStore>(p => p.GetRequiredService<PostgresSt
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IReadOnlySet<string>>(ConfigurationChecks.Administrators(portal));
 builder.Services.AddSingleton(keycloak);
+builder.Services.AddSingleton(new DirectoryRetentionPolicy(
+    ConfigurationChecks.ReadDirectoryRetentionDays(builder.Configuration)));
 builder.Services.AddHttpClient<KeycloakConnector>(http => http.Timeout = TimeSpan.FromSeconds(15))
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddTransient<IAccessConnector>(p => p.GetRequiredService<KeycloakConnector>());
