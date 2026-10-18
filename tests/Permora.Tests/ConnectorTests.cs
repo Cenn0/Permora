@@ -111,7 +111,7 @@ public sealed class ConnectorTests
                     mapped = false;
                     return new HttpResponseMessage(HttpStatusCode.NoContent);
                 }
-                return Json(mapped ? [role] : Array.Empty<object>());
+                return Json(mapped ? new object[] { role } : Array.Empty<object>());
             }
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
