@@ -92,6 +92,18 @@ risikobewertet, auf zulässige Gruppen begrenzt und aktiv überwacht wird.
 Für realen Produktivbetrieb sind alle Scope-/Token-/Admin-REST-Aktionen
 dieses Kontos vollständig abzunehmen.
 
+**Zwei getrennte Prüfgrenzen:** Bereits die API lehnt einen neuen
+`GrantAccess`-Antrag für eine Gruppe synchron mit
+`403 group_mapping_disabled` ab, bevor ein Approval- oder Worker-Auftrag
+persistiert wird. Die API liest dafür ausschließlich das nicht geheime
+`Keycloak:Realms:<realm>:AllowGroupRoleGrants`-Flag. Sie benötigt **keine**
+`Roles`-, `Assignments`- oder `Directory`-Servicecredentials. Der Worker
+prüft denselben Schalter im Keycloak-Connector **erneut unmittelbar vor dem
+Remote-Write**. Ein IAM-geprüfter Opt-in muss deshalb in der API- und
+Worker-Konfiguration explizit und konsistent stehen. Ein API-`202 Accepted`
+beweist weiterhin ausschließlich die Annahme des Auftrags; nur ein
+Keycloak-Readback nach dem Worker-Lauf belegt eine tatsächliche Zuweisung.
+
 Sicherheitskritische **RevokeAccess**-Aufträge bleiben auch bei deaktivierten
 Gruppengrants möglich; ein Incident darf nicht daran scheitern, dass die
 Erweiterungssperre aktiv ist. Das Umschalten ändert keine bestehenden
