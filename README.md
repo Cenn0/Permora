@@ -18,7 +18,17 @@
 
 Permora is an independent open-source **C# / Angular portal** designed to let application teams manage their own roles, fine-grained permissions, and access requests. Central IAM administrators retain control over the realm and cross-application security policies.
 
-> **Status: CI-tested development version, not approved for production.** Current development CI covers .NET/Angular builds, real PostgreSQL/xUnit, frontend and Playwright tests, selected Keycloak 26.8.1 FGAP role/user/group tests, and **real Chromium → Keycloak → ASP.NET BFF password-only login, cookie/CSRF and denial of low-assurance privileged writes**. It also builds a non-root Docker image, generates a partial offline CycloneDX NuGet/npm package inventory, and tests isolated PostgreSQL backup/restore. **Production-like positive MFA/step-up, enterprise LDAP/AD, full delegated rights isolation, full system disaster recovery, complete SBOM/third-party licenses, load/HA and independent penetration testing remain open.** [CI evidence](docs/ci.md) · [Release gates](docs/release-checklist.md) · [Roadmap](docs/roadmap.md).
+> **Status: extensively CI-tested development version, NOT production-approved.**
+> The verified [main-commit acceptance matrix](docs/release-checklist.md) includes
+> real Keycloak 26.8.1 FGAP and LoA2/TOTP browser authentication, OpenLDAP/LDAPS
+> imported and non-imported identities, two real worker processes under fault
+> injection, PostgreSQL/Keycloak restore, encrypted cross-replica BFF sessions,
+> automated WCAG A/AA scanning, and actual-image CycloneDX/SPDX inventories.
+> An OIDC/Sigstore-signed **draft development candidate** exists; it is not a
+> production release. **Microsoft Active Directory-specific behavior, actual
+> multi-host TLS/HA, corporate secret rotation and RPO/RTO, manual accessibility,
+> third-party license/legal approval, privacy retention/WORM and independent
+> penetration testing remain open.**
 
 ## Scope
 
@@ -30,7 +40,7 @@ Permora is an independent open-source **C# / Angular portal** designed to let ap
 
 The critical security boundary remains **centralized**: realm settings, cross-application privileges, IAM policy, and approval of newly prepared clients/delegation rights are outside team self-service. Prepared clients remain disabled until the documented IAM approval. An HTTP `202 Accepted` response **does not** prove a change has taken effect in Keycloak.
 
-**Not yet implemented or accepted:** Automatic FGAP provisioning, complete cross-issuer identity correlation, ABAC, full HR/AD integration, externally immutable audit storage, and load, recovery, and penetration testing. The [roadmap](docs/roadmap.md) distinguishes implemented source code, executed tests, and outstanding acceptance criteria.
+**Not yet implemented or accepted:** Automatic FGAP provisioning, full cross-issuer identity correlation, ABAC, HR/Microsoft AD-specific integration and external WORM/SIEM. Isolated load and recovery scenarios have passed, but production-scale HA, disaster-recovery targets and independent penetration/privacy approval are still open. The [roadmap](docs/roadmap.md) distinguishes implemented source code, executed tests, and outstanding acceptance criteria.
 
 ## Trust boundaries
 
