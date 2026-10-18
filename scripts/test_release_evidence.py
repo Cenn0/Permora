@@ -3,8 +3,20 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
-from build_release_evidence import safe_archive, safe_name
+from importlib.util import module_from_spec, spec_from_file_location
 from release_sbom import merge, validate_graph
+
+# The release builder is a CLI with a hyphenated filename, not a Python module.
+# Load that exact checked-in file to test its production code without renaming it.
+_builder_spec = spec_from_file_location(
+    "build_release_evidence", Path(__file__).with_name("build-release-evidence.py")
+)
+if _builder_spec is None or _builder_spec.loader is None:
+    raise RuntimeError("Cannot locate the release evidence builder")
+_builder = module_from_spec(_builder_spec)
+_builder_spec.loader.exec_module(_builder)
+safe_archive = _builder.safe_archive
+safe_name = _builder.safe_name
 
 
 def bom():
