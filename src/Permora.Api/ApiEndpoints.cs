@@ -170,7 +170,7 @@ public static class ApiEndpoints
                 var op = new Operation(Guid.NewGuid(), id, actor, command, tx.Application.Revision,
                     $"binding:{Guid.NewGuid()}", Wire.Hash(Wire.Serialize(command)), OperationStatus.Queued, now, now, 0);
                 await tx.SaveOperationAsync(op, ct);
-                await tx.AppendAuditAsync(actor, "binding.approved", input.ClientId, now, ct);
+                await tx.AppendAuditAsync(actor, "binding.approved", AuditDetails.ClientBinding(input.ClientId), now, ct);
                 return tx.Application;
             }, ct));
         admin.MapPost("/applications/{id:guid}/iam-approval", async (Guid id, ConfirmIamApproval input,
