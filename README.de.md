@@ -18,19 +18,19 @@
 
 Permora ist ein eigenständiges, quelloffenes **C#-/Angular-Portal** für die eingeschränkte Verwaltung eigener Anwendungen. Anwendungsteams können fachliche Rollen, Einzelberechtigungen und Zugriffsanträge bearbeiten, ohne die zentrale Realm-Verwaltung zu erhalten.
 
-> **Status: umfangreich CI-geprüfter Entwicklungsstand, NICHT produktionsfreigegeben.**
+> **Status: Open-Source-Entwicklungsstand mit nachweisbaren, begrenzten CI-Tests.**
 > Die aktuelle [Abnahmematrix](docs/release-checklist.md) belegt echte
 > Keycloak-26.8.1-FGAP- und LoA2/TOTP-Browserprüfungen, OpenLDAP/LDAPS mit
 > importierten und nicht importierten Identitäten, zwei reale Worker unter
 > Netz-/Absturzfehlern, isolierte Keycloak-/PostgreSQL-Wiederherstellung,
 > verschlüsselte BFF-Sitzungen über mehrere Instanzen, automatisierte
 > WCAG-A/AA-Prüfungen sowie CycloneDX-/SPDX-Inventare tatsächlich gebauter
-> Container. Ein signierter **Draft-Entwicklungskandidat** existiert, aber
-> kein produktionsfreigegebener Release.
+> Container. Ein signierter **Draft-Entwicklungskandidat** existiert;
+> ein allgemein bereitgestelltes Paket wird nicht behauptet.
 > **Microsoft-AD-spezifische Integration, echter Multi-Host-TLS-/HA-Betrieb,
-> produktive Schlüssel-/Secret-Rotation und RPO/RTO, manuelle Accessibility,
-> rechtliche Lizenzprüfung, Datenschutz-Retention/WORM und ein unabhängiger
-> Penetrationstest bleiben offen.**
+> betriebliche Schlüssel-/Secret-Rotation und gemessene Recovery-Ziele,
+> manuelle Accessibility-Tests, Drittanbieter-Lizenzkonformität,
+> Datenschutz-Retention/WORM und unabhängige Penetrationstests sind ungeprüft.****
 
 ## Was Permora abdeckt
 
@@ -42,21 +42,23 @@ Permora ist ein eigenständiges, quelloffenes **C#-/Angular-Portal** für die ei
 
 Die wesentliche Sicherheitsgrenze bleibt **zentral**: Realm-Einstellungen, übergreifende Berechtigungen, IAM-Sicherheitsrichtlinien und die Freigabe neuer Clients/Delegationsrechte gehören nicht zum Self-Service. Neu vorbereitete Clients bleiben bis zur dokumentierten IAM-Abnahme deaktiviert. Eine API-Antwort `202 Accepted` bedeutet **nicht**, dass eine Änderung bereits in Keycloak wirksam ist.
 
-**Noch nicht umgesetzt oder vollständig abgenommen** sind automatisches FGAP-Provisioning, vollständige externe Identitätskorrelation, ABAC, HR-/Microsoft-AD-spezifische Integration sowie externe unveränderliche Audit-Speicherung. Isolierte Last- und Wiederanlaufprüfungen wurden erfolgreich ausgeführt; produktiver Multi-Host-Betrieb, verbindliche Recovery-Ziele und die unabhängige Sicherheits-/Datenschutzfreigabe bleiben offen. Die [Roadmap](docs/roadmap.md) unterscheidet Quellcode, ausgeführte Tests und offene Abnahmekriterien.
+**Noch nicht umgesetzt oder nicht abschließend überprüft** sind automatisches FGAP-Provisioning, vollständige externe Identitätskorrelation, ABAC, HR-/Microsoft-AD-spezifische Integration sowie externe unveränderliche Audit-Speicherung. Isolierte Last- und Wiederanlaufprüfungen wurden erfolgreich ausgeführt; realer Multi-Host-Betrieb, messbare Recovery-Ziele und unabhängige Sicherheits-/Datenschutztests stehen aus. Die [Roadmap](docs/roadmap.md) unterscheidet Quellcode, ausgeführte Tests und offene Abnahmekriterien.
 
 ## Vertrauensgrenzen
 
 ```mermaid
 flowchart LR
-  T[Anwendungsteam im Browser] -->|Session / CSRF| A[Permora BFF und API]
-  A --> P[(Portal PostgreSQL)]
-  W[Getrennter Worker] --> P
-  W -->|Begrenzte Admin-Aufrufe| K[Keycloak Admin API]
-  I[Zentrale IAM-Stelle] -->|Attestierte Freigabe im Portal| A
-  Z[Isolierter Provisioner] -->|Deaktivierte Clients vorbereiten| K
+  Browser["Anwendungsteams im Browser"] --> BFF["Permora BFF und API"]
+  Browser -. "OIDC-Anmeldung" .-> IdP["Keycloak Identity Provider"]
+  BFF --> DB[("Portal PostgreSQL")]
+  Worker["Separater Provisioning-Worker"] --> DB
+  Worker -->|"Begrenzte Admin-Aufrufe"| KC["Keycloak Admin API"]
+  IAM["Zentrale IAM-Stelle"] -->|"Prüfung und Entscheidung"| BFF
+  Provisioner["Isolierter Client-Provisioner"] -->|"Deaktivierte Clients vorbereiten"| KC
+  KC --- IdP
 ```
 
-Dies beschreibt eine **Architekturgrenze**, keine nachgewiesene produktive Berechtigungsisolation. Client-Aktivierung erfordert eine zentrale IAM-Freigabe; angenommene Änderungsaufträge müssen mit Keycloak abgeglichen werden. [Architektur](docs/architecture.md), [Sicherheitsmodell](docs/security.md) und [CI-Nachweise](docs/ci.md) trennen Funktion, Herstellersupport und Sicherheitsabnahme.
+Dies beschreibt eine **Architekturgrenze**, keinen Nachweis für sichere Berechtigungsisolation in beliebigen Installationen. Client-Aktivierung erfordert eine zentrale IAM-Freigabe; angenommene Änderungsaufträge müssen mit Keycloak abgeglichen werden. [Architektur](docs/architecture.md), [Sicherheitsmodell](docs/security.md) und [CI-Nachweise](docs/ci.md) trennen Funktion, Herstellersupport und Sicherheitsabnahme.
 
 ## Technische Basis
 
@@ -105,14 +107,14 @@ npm start
 
 Die Oberfläche ist unter **http://localhost:4200** erreichbar. Der lokale `demo-owner`-Zugang ist ausdrücklich **nur für Development**, kein produktives Single Sign-on. Der Keycloak-Entwicklungscontainer konfiguriert noch keine produktiven Realm-/FGAP-Rechte; dafür ist eine separate [IAM-Anbindung](docs/keycloak.md) nötig.
 
-## Tests und Freigabestatus
+## Tests und technische Nachweise
 
 ```bash
 bash scripts/check.sh --lightweight
 bash scripts/check.sh
 ```
 
-`--lightweight` prüft Repository-Struktur und isolierte Frontend-Logik. Die Paket-Lockfiles sind inzwischen eingecheckt und werden in der CI validiert. Der vollständige lokale Lauf benötigt zusätzlich passende SDKs sowie eine **isolierte** PostgreSQL-Testdatenbank über `PERMORA_TEST_POSTGRES`. Die [GitHub-Actions-CI](.github/workflows/ci.yml) testet gesperrte Restores, .NET/Angular, ausgewählte echte Keycloak-FGAP-Fälle und den Docker-Build **ohne Veröffentlichung oder Deployment**. Das ersetzt keine Produktionsabnahme.
+`--lightweight` prüft Repository-Struktur und isolierte Frontend-Logik. Die Paket-Lockfiles sind inzwischen eingecheckt und werden in der CI validiert. Der vollständige lokale Lauf benötigt zusätzlich passende SDKs sowie eine **isolierte** PostgreSQL-Testdatenbank über `PERMORA_TEST_POSTGRES`. Die [GitHub-Actions-CI](.github/workflows/ci.yml) testet gesperrte Restores, .NET/Angular, ausgewählte echte Keycloak-FGAP-Fälle und den Docker-Build **ohne Veröffentlichung oder Deployment**. Grüne Tests belegen nur die geprüften Fälle; verbleibende Risiken stehen in der [Nachweismatrix](docs/release-checklist.md).
 
 [Entwicklungsanleitung](docs/development.md) · [CI-Abdeckung](docs/ci.md) · [Testvoraussetzungen](docs/testing.md) · [Prüfergebnisse](docs/review.md)
 
