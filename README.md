@@ -18,17 +18,16 @@
 
 Permora is an independent open-source **C# / Angular portal** designed to let application teams manage their own roles, fine-grained permissions, and access requests. Central IAM administrators retain control over the realm and cross-application security policies.
 
-> **Status: extensively CI-tested development version, NOT production-approved.**
+> **Status: open-source development version with scoped automated test evidence.**
 > The verified [main-commit acceptance matrix](docs/release-checklist.md) includes
 > real Keycloak 26.8.1 FGAP and LoA2/TOTP browser authentication, OpenLDAP/LDAPS
 > imported and non-imported identities, two real worker processes under fault
 > injection, PostgreSQL/Keycloak restore, encrypted cross-replica BFF sessions,
 > automated WCAG A/AA scanning, and actual-image CycloneDX/SPDX inventories.
-> An OIDC/Sigstore-signed **draft development candidate** exists; it is not a
-> production release. **Microsoft Active Directory-specific behavior, actual
-> multi-host TLS/HA, corporate secret rotation and RPO/RTO, manual accessibility,
-> third-party license/legal approval, privacy retention/WORM and independent
-> penetration testing remain open.**
+> An OIDC/Sigstore-signed **draft development candidate** exists; no generally distributed release is claimed. **Microsoft Active Directory-specific behavior, real
+> multi-host TLS/HA, operational key/secret rotation and measured recovery objectives,
+> manual accessibility testing, third-party license compliance, privacy retention/WORM
+> and independent penetration testing remain unverified.**
 
 ## Scope
 
@@ -40,21 +39,23 @@ Permora is an independent open-source **C# / Angular portal** designed to let ap
 
 The critical security boundary remains **centralized**: realm settings, cross-application privileges, IAM policy, and approval of newly prepared clients/delegation rights are outside team self-service. Prepared clients remain disabled until the documented IAM approval. An HTTP `202 Accepted` response **does not** prove a change has taken effect in Keycloak.
 
-**Not yet implemented or accepted:** Automatic FGAP provisioning, full cross-issuer identity correlation, ABAC, HR/Microsoft AD-specific integration and external WORM/SIEM. Isolated load and recovery scenarios have passed, but production-scale HA, disaster-recovery targets and independent penetration/privacy approval are still open. The [roadmap](docs/roadmap.md) distinguishes implemented source code, executed tests, and outstanding acceptance criteria.
+**Not implemented or not verified:** Automatic FGAP provisioning, full cross-issuer identity correlation, ABAC, HR/Microsoft AD-specific integration and external WORM/SIEM. Isolated load and recovery scenarios have passed, but real multi-host HA, measured recovery objectives and independent security/privacy assessments remain outstanding. The [roadmap](docs/roadmap.md) distinguishes implemented source code, executed tests, and outstanding acceptance criteria.
 
 ## Trust boundaries
 
 ```mermaid
 flowchart LR
-  T[Application team in browser] -->|Session / CSRF| A[Permora BFF and API]
-  A --> P[(Portal PostgreSQL)]
-  W[Separate worker] --> P
-  W -->|Scoped admin calls| K[Keycloak Admin API]
-  I[Central IAM approver] -->|Attested approval in portal| A
-  Z[Isolated provisioner] -->|Prepare disabled clients| K
+  Browser["Application teams in browser"] --> BFF["Permora BFF and API"]
+  Browser -. "OIDC sign-in" .-> IdP["Keycloak identity provider"]
+  BFF --> Store[("Portal PostgreSQL")]
+  Worker["Separate provisioning worker"] --> Store
+  Worker -->|"Scoped admin calls"| API["Keycloak Admin API"]
+  IAM["Central IAM administrator"] -->|"Review and decision"| BFF
+  Provisioner["Isolated client provisioner"] -->|"Prepare disabled clients"| API
+  API --- IdP
 ```
 
-This is a **design boundary**, not proof of production permission isolation. A central IAM approval is required before client activation, and any accepted change request must be reconciled against Keycloak. The [architecture](docs/architecture.md), [security model](docs/security.md) and [CI evidence](docs/ci.md) distinguish technical behavior, Keycloak support and security acceptance.
+This is a **design boundary**, not evidence that every deployment securely isolates permissions. Central IAM approval is required before client activation, and accepted changes must be reconciled against Keycloak. The [architecture](docs/architecture.md), [security model](docs/security.md) and [CI evidence](docs/ci.md) distinguish technical behavior, Keycloak support and security acceptance.
 
 ## Technology
 
@@ -101,7 +102,7 @@ npm ci
 npm start
 ```
 
-Open **http://localhost:4200**. The local `demo-owner` login is enabled **for development only**; it is not production SSO. The Keycloak development container does not configure a production realm or fine-grained permissions on its own. Follow the separate [Keycloak integration guide](docs/keycloak.md) before testing actual remote changes.
+Open **http://localhost:4200**. The local `demo-owner` login is enabled **for development only**; it is not the configured OIDC login path. The Keycloak development container does not configure a production realm or fine-grained permissions on its own. Follow the separate [Keycloak integration guide](docs/keycloak.md) before testing actual remote changes.
 
 ## Tests and readiness
 
@@ -110,7 +111,7 @@ bash scripts/check.sh --lightweight
 bash scripts/check.sh
 ```
 
-`--lightweight` checks repository structure and isolated frontend logic. Dependency lockfiles are committed and validated in CI; the full local check additionally requires the correct SDKs and a **dedicated** PostgreSQL test database configured through `PERMORA_TEST_POSTGRES`. The [GitHub Actions CI](.github/workflows/ci.yml) runs locked restores, .NET/Angular tests, selected real Keycloak FGAP integration cases and a Docker image build **without publishing or deploying**. Passing these checks does not constitute production acceptance.
+`--lightweight` checks repository structure and isolated frontend logic. Dependency lockfiles are committed and validated in CI; the full local check additionally requires the correct SDKs and a **dedicated** PostgreSQL test database configured through `PERMORA_TEST_POSTGRES`. The [GitHub Actions CI](.github/workflows/ci.yml) runs locked restores, .NET/Angular tests, selected real Keycloak FGAP integration cases and a Docker image build **without publishing or deploying**. Passing checks demonstrates only the exercised test matrix; see [remaining engineering and security gaps](docs/release-checklist.md).
 
 [Development guide](docs/development.md) · [CI coverage](docs/ci.md) · [Test requirements](docs/testing.md) · [Evidence and outstanding checks](docs/review.md)
 
