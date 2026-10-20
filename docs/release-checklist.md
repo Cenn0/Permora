@@ -18,6 +18,29 @@ engineering controls from missing external/operator acceptance. The unresolved
 Groups.manage blast radius is documented in
 [issue #46](https://github.com/Cenn0/Permora/issues/46).
 
+## Updated verified source snapshot (20 October 2026)
+
+`main` at
+[`5017624d57aecb65758553a8d017a02d6636be4c`](https://github.com/Cenn0/Permora/commit/5017624d57aecb65758553a8d017a02d6636be4c)
+passed six [exact-SHA
+workflows](https://github.com/Cenn0/Permora/actions/runs/39398135314),
+including the Keycloak/LDAP system test, worker/recovery, accessibility,
+documentation and artifact integrity.
+[Run #39398135494](https://github.com/Cenn0/Permora/actions/runs/39398135494)
+created the signed **draft-only** tag
+`candidate-5017624d57ae-run39398135494` (25 assets). It is not
+a published community release or independent security validation.
+Release-specific human/license/privacy decisions remain separate.
+
+**Current P2 engineering work:** A new
+[FGAP Group acceptance matrix](keycloak-fgap-acceptance.md)
+adds same-delegated-token probes of foreign group edits/deletions and
+membership changes, plus bootstrap-admin postcondition checks.
+The new source itself requires passing live Keycloak CI at the
+**new** commit before it becomes execution evidence.
+`Groups.manage`'s non-mapping powers remain a documented open risk
+even if all expected negative probes pass. R03 and R06 remain partial.
+
 A green development CI, a signed development candidate, an automated WCAG scan
 and an isolated successful restore do **not** constitute production approval,
 Microsoft AD certification, GDPR compliance or a penetration test.
