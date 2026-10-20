@@ -9,6 +9,7 @@ Permora is an independent, open-source C# / Angular portal for **delegated Keycl
 | Understand the main value and trust boundaries | [Project README](../README.md) · [Architecture](architecture.md) |
 | Run a local development environment | [Development](development.md) |
 | Integrate with Keycloak and understand delegated permissions | [Keycloak](keycloak.md) |
+| Test the real FGAP group permission blast radius and deployment controls | [FGAP group acceptance matrix](keycloak-fgap-acceptance.md) |
 | Review tenant/application isolation and security requirements | [Security model](security.md) |
 | Review personal-data inventory, retention and rights-handling acceptance | [Privacy and data retention](privacy.md) |
 | Learn typed application API contracts | [API](api.md) |
