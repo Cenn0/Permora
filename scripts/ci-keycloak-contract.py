@@ -403,7 +403,8 @@ def run():
         finally:
             # Tests never leave altered group metadata behind, even when an
             # unexpected HTTP response or a read-back assertion fails.
-            request("PUT", allowed_group_path, group_before, token=master_token)
+            request("PUT", allowed_group_path,
+                    {"id": group, "name": group_name}, token=master_token)
             restored = request("GET", allowed_group_path, token=master_token)[1]
             check(restored["name"] == group_name,
                   "Group metadata restored with isolated bootstrap identity")
