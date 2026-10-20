@@ -1,5 +1,29 @@
 # Permora – Product & Engineering Roadmap (V2)
 
+> **Aktueller Engineering-Checkpoint (20.10.2026):** `main` auf
+> [`c83711c26920`](https://github.com/Cenn0/Permora/commit/c83711c269204ada7f3dade33b68a036e373962c)
+> hat nach Merge von [PR #57](https://github.com/Cenn0/Permora/pull/57)
+> **alle sechs relevanten Workflows erfolgreich** durchlaufen:
+> [Core CI](https://github.com/Cenn0/Permora/actions/runs/39416605015)
+> (221/221 xUnit),
+> [echte LDAPS-/Keycloak-Föderation](https://github.com/Cenn0/Permora/actions/runs/39416604931),
+> [Worker/Recovery](https://github.com/Cenn0/Permora/actions/runs/39416605037),
+> [Accessibility](https://github.com/Cenn0/Permora/actions/runs/39416604905),
+> [Artefaktintegrität](https://github.com/Cenn0/Permora/actions/runs/39416604980)
+> und [Dokumentation](https://github.com/Cenn0/Permora/actions/runs/39416605443).
+> Die LDAP-Suite prüft jetzt den **realen Wechsel geerbter Keycloak-Rollen
+> beim externen Entfernen/Hinzufügen und Wiederherstellen** von Mitgliedschaften
+> (importierte und nicht importierte OpenLDAP-Benutzer). P4-Autorisierungs-
+> und SoD-Regressionen sind ergänzt. **Nicht nachgewiesen** ist ein
+> zusammenhängender Worker-zu-LDAPS-End-to-End-Entzug; siehe
+> [Issue #58](https://github.com/Cenn0/Permora/issues/58).
+> [Release #3](https://github.com/Cenn0/Permora/issues/3) und
+> [FGAP-Scope #46](https://github.com/Cenn0/Permora/issues/46)
+> bleiben offen. Die nachfolgenden Checkpoints vom 17.–18.10. bzw.
+> `5017624d` sind historische Zwischenstände, **keine** aktuellen
+> Produktionsfreigaben.
+
+
 > **Stand der Abnahme am 18.10.2026:** Die nachfolgende V2-Roadmap enthält
 > noch ihren **historischen Ist-Stand vom 17.10.2026** und bewusst offene
 > Plan-Checkboxen. Sie sind **keine aktuelle Aussage, dass alle darunter
