@@ -1,5 +1,29 @@
 # Permora – Product & Engineering Roadmap (V2)
 
+> **Neuer P4-Checkpoint am 20.10.2026:** [PR #60](https://github.com/Cenn0/Permora/pull/60)
+> wurde als [`e3bfcf6ca6b2`](https://github.com/Cenn0/Permora/commit/e3bfcf6ca6b234d4f2082aaa633d95e95cfffbc4)
+> auf `main` gemergt. Alle **sieben** PR-Workflows auf dem exakten
+> Test-Commit `dacae649479d` bestanden: [echte durchgängige
+> LDAPS/Keycloak/PostgreSQL/Worker-Integration](https://github.com/Cenn0/Permora/actions/runs/39432701299),
+> [Core-CI](https://github.com/Cenn0/Permora/actions/runs/39432701392),
+> [Worker-/Recovery-Tests](https://github.com/Cenn0/Permora/actions/runs/39432701343),
+> [96-Entzüge-Lasttest](https://github.com/Cenn0/Permora/actions/runs/39432701364),
+> [Accessibility](https://github.com/Cenn0/Permora/actions/runs/39432701535),
+> [Public Docs](https://github.com/Cenn0/Permora/actions/runs/39432701384)
+> und [Artefaktintegrität](https://github.com/Cenn0/Permora/actions/runs/39432701640).
+> Der real laufende Worker verarbeitet nun in einem einzigen isolierten Test
+> eine externe LDAP-Gruppenänderung bis zur geprüften Keycloak-Rollenzuweisungs-
+> Entfernung. Die Test-Serviceidentität hat `fullScopeAllowed=false`
+> mit notwendiger expliziter Rollenscope-Zuweisung für Directory-Reads.
+> **P4/R07 ist dennoch nur TEILWEISE** abgeschlossen: Worker-End-to-End für
+> nicht importierte LDAP-Benutzer, Federationsausfälle und alle realen AD-
+> Spezialfälle fehlen weiterhin, siehe [#58](https://github.com/Cenn0/Permora/issues/58).
+> Auch die Betreiber-, Rechts-, Sicherheits- und Release-Gates aus
+> [#3](https://github.com/Cenn0/Permora/issues/3) sowie der breite
+> [`Groups.manage`-Scope #46](https://github.com/Cenn0/Permora/issues/46)
+> sind **offen**. Ein erfolgreicher CI-Lauf ist keine Produktionszulassung.
+
+
 > **Aktueller Engineering-Checkpoint (20.10.2026):** `main` auf
 > [`c83711c26920`](https://github.com/Cenn0/Permora/commit/c83711c269204ada7f3dade33b68a036e373962c)
 > hat nach Merge von [PR #57](https://github.com/Cenn0/Permora/pull/57)
