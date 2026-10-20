@@ -123,4 +123,69 @@ public sealed class DirectoryGovernanceTests
         Assert.Empty(DirectoryGovernance.UnverifiableGroupAssignments(app, [group], f.Clock.Now));
     }
 
+
+    [Fact]
+    public void External_membership_churn_recomputes_revocations_without_sticky_decisions()
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group, EffectiveMemberKeys = [f.Approver.Key] };
+        var app = f.App with
+        {
+            Policy = f.App.Policy with { SeparationRules = [new(f.Reader.Id, f.Supervisor.Id, "Conflict")] },
+            Assignments = [f.Assignment(f.Reader.Id, f.OwnerPrincipal.Id), f.Assignment(f.Supervisor.Id, group.Id)]
+        };
+        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(app, [f.OwnerPrincipal, group], f.Clock.Now));
+        var joined = group with { EffectiveMemberKeys = [f.Approver.Key, f.Owner.Key] };
+        Assert.Equal([app.Assignments[1].Id], DirectoryGovernance.GroupRevocationsForSeparation(
+            app, [f.OwnerPrincipal, joined], f.Clock.Now));
+        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(app, [f.OwnerPrincipal, group], f.Clock.Now));
+    }
+
+    [Fact]
+    public void Duplicate_assigned_group_is_an_incident_not_a_basis_for_automatic_revocation()
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group, EffectiveMemberKeys = [f.Owner.Key] };
+        var divergent = group with { KeycloakId = "other-remote-group", EffectiveMemberKeys = [] };
+        var grant = f.Assignment(f.Supervisor.Id, group.Id);
+        var app = f.App with
+        {
+            Policy = f.App.Policy with { SeparationRules = [new(f.Reader.Id, f.Supervisor.Id, "Conflict")] },
+            Assignments = [f.Assignment(f.Reader.Id, f.OwnerPrincipal.Id), grant]
+        };
+        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(
+            app, [f.OwnerPrincipal, group, divergent], f.Clock.Now));
+        Assert.Equal([grant.Id], DirectoryGovernance.UnverifiableGroupAssignments(
+            app, [f.OwnerPrincipal, group, divergent], f.Clock.Now));
+    }
+
+    [Theory]
+    [InlineData("stale")]
+    [InlineData("disabled")]
+    [InlineData("protected")]
+    [InlineData("missing-remote-id")]
+    public void Unsafe_group_snapshot_is_unverifiable_and_does_not_trigger_automatic_revocation(string scenario)
+    {
+        var f = new Fixture();
+        var group = f.Employee with { Kind = PrincipalKind.Group, EffectiveMemberKeys = [f.Owner.Key] };
+        group = scenario switch
+        {
+            "stale" => group with { SyncedAt = f.Clock.Now.AddHours(-1) },
+            "disabled" => group with { Enabled = false },
+            "protected" => group with { Protected = true },
+            "missing-remote-id" => group with { KeycloakId = "" },
+            _ => throw new InvalidOperationException()
+        };
+        var grant = f.Assignment(f.Supervisor.Id, group.Id);
+        var app = f.App with
+        {
+            Policy = f.App.Policy with { SeparationRules = [new(f.Reader.Id, f.Supervisor.Id, "Conflict")] },
+            Assignments = [f.Assignment(f.Reader.Id, f.OwnerPrincipal.Id), grant]
+        };
+        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(
+            app, [f.OwnerPrincipal, group], f.Clock.Now));
+        Assert.Equal([grant.Id], DirectoryGovernance.UnverifiableGroupAssignments(
+            app, [f.OwnerPrincipal, group], f.Clock.Now));
+    }
+
 }
