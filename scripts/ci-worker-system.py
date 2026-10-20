@@ -321,6 +321,10 @@ def run():
                 token=kc.request('POST','/realms/'+realm+'/protocol/openid-connect/token',
                     {'grant_type':'client_credentials','client_id':account['name'],'client_secret':account['secret']},
                     admin=False,form=True)['access_token']
+                if account['profile']=='directory':
+                    visible=kc.request('GET',base+'/users?first=0&max=100&briefRepresentation=false',token=token)
+                    check({u['id'] for u in users}.issubset({u['id'] for u in visible}),
+                          'Scoped directory token really enumerates all fixture identities')
                 if account['profile']=='roles':
                     kc.request('GET',base+'/clients/'+remote_clients[0],token=token)
                     kc.request('GET',base+'/clients/'+remote_clients[0]+'/roles/role.reader',token=token)
