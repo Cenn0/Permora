@@ -18,11 +18,18 @@ jobs:
   federation:
     name: Real LDAPS and FGAP with imported and non-imported users
     runs-on: ubuntu-24.04
-    timeout-minutes: 18
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          global-json-file: global.json
+      - name: Build real worker for joined federation acceptance
+        run: |
+          dotnet restore src/Permora.Worker/Permora.Worker.csproj --locked-mode
+          dotnet build src/Permora.Worker/Permora.Worker.csproj -c Release --no-restore
       - name: Install isolated LDAP server and clients
         run: |
           sudo apt-get update -qq
@@ -34,17 +41,18 @@ jobs:
           sudo install -d -m 0700 -o "$(id -u)" -g "$(id -g)" /var/lib/ldap/permora-ci
           test -x /var/lib/ldap/permora-ci
       - name: Validate test syntax
-        run: python3 -m py_compile scripts/ci-federation.py
+        run: python3 -m py_compile scripts/ci-federation.py scripts/ci_federation_worker.py
       - name: Execute real LDAPS federation and delegated security matrix
         env:
           PERMORA_SYSTEM_TESTS: isolated
+          PERMORA_FEDERATION_WORKER: isolated
           TMPDIR: /var/lib/ldap/permora-ci
         run: python3 scripts/ci-federation.py
       - name: Record scope without storing secrets or artifacts
         if: always()
         run: |
-          echo 'Real OpenLDAP/LDAPS + Keycloak 26.8.1. Imported/non-imported users, nested groups, live membership-loss/restore effective-role checks and negative delegated authorization.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Not Microsoft AD, Kerberos, corporate IAM or a production approval. No test secrets or backups are uploaded.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Real OpenLDAP/LDAPS + Keycloak 26.8.1. Imported/non-imported identities, effective roles, scoped FGAP; imported LDAP also runs real PostgreSQL and Permora.Worker SoD remediation.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Not Microsoft AD, Kerberos, corporate IAM, multi-host HA or production approval. No test secrets or backups are uploaded.' >> "$GITHUB_STEP_SUMMARY"
   system-gate:
     name: Required system acceptance gate
     if: always()

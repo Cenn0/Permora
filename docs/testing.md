@@ -211,3 +211,34 @@ The isolated [system acceptance](../scripts/ci-federation.py) checks **actual Op
 The domain regression suite separately models the worker's SoD-remediation decision across group membership arrival/loss/restoration. Automatic group revocation now requires unique, valid, fresh, eligible and membership-complete directory identities on both sides of the conflicting role pair. Stale, duplicated and otherwise unreliable groups must produce findings rather than arbitrary automatic deletions. Access-review retention uses an equally unambiguous in-realm target check; tests cover missing, duplicate, unknown-kind, foreign, stale, disabled and incomplete identities plus successful independent review.
 
 **Limits:** A successful federation fixture proves live Keycloak group-role semantics, **not** a running Permora worker connected end-to-end to that same LDAPS fixture. It is not a Microsoft Active Directory acceptance, production IAM approval, token revocation guarantee, or proof that a restored LDAP member's prior access is organizationally authorized. An externally restored group membership can restore inherited rights without a new Permora request; operators must use authoritative IAM lifecycle controls, reconciliation and timely group-grant revocation. See [FGAP group rights](keycloak-fgap-acceptance.md) and [release gates](release-checklist.md).
+
+## Real end-to-end LDAPS directory-drift worker test (P4)
+
+The `Permora system acceptance` GitHub workflow builds the actual Release
+`Permora.Worker` and runs
+[`ci-federation.py`](../scripts/ci-federation.py) with the
+[`ci_federation_worker.py`](../scripts/ci_federation_worker.py) joined fixture.
+All services and accounts are ephemeral: TLS-validated OpenLDAP, Keycloak
+26.8.1, a PostgreSQL 18 container, and the compiled .NET worker.
+
+The test seeds a real Keycloak client, a direct user role and a group role
+under a separation-of-duties policy. It first requires the real worker to
+synchronize a **nonconflicting** directory snapshot to PostgreSQL. It then
+changes LDAP group membership externally, proves the effective Keycloak
+role conflict, starts the worker to reconcile the new directory snapshot,
+and verifies a **single** targeted group revocation: PostgreSQL domain
+state, system operation, append-only audit, surviving unrelated individual
+access, removed remote group role, and no regrant after external membership
+restoration. A scoped same-token negative probe rejects realm mutation.
+
+The group-role grant is seeded by the isolated administrator as historical
+fixture state. Runtime `AllowGroupRoleGrants=false` remains enforced; only
+emergency group revocation is exercised. The live joined worker case uses
+**imported read-only** LDAP. The non-imported path separately proves inherited
+access and direct-user-write rejection but is not yet a joined-worker case.
+No real AD, LDAP outage/ambiguity fault matrix, key rotation, production RPO/RTO
+or p95/p99/independent security acceptance is implied. The numerical CI
+revocation duration is **not** an approved operational SLO.
+
+A passing exact-commit [system acceptance workflow](../.github/workflows/system-acceptance.yml)
+is required before marking this new engineering proof as verified.

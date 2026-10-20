@@ -210,3 +210,41 @@ Ein unter OpenLDAP erfolgreiches Szenario darf nicht als offiziell bestätigte
 Microsoft-AD-Kompatibilität, produktive Rechteisolation oder vollständige
 FGAP-Matrix gekennzeichnet werden. Siehe
 [Release-Gates](release-checklist.md).
+
+## FGAP service-account token scope for complete directory reads
+
+A **realm-wide read** account is a separate trust boundary from application role
+creation and role mapping. Keycloak 26.8.1 requires a token able to list users,
+groups, nested groups and effective group membership to build a complete
+reconciliation snapshot. The `realm-management:view-users` role allows broad
+read access to users and groups; it is **not** an application- or group-scoped
+least-privilege entitlement. Central IAM must review and authorize this visibility
+in each actual realm.
+
+For confidential Keycloak service-account clients with
+`fullScopeAllowed=false`, assigning `view-users` to the service-account user
+**alone is insufficient**. Add the same `realm-management` client role to the
+**service client's role-scope mappings** (directly or through an appropriate
+linked client scope). The issued token's effective roles are the intersection
+of account roles and client scope. The real acceptance fixture verifies all
+four actual Admin REST reads with that token:
+`GET /users`, `GET /groups`, `GET /groups/{id}/members`, and
+`GET /groups/{id}/children`. The missing scope was independently reproduced
+as HTTP 403 when `fullScopeAllowed=false`. Do **not** enable full scope as a
+shortcut.
+
+The worker's independent **Roles** and **Assignments** profiles remain
+application-scoped permissions in the production model. The joined
+OpenLDAP integration fixture deliberately reuses an existing, previously
+validated limited mapping account for those two roles to avoid introducing
+overlapping Keycloak group FGAP permissions in a disposable realm. This is a
+test-fixture limitation, **not** a recommendation to combine production secrets.
+
+The [joined worker acceptance](../scripts/ci_federation_worker.py) tests
+external LDAP membership drift and actual Keycloak revocation against a
+disposable imported-LDAP user. The separate [federation contract](../scripts/ci-federation.py)
+still checks non-imported read-only identities. Microsoft AD, multi-host
+outage scenarios, Keycloak group `manage` overbreadth, organizational rights
+review and upstream token leakage are **not** certified by these tests.
+
+Reference: [Keycloak Service Accounts and Token Role Mappings](https://www.keycloak.org/docs/latest/server_admin/).
