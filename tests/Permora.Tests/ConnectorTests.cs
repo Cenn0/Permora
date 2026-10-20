@@ -373,12 +373,27 @@ public sealed class ConnectorTests
         var disabled = f.Employee with { Enabled = false };
         var assignment = f.Assignment(principal: disabled.Id);
         var app = f.App with { Assignments = [assignment] };
+        var mappedRole = new { id = Guid.NewGuid().ToString(), name = "role.reader",
+            clientRole = true, containerId = f.App.KeycloakClientUuid, composite = false,
+            attributes = new Dictionary<string, string[]> {
+                ["permora.application"] = [f.App.Id.ToString()],
+                ["permora.entity"] = [f.Reader.Id.ToString()] } };
         using var fixture = new ConnectorFixture(f, (request, _) =>
-            request.RequestUri!.AbsolutePath.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)
-                ? SafeClient(f) : Json(Array.Empty<object>()));
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            // Role-mapping URLs also end in /clients/{uuid}: dispatch them
+            // before the application's client-metadata route.
+            if (path.Contains("/role-mappings/", StringComparison.Ordinal))
+                return Json(new[] { mappedRole });
+            if (path.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal))
+                return SafeClient(f);
+            return Json(Array.Empty<object>());
+        });
         var findings = await fixture.Connector.InspectAsync(app, [disabled], TestContext.Current.CancellationToken);
         Assert.Contains(findings, finding => finding.Resource == assignment.Id.ToString()
             && finding.Code == "ineligible_assigned_identity");
+        Assert.Contains(fixture.Handler.Paths, p => p.Method == HttpMethod.Get
+            && p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
         Assert.DoesNotContain(fixture.Handler.Paths, p => p.Method != HttpMethod.Get
             && !p.Path.EndsWith("/token", StringComparison.Ordinal));
     }
