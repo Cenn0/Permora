@@ -1,5 +1,14 @@
 # Permora roadmap / production gate audit — 2026-10-18
 
+> **Historical audit:** This file records the 18 October assessment at
+> `2499f863`; do not interpret it as the current branch head. A newer
+> [20 October P4 engineering checkpoint](../release-checklist.md#new-verified-engineering-evidence--20-october-2026)
+> covers [PR #57](https://github.com/Cenn0/Permora/pull/57)
+> merged as `c83711c` with six passing exact-main-SHA workflows and
+> [open end-to-end federation/worker gate #58](https://github.com/Cenn0/Permora/issues/58).
+> The original six release conditions remain open.
+
+
 **Repository:** `Cenn0/Permora` · **Inspected main SHA:** `2499f863521b1a3b42d2768a93849ed001e2941f`.
 **Verdict:** Not 1.0 complete; production release blocked. This record is not an
 independent audit or a substitute for signed engineering/operator acceptance.
