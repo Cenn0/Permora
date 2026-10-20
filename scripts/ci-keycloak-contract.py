@@ -387,39 +387,85 @@ def run():
         actual = request("GET", group_path, token=master_token)[1]
         check(any(role["id"] == new_roles["A"]["id"] for role in actual),
               "Team A can map its own client role onto its explicitly allowed group")
-        # IMPORTANT SECURITY CONTRACT: in Keycloak 26.8.1 the FGAP group
-        # 'manage' privilege is broader than role mapping alone. Probe an
-        # unrelated group modification using the SAME delegated credential
-        # to determine the actual extra authority, rather than calling this
-        # service account 'map-roles-only' or least privilege.
+        # Actual 26.8.1 privilege blast radius, tested with the SAME scoped
+        # account that writes group role mappings above. This is a known excess
+        # entitlement, not a passing least-privilege certification.
         allowed_group_path = admin_path("/groups/" + group)
         group_before = request("GET", allowed_group_path, token=master_token)[1]
         group_name = group_before["name"]
-        widened_name = "ci-group-manage-breadth-probe"
-        edit_status, _, _ = request("PUT", allowed_group_path,
-            {"id": group, "name": widened_name}, token=delegated_a,
-            expected=(204, 403, 404))
-        group_after = request("GET", allowed_group_path, token=master_token)[1]
-        if edit_status == 204:
-            check(group_after["name"] == widened_name,
-                "FGAP Group.manage can also rename a mapped group (non-mapping authority)")
-            request("PUT", allowed_group_path, {"id": group, "name": group_name}, token=master_token)
-            check(request("GET", allowed_group_path, token=master_token)[1]["name"] == group_name,
-                "Temporary group metadata restored after blast-radius test")
-        else:
-            check(group_after["name"] == group_name,
-                "FGAP denied non-mapping group modification in this isolated setup")
-        print("GROUP FGAP: map-roles on Groups currently needs manage; its wider operation surface must be individually audited.",
+        try:
+            status, _, _ = request("PUT", allowed_group_path,
+                {"id": group, "name": "ci-group-manage-breadth-probe"},
+                token=delegated_a, expected=(204,))
+            changed = request("GET", allowed_group_path, token=master_token)[1]
+            check(status == 204 and changed["name"] == "ci-group-manage-breadth-probe",
+                  "Known Keycloak 26.8.1 risk: group-role mapping credential can rename its managed group")
+        finally:
+            # Tests never leave altered group metadata behind, even when an
+            # unexpected HTTP response or a read-back assertion fails.
+            request("PUT", allowed_group_path,
+                    {"id": group, "name": group_name}, token=master_token)
+            restored = request("GET", allowed_group_path, token=master_token)[1]
+            check(restored["name"] == group_name,
+                  "Group metadata restored with isolated bootstrap identity")
+
+        # Negative *upstream* REST probes. Application-side GroupGrantPolicy
+        # cannot constrain a stolen service-account token, so it is necessary
+        # to exercise cross-resource writes directly, not through Permora API.
+        # Every mutation is followed by a bootstrap-admin read-back.
+        foreign_group_path = admin_path("/groups/" + other_group)
+        foreign_before = request("GET", foreign_group_path, token=master_token)[1]
+        status, _, _ = request("PUT", foreign_group_path,
+            {"id": other_group, "name": "ci-illicit-foreign-group-name"},
+            token=delegated_a, expected=(401, 403, 404))
+        foreign_after = request("GET", foreign_group_path, token=master_token)[1]
+        check(status in (401, 403, 404) and foreign_after["name"] == foreign_before["name"],
+              "Group-mapping credential cannot rename an unapproved group")
+        status, _, _ = request("DELETE", foreign_group_path,
+                               token=delegated_a, expected=(401, 403, 404))
+        foreign_after_delete = request("GET", foreign_group_path, token=master_token)[1]
+        check(status in (401, 403, 404) and foreign_after_delete["id"] == other_group,
+              "Group-mapping credential cannot delete an unapproved group")
+
+        # A role mapper is not a group membership editor. Keycloak requires
+        # explicit user manage-group-membership and group manage-membership
+        # privileges. Probe the permitted mapping *target* rather than just
+        # an unrelated group to expose implied-scope regressions.
+        membership_path = admin_path("/users/" + person + "/groups")
+        membership_before = request("GET", membership_path, token=master_token)[1]
+        member_add_path = membership_path + "/" + group
+        status, _, _ = request("PUT", member_add_path,
+                               token=delegated_a, expected=(401, 403, 404))
+        membership_after = request("GET", membership_path, token=master_token)[1]
+        check(status in (401, 403, 404)
+              and {g["id"] for g in membership_after} == {g["id"] for g in membership_before},
+              "Group-role mapper cannot add a user to its approved group")
+        status, _, _ = request("DELETE", member_add_path,
+                               token=delegated_a, expected=(401, 403, 404))
+        membership_final = request("GET", membership_path, token=master_token)[1]
+        check(status in (401, 403, 404)
+              and {g["id"] for g in membership_final} == {g["id"] for g in membership_before},
+              "Group-role mapper cannot remove a user from its approved group")
+        print("FGAP GROUP SCOPE: approved-group metadata modification is ALLOWED; "
+              "foreign-group modification/deletion and user membership writes DENIED. "
+              "No mapping-only scope is proven; central IAM risk acceptance remains required.",
               flush=True)
 
         status, _, _ = request("POST", forbidden_group_path, [new_roles["A"]], token=delegated_a,
                                expected=(401, 403, 404))
         check(status in (401, 403, 404),
               "Team A cannot map own roles onto an unapproved group")
+        denied_group_roles = request("GET", forbidden_group_path, token=master_token)[1]
+        check(not any(role["id"] == new_roles["A"]["id"] for role in denied_group_roles),
+              "Rejected group mapping created no Keycloak side effect")
         status, _, _ = request("POST", group_path, [new_roles["B"]], token=delegated_a,
                                expected=(401, 403, 404))
         check(status in (401, 403, 404),
               "Group management alone does not allow foreign Client B roles")
+        denied_foreign_client_roles = request("GET", admin_path("/groups/" + group +
+            "/role-mappings/clients/" + cb), token=master_token)[1]
+        check(not any(role["id"] == new_roles["B"]["id"] for role in denied_foreign_client_roles),
+              "Rejected foreign-client group mapping created no Keycloak side effect")
         request("DELETE", roles_a_path, [new_roles["A"]], token=delegated_a)
         request("DELETE", group_path, [new_roles["A"]], token=delegated_a)
         after_user = request("GET", roles_a_path, token=master_token)[1]

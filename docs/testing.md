@@ -1,5 +1,31 @@
 # Teststrategie und Ausführung
 
+## Erweiterte Keycloak-FGAP-Gruppenadministrationsmatrix (20.10.2026)
+
+`scripts/ci-keycloak-contract.py` erweitert den isolierten **echten
+Keycloak-26.8.1-Test**. Nach tatsächlicher Zuordnung einer eigenen
+Anwendungsrolle zu Gruppe A prüft der Test mit **demselben delegierten
+Bearer-Token** direkte Admin-REST-Aufrufe:
+
+- Die ausdrücklich **zu weit gefasste** Berechtigung `Groups.manage`
+  erlaubt auch die Umbenennung der berechtigten Gruppe; eine
+  `finally`-Wiederherstellung verhindert zurückgelassene Änderungen.
+- Umbenennen/Löschen einer fremden Gruppe ist abzuweisen und wird mit
+  einem unabhängig authentifizierten Readback kontrolliert.
+- Anlegen oder Aufheben einer Mitgliedschaft der eigenen Zielgruppe
+  darf ohne zusätzliche Mitgliederberechtigungen nicht möglich sein.
+- Ein verbotener Grant auf eine fremde Gruppe oder für Client B
+  muss ohne Remote-Nebenwirkung bleiben (getrennte Readbacks).
+
+Verifikationsstufen: **Quellcode vorhanden** genügt nicht; die realen
+Keycloak-REST-Proben müssen im Keycloak-CI-Job des **exakten Commits**
+erfolgreich sein. Diese Matrix ist **keine** Microsoft-AD-Abnahme und
+keine vollständige Bewertung der effektiven Berechtigungen eines
+späteren Betriebs-Servicekontos. Testreihenfolge und Betreiberpflichten:
+[FGAP-Acceptance](keycloak-fgap-acceptance.md). Der Sicherheitsblocker
+[Issue #46](https://github.com/Cenn0/Permora/issues/46) bleibt trotz
+grünem Test bestehen, solange nur `Groups.manage` verfügbar ist.
+
 ## Directory-Reconciliation: Negativregressionen (20.10.2026)
 
 Die neuen Tests in `PolicyTests` und `ConnectorTests` prüfen das Verhalten

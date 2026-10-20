@@ -13,23 +13,29 @@
 > Ein grünes CI-Ergebnis ersetzt keine reale AD-/Multi-Host-/Penetrations-/
 > Datenschutzabnahme.
 
-**Engineering-Checkpoint 20.10.2026 (nicht mit 1.0-Abnahme verwechseln):** Der
-aktuelle Referenzstand von `main` ist
-[`e56f1389`](https://github.com/Cenn0/Permora/commit/e56f13891780e1309fe94334e0b07e2086d3b24e).
-Die Kern-CI, die echte isolierte Keycloak-/LDAP-Systemprüfung, der
-Worker-/Recovery-Lauf, Accessibility und öffentliche Dokumentation waren
-auf diesem Commit erfolgreich. Ältere Zahlen und V2-Checkboxen unten sind
-**historische Planpunkte**, keine fehlenden Implementierungsnachweise.
-Das wegen unzureichender Privilegientrennung weiter relevante
-[Security-Issue #46](https://github.com/Cenn0/Permora/issues/46) ist
-geöffnet. Die nächste P4-Verbesserung verhindert mehrdeutige
-Directory-Zielauflösung vor Grants/Remote-Writes und liefert
-Reconcile-Driftbefunde bei doppelten, ungültigen, alten oder deaktivierten
-Identitäten. Die neuen Tests sind in der
-[Testmatrix](testing.md#directory-reconciliation-negativregressionen-20102026)
-beschrieben; ob sie ausgeführt bestanden haben, muss am jeweiligen
-CI-Commit überprüft werden. Das ersetzt weder Microsoft-AD-Tests noch
-realen Token-Widerruf.
+**Engineering-Checkpoint 20.10.2026 – verifiziert:** `main` steht auf
+[`5017624d57ae`](https://github.com/Cenn0/Permora/commit/5017624d57aecb65758553a8d017a02d6636be4c).
+Sechs relevante Workflows auf diesem Commit
+[bestanden](https://github.com/Cenn0/Permora/actions/runs/39398135314);
+der dazugehörige [Artefaktintegritätslauf
+#39398135494](https://github.com/Cenn0/Permora/actions/runs/39398135494)
+hat erfolgreich einen SHA-gebundenen, signierten
+**unveröffentlichten Draft-Kandidaten** erstellt.
+Die im [Merge #54](https://github.com/Cenn0/Permora/pull/54)
+ergänzten Directory-Negativregressionen bestanden vor Merge mit
+198/198 xUnit-Tests und erneut auf `main`. Diese Nachweise betreffen
+die isolierte technische Abdeckung, nicht die externe 1.0-Abnahme.
+
+**Nächster P2-Sicherheitsschritt (in Bearbeitung):**
+Das [Keycloak-FGAP-Acceptance-Konzept](keycloak-fgap-acceptance.md)
+und die erweiterte echte Admin-REST-Negativmatrix prüfen den
+tatsächlichen Berechtigungsumfang **derselben**
+Gruppen-Mapping-Serviceidentität. Die zusätzlichen Tests werden erst
+nach einem grünen exakten GitHub-Commit als nachgewiesen eingestuft.
+[Issue #46](https://github.com/Cenn0/Permora/issues/46) bleibt
+offen: `Groups.manage` ist keine Mapping-only-Berechtigung.
+Fremd-/Gruppen-, AD-, Netzwerk-/Secret-/Audit- und
+Mehrhost-/Recovery-Grenzen benötigen separate Betriebsnachweise.
 
 **Stand:** 17.10.2026 · **Basis:** Repository `Cenn0/Permora`, Branch `main`, Commit `dc7b7d8ef223f42d9a4b451850b97bd3b04cf5c1`.  
 **Status:** CI-verifizierter Entwicklungsstand; **keine** Produktionsfreigabe.  
@@ -263,10 +269,12 @@ Eine erneute bloße Implementierung derselben Testnamen wäre kein Fortschritt.
    blockieren. Unit-/HTTP-Regressionen laufen in der normalen CI;
    **reale Federationsänderungen und gezielte Revocation bleiben separate Gates**.
 2. **P2: FGAP-Gruppen-Privilegien** — [Issue #46](https://github.com/Cenn0/Permora/issues/46):
-   echte Keycloak-Admin-REST-Negativmatrix mit *demselben*
-   Gruppen-Assignment-Servicekonto, nicht nur API-Allowlist; egress,
-   Key-Rotation, Auditmonitoring und dokumentierte zentrale IAM-Risikoannahme.
-   Standardmäßig bleiben neue Gruppengrants gesperrt.
+   direkte Same-Token-Admin-REST-Negativmatrix, anschließende
+   [Betriebsabnahme](keycloak-fgap-acceptance.md) mit nachweislich
+   eingeschränktem Egress, getestetem Secret-Wechsel und externem Audit.
+   **Automatisierte Tests ersetzen keine Freigabe des tatsächlichen
+   Keycloak-Service-Token-Umfangs.** Neue Gruppengrants bleiben
+   standardmäßig gesperrt.
 3. **P4: Vollständige externe Directory-Drift** — in echten Keycloak-/LDAP-
    Integrationstests Deaktivierung, verschachtelte Mitgliedschaften und
    kollidierende Gruppenrollen verändern; verifizierte Soll-/Ist- und

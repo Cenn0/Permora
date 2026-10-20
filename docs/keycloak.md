@@ -73,6 +73,17 @@ abzuleiten.
 Primärquellen: [Keycloak 26.8.1 Server Administration – Groups Resource Type](https://www.keycloak.org/docs/26.8.1/server_admin/)
 und [Keycloak upstream #45269](https://github.com/keycloak/keycloak/issues/45269).
 
+**Erweiterte, direkt gegen die Keycloak-Admin-REST-API ausgeführte
+Negativmatrix:** Der Vertragstest überprüft mit *derselben* delegierten
+Serviceidentität neben der bekannten zulässigen Umbenennung einer eigenen
+Gruppe auch die verbotene Änderung/Löschung fremder Gruppen, das unzulässige
+Ändern der Gruppenmitgliedschaft und unerlaubte Fremd-Client-Rollen.
+Ein zweites, isoliertes Admin-Konto bestätigt jeweils den tatsächlichen
+Istzustand. Die Probe ist erst nach einem grünen CI-Lauf am konkreten
+Commit als ausgeführt nachgewiesen. Vollständiger Ablauf und die
+betrieblichen Gegenmaßnahmen: [FGAP-Gruppenrechte: Test- und
+Abnahmematrix](keycloak-fgap-acceptance.md).
+
 FGAP-Policy-Erstellung wird in diesem Stand nicht automatisch ausgerollt. Das ist ein offener Roadmap-Punkt, keine versteckte fertige Funktion.
 
 ## Delegierte Gruppen-Rollenzuweisungen: standardmäßig gesperrt
