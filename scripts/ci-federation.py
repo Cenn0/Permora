@@ -195,6 +195,33 @@ def test_realm(kc, bind_secret, imported, group_members):
         kc.request('POST', group_path, [own], token=delegated)
         check(any(r['id'] == own['id'] for r in kc.request('GET', group_path)[1]), mode + ': delegated group mapping applied')
         check(any(r['id'] == own['id'] for r in kc.request('GET', effective)[1]), mode + ': LDAP member inherits mapped group access')
+
+        # A mapped LDAP group is dynamic: Keycloak must stop granting the
+        # inherited role when a member leaves, and grant it to an externally
+        # added member without a separate user-role mapping. This is the
+        # privilege-drift input the Permora worker must reconcile against SoD.
+        other_effective = user_path(other) + '/role-mappings/clients/' + ca + '/composite'
+        other_direct = user_path(other) + '/role-mappings/clients/' + ca
+        check(not any(r['id'] == own['id'] for r in kc.request('GET', other_effective)[1]),
+              mode + ': unrelated LDAP account initially has no inherited role')
+        group_members('federated1')
+        kc.request('POST', base + '/clear-user-cache')
+        check(not any(g['name'] == 'team-a' for g in kc.request('GET', user_path(subject) + '/groups')[1])
+              and any(g['name'] == 'team-a' for g in kc.request('GET', user_path(other) + '/groups')[1]),
+              mode + ': LDAP membership moves from original to external account')
+        check(not any(r['id'] == own['id'] for r in kc.request('GET', effective)[1])
+              and any(r['id'] == own['id'] for r in kc.request('GET', other_effective)[1]),
+              mode + ': effective application role follows LDAP membership loss/addition')
+        check(not any(r['id'] == own['id'] for r in kc.request('GET', other_direct)[1]),
+              mode + ': newly inherited access has no untracked direct user mapping')
+        check(any(r['id'] == own['id'] for r in kc.request('GET', group_path)[1]),
+              mode + ': group role mapping persists across external membership changes')
+        group_members('federated0')
+        kc.request('POST', base + '/clear-user-cache')
+        check(any(r['id'] == own['id'] for r in kc.request('GET', effective)[1])
+              and not any(r['id'] == own['id'] for r in kc.request('GET', other_effective)[1]),
+              mode + ': group membership restoration recovers only eligible user role')
+
         for label, method, path, body in (
             ('foreign user', 'POST', user_path(other) + '/role-mappings/clients/' + ca, [own]),
             ('foreign client', 'POST', user_path(subject) + '/role-mappings/clients/' + cb, [foreign]),

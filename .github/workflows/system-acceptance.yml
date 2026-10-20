@@ -43,7 +43,7 @@ jobs:
       - name: Record scope without storing secrets or artifacts
         if: always()
         run: |
-          echo 'Real OpenLDAP/LDAPS + Keycloak 26.8.1. Imported/non-imported users, nested groups and negative delegated authorization.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Real OpenLDAP/LDAPS + Keycloak 26.8.1. Imported/non-imported users, nested groups, live membership-loss/restore effective-role checks and negative delegated authorization.' >> "$GITHUB_STEP_SUMMARY"
           echo 'Not Microsoft AD, Kerberos, corporate IAM or a production approval. No test secrets or backups are uploaded.' >> "$GITHUB_STEP_SUMMARY"
   system-gate:
     name: Required system acceptance gate

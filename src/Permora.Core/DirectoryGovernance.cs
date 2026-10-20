@@ -8,14 +8,33 @@ namespace Permora.Core;
 public static class DirectoryGovernance
 {
     public static IReadOnlyList<Guid> GroupRevocationsForSeparation(ApplicationDocument app,
-        IReadOnlyList<DirectoryPrincipal> directory)
+        IReadOnlyList<DirectoryPrincipal> directory, DateTimeOffset now)
     {
         if (app.Policy.SeparationRules.Count == 0 || app.Assignments.Count == 0)
             return [];
 
         var principals = directory.Where(p => p.RealmKey == app.RealmKey)
-            .GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First());
+            .GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.ToArray());
         var revokedGroups = new HashSet<Guid>();
+
+        // Automatic revocations must be based on an unambiguous, fresh and complete
+        // directory view. A first-match lookup could spuriously revoke access when
+        // the same ID appears twice with different LDAP membership snapshots.
+        bool TryReliable(Guid id, out DirectoryPrincipal principal)
+        {
+            principal = default!;
+            if (!principals.TryGetValue(id, out var matches) || matches.Length != 1)
+                return false;
+            var current = matches[0];
+            if (!Enum.IsDefined(current.Kind) || string.IsNullOrWhiteSpace(current.KeycloakId)
+                || !current.Enabled || current.Protected
+                || current.SyncedAt > now.AddMinutes(1)
+                || now - current.SyncedAt > TimeSpan.FromMinutes(15)
+                || (current.Kind == PrincipalKind.Group && !current.MembershipComplete))
+                return false;
+            principal = current;
+            return true;
+        }
 
         foreach (var rule in app.Policy.SeparationRules)
         {
@@ -23,14 +42,12 @@ public static class DirectoryGovernance
             var right = app.Assignments.Where(a => a.RoleId == rule.SecondRoleId);
             foreach (var lhs in left)
             {
-                if (!principals.TryGetValue(lhs.PrincipalId, out var leftPrincipal)
-                    || (leftPrincipal.Kind == PrincipalKind.Group && !leftPrincipal.MembershipComplete))
+                if (!TryReliable(lhs.PrincipalId, out var leftPrincipal))
                     continue;
                 var leftKeys = EffectiveKeys(leftPrincipal).ToHashSet(StringComparer.Ordinal);
                 foreach (var rhs in right)
                 {
-                    if (lhs.Id == rhs.Id || !principals.TryGetValue(rhs.PrincipalId, out var rightPrincipal)
-                        || (rightPrincipal.Kind == PrincipalKind.Group && !rightPrincipal.MembershipComplete))
+                    if (lhs.Id == rhs.Id || !TryReliable(rhs.PrincipalId, out var rightPrincipal))
                         continue;
                     if (!EffectiveKeys(rightPrincipal).Any(leftKeys.Contains)) continue;
 
@@ -55,13 +72,16 @@ public static class DirectoryGovernance
         IReadOnlyList<DirectoryPrincipal> directory, DateTimeOffset now)
     {
         var groups = directory.Where(p => p.RealmKey == app.RealmKey && p.Kind == PrincipalKind.Group)
-            .GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First());
+            .GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.ToArray());
 
         return app.Assignments
-            .Where(a => groups.TryGetValue(a.PrincipalId, out var principal)
-                && (!principal.MembershipComplete
-                    || principal.SyncedAt > now.AddMinutes(1)
-                    || now - principal.SyncedAt > TimeSpan.FromMinutes(15)))
+            .Where(a => groups.TryGetValue(a.PrincipalId, out var matches)
+                && (matches.Length != 1
+                    || !matches[0].MembershipComplete
+                    || !matches[0].Enabled || matches[0].Protected
+                    || string.IsNullOrWhiteSpace(matches[0].KeycloakId)
+                    || matches[0].SyncedAt > now.AddMinutes(1)
+                    || now - matches[0].SyncedAt > TimeSpan.FromMinutes(15)))
             .Select(a => a.Id).Distinct().Order().ToArray();
     }
 
