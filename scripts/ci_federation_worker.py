@@ -53,7 +53,8 @@ def command(args, *, data=None, env=None, timeout=120):
 
 
 def run_worker_acceptance(kc, workspace, realm, base, subject_user,
-                          other_user, group, change_group_members, check):
+                          other_user, group, change_group_members, check,
+                          remote_client, scoped_secret):
     """Use the existing imported-LDAP fixture and verify a real worker revoke."""
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("PERMORA_SYSTEM_TESTS") != "isolated":
         raise RuntimeError("Only disposable, explicitly authorized CI may execute this test")
@@ -130,8 +131,22 @@ def run_worker_acceptance(kc, workspace, realm, base, subject_user,
         else:
             raise TimeoutError("Disposable PostgreSQL was not ready")
 
-        remote_client = create_client("ci-ldap-worker-app", app=app_id)
-        reader = mapped_role(remote_client, "role.reader", reader_id)
+        # Reuse the FGAP-scoped "limited-mapper" principal already verified by
+        # ci-federation.py. A second overlapping Groups.manage permission would
+        # produce a 403 under Keycloak FGAP policy resolution. The service
+        # identity is intentionally shared by roles/assignments in THIS fixture;
+        # separate profiles are covered by the real multiworker test.
+        kc.request("PUT", base + "/clients/" + remote_client, {
+            "id": remote_client, "clientId": "own-api", "protocol": "openid-connect",
+            "enabled": True, "standardFlowEnabled": False,
+            "implicitFlowEnabled": False, "directAccessGrantsEnabled": False,
+            "fullScopeAllowed": False, "serviceAccountsEnabled": False,
+            "attributes": {"permora.application": app_id}})
+        kc.request("PUT", base + "/clients/" + remote_client + "/roles/role.reader", {
+            "name": "role.reader", "clientRole": True,
+            "attributes": {"permora.application": [app_id],
+                           "permora.entity": [reader_id]}})
+        reader = kc.request("GET", base + "/clients/" + remote_client + "/roles/role.reader")[1]
         supervisor = mapped_role(remote_client, "role.supervisor", supervisor_id)
         kc.request("POST", mapping("users", other_user["id"], remote_client), [reader])
         kc.request("POST", mapping("groups", group["id"], remote_client), [supervisor])
@@ -142,52 +157,29 @@ def run_worker_acceptance(kc, workspace, realm, base, subject_user,
                   kc.request("GET", mapping("groups", group["id"], remote_client))[1]),
               "Live worker fixture starts with real Keycloak group supervisor mapping")
 
-        authz_client = next(c["id"] for c in kc.request("GET",
-            base + "/clients?clientId=admin-permissions")[1] if c["clientId"] == "admin-permissions")
-        authz = base + "/clients/" + authz_client + "/authz/resource-server"
+        scoped_file = workspace / ("ci-existing-scoped-" + suffix + ".secret")
+        scoped_file.write_text(scoped_secret)
+        scoped_file.chmod(0o600)
+        profiles = {
+            "Roles": {"ClientId": "limited-mapper", "SecretFile": str(scoped_file)},
+            "Assignments": {"ClientId": "limited-mapper", "SecretFile": str(scoped_file)}}
+        directory_name = "ci-ldap-worker-directory"
+        cid = create_client(directory_name, service=True)
+        account = kc.request("GET", base + "/clients/" + cid + "/service-account-user")[1]["id"]
+        directory_secret = kc.request("GET", base + "/clients/" + cid + "/client-secret")[1]["value"]
+        directory_file = workspace / ("ci-worker-directory-" + suffix + ".secret")
+        directory_file.write_text(directory_secret)
+        directory_file.chmod(0o600)
+        profiles["Directory"] = {"ClientId": directory_name, "SecretFile": str(directory_file)}
         management = next(c["id"] for c in kc.request("GET",
             base + "/clients?clientId=realm-management")[1] if c["clientId"] == "realm-management")
-        profiles = {}
-        accounts = {}
-        for label in ("Roles", "Assignments", "Directory"):
-            client_name = "ci-ldap-worker-" + label.lower()
-            cid = create_client(client_name, service=True)
-            account = kc.request("GET", base + "/clients/" + cid + "/service-account-user")[1]["id"]
-            secret = kc.request("GET", base + "/clients/" + cid + "/client-secret")[1]["value"]
-            secret_file = workspace / (client_name + "-" + suffix + ".secret")
-            secret_file.write_text(secret)
-            secret_file.chmod(0o600)
-            profiles[label] = {"ClientId": client_name, "SecretFile": str(secret_file)}
-            accounts[label] = (account, secret, client_name)
-            if label == "Directory":
-                view = kc.request("GET", base + "/clients/" + management + "/roles/view-users")[1]
-                kc.request("POST", base + "/users/" + account + "/role-mappings/clients/" + management, [view])
-
-        kc.request("POST", authz + "/policy/user", {
-            "name": "ci-drift-viewers", "logic": "POSITIVE",
-            "users": [accounts["Roles"][0], accounts["Assignments"][0]]})
-        kc.request("POST", authz + "/policy/user", {
-            "name": "ci-drift-revoker", "logic": "POSITIVE",
-            "users": [accounts["Assignments"][0]]})
-        for name, typ, resources, scopes, policy in (
-            ("ci-drift-own-view", "Clients", [remote_client], ["view"], "ci-drift-viewers"),
-            ("ci-drift-own-map", "Clients", [remote_client], ["map-roles"], "ci-drift-revoker"),
-            # Keycloak Groups.manage is NOT map-role-only. Exercise emergency
-            # revocation in a disposable realm, while disabling new group grants.
-            ("ci-drift-target", "Groups", [group["id"]], ["view", "manage"], "ci-drift-revoker")):
-            kc.request("POST", authz + "/permission/scope", {
-                "name": name, "resourceType": typ, "resources": resources,
-                "scopes": scopes, "policies": [policy]})
-
-        def token(label):
-            user_id, secret, client_name = accounts[label]
-            return kc.request("POST", "/realms/" + realm + "/protocol/openid-connect/token",
-                {"grant_type": "client_credentials", "client_id": client_name,
-                 "client_secret": secret}, admin=False, form=True)[1]["access_token"]
-
-        own_roles_token = token("Roles")
-        assignments_token = token("Assignments")
-        kc.request("GET", base + "/clients/" + remote_client, token=own_roles_token)
+        view = kc.request("GET", base + "/clients/" + management + "/roles/view-users")[1]
+        kc.request("POST", base + "/users/" + account + "/role-mappings/clients/" + management, [view])
+        assignments_token = kc.request("POST",
+            "/realms/" + realm + "/protocol/openid-connect/token",
+            {"grant_type": "client_credentials", "client_id": "limited-mapper",
+             "client_secret": scoped_secret}, admin=False, form=True)[1]["access_token"]
+        kc.request("GET", base + "/clients/" + remote_client, token=assignments_token)
         kc.request("GET", mapping("groups", group["id"], remote_client), token=assignments_token)
         status, _, _ = kc.request("PUT", base,
             {"enabled": False}, token=assignments_token, expected=(401, 403))
@@ -212,7 +204,7 @@ def run_worker_acceptance(kc, workspace, realm, base, subject_user,
                "slug": "ldap-worker-app", "name": "LDAPS worker fixture",
                "description": "Disposable integration acceptance only",
                "environment": "Test", "status": "Active", "revision": 1,
-               "keycloakClientUuid": remote_client, "keycloakClientId": "ci-ldap-worker-app",
+               "keycloakClientUuid": remote_client, "keycloakClientId": "own-api",
                "loginClientUuid": None,
                "policy": {"requireApproval": True, "maxGrantDays": 90,
                           "separationRules": [{"firstRoleId": reader_id,
