@@ -133,7 +133,15 @@ public static partial class Policy
                 break;
             case ChangeKind.GrantAccess:
                 var assignedRole = Get(app.Roles, r => r.Id == change.RoleId);
-                var target = Get(directory, p => p.Id == change.PrincipalId && p.RealmKey == app.RealmKey);
+                // A duplicated directory identifier cannot safely select an identity.
+                // Reject it before queueing a grant, even if one record appears valid.
+                var candidateTargets = directory.Where(p => p.Id == change.PrincipalId && p.RealmKey == app.RealmKey)
+                    .Take(2).ToArray();
+                if (candidateTargets.Length > 1)
+                    throw new DomainException("ambiguous_directory_identity",
+                        "Multiple directory identities share the requested identifier. Refresh and reconcile.", 409);
+                var target = candidateTargets.Length == 1 ? candidateTargets[0]
+                    : throw new DomainException("not_found", "The application resource was not found.", 404);
                 if (!Enum.IsDefined(target.Kind))
                     throw new DomainException("unsupported_principal_kind",
                         "The directory principal kind is not recognized.", 409);

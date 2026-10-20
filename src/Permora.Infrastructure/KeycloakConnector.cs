@@ -170,8 +170,15 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
 
     private async Task MapRoleAsync(ApplicationDocument app, Assignment assignment, IReadOnlyList<DirectoryPrincipal> directory, bool grant, CancellationToken ct)
     {
-        var principal = directory.SingleOrDefault(p => p.Id == assignment.PrincipalId && p.RealmKey == app.RealmKey)
-            ?? throw new DomainException("identity_missing", "The target identity is missing from the directory snapshot.", 409);
+        // Refuse to infer a remote group/user when a corrupted directory contains
+        // two entries for one local principal ID. Never guess a remote write target.
+        var candidates = directory.Where(p => p.Id == assignment.PrincipalId && p.RealmKey == app.RealmKey)
+            .Take(2).ToArray();
+        if (candidates.Length > 1)
+            throw new DomainException("ambiguous_directory_identity",
+                "Multiple directory identities share the target identifier. Reconcile before changing access.", 409);
+        var principal = candidates.Length == 1 ? candidates[0]
+            : throw new DomainException("identity_missing", "The target identity is missing from the directory snapshot.", 409);
         // A corrupted/unknown principal kind must never bypass the Groups.manage
         // risk gate by falling through the implicit "not User => Group" branch.
         // This applies to revocations too: never mutate a guessed remote resource.
@@ -289,8 +296,39 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
         }
         foreach (var assignment in app.Assignments)
         {
-            var principal = directory.SingleOrDefault(p => p.Id == assignment.PrincipalId && p.RealmKey == app.RealmKey);
-            if (principal is null) { findings.Add(new(assignment.Id.ToString(), "identity_missing", "The assigned identity is missing.")); continue; }
+            var matches = directory.Where(p => p.Id == assignment.PrincipalId && p.RealmKey == app.RealmKey)
+                .Take(2).ToArray();
+            if (matches.Length == 0)
+            {
+                findings.Add(new(assignment.Id.ToString(), "identity_missing",
+                    "The assigned identity is missing from the directory snapshot."));
+                continue;
+            }
+            if (matches.Length > 1)
+            {
+                findings.Add(new(assignment.Id.ToString(), "ambiguous_directory_identity",
+                    "Directory records conflict for this assignment; remote access cannot be verified."));
+                continue;
+            }
+            var principal = matches[0];
+            if (!Enum.IsDefined(principal.Kind) || string.IsNullOrWhiteSpace(principal.KeycloakId))
+            {
+                // Do not fall through from an unknown enum to the Groups endpoint,
+                // or build an Admin REST path from an empty remote identifier.
+                findings.Add(new(assignment.Id.ToString(), "invalid_directory_identity",
+                    "Directory identity kind or remote identifier is invalid; no remote target was inferred."));
+                continue;
+            }
+            var now = clock.GetUtcNow();
+            if (principal.SyncedAt > now.AddMinutes(1) || now - principal.SyncedAt > TimeSpan.FromMinutes(15))
+            {
+                findings.Add(new(assignment.Id.ToString(), "stale_directory_identity",
+                    "Assigned identity was not refreshed within the required window."));
+                continue;
+            }
+            if (!principal.Enabled || principal.Protected)
+                findings.Add(new(assignment.Id.ToString(), "ineligible_assigned_identity",
+                    "An assigned identity is disabled or protected; access requires review."));
             var kind = principal.Kind == PrincipalKind.User ? "users" : "groups";
             var actual = await GetAsync<Role[]>(app.RealmKey, "assignments",
                 $"{kind}/{E(principal.KeycloakId)}/role-mappings/clients/{E(app.KeycloakClientUuid!)}", ct) ?? [];

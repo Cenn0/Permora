@@ -1,5 +1,31 @@
 # Teststrategie und Ausführung
 
+## Directory-Reconciliation: Negativregressionen (20.10.2026)
+
+Die neuen Tests in `PolicyTests` und `ConnectorTests` prüfen das Verhalten
+bei unzuverlässigen Verzeichnisdaten. Ohne eindeutigen, aktuellen und
+ausreichend validierten Snapshot darf ein Keycloak-Soll-/Ist-Abgleich **nicht**
+als erfolgreich abgeschlossen oder als Grundlage einer Aktivierung verwendet
+werden. Die Prüfungen verwenden einen aufgezeichneten HTTP-Testconnector;
+sie sind **keine** Microsoft-AD-, LDAP- oder Keycloak-Server-End-to-End-Abnahme.
+
+| Ursache | API/Policy beziehungsweise Worker | Reconciliation |
+| --- | --- | --- |
+| Zwei Einträge mit derselben lokalen Principal-ID im selben Realm | Neue Grants vor dem Queueing mit `ambiguous_directory_identity` blockieren; Worker unterbindet mutmaßliche Remote-Writes | Driftfinding `ambiguous_directory_identity`, kein erratener REST-Pfad |
+| Unbekannter Principal-Typ oder leere Keycloak-ID | Bereits bestehende Typprüfung für Grants und Entzüge; keine implizite Umdeutung zu einer Gruppe | `invalid_directory_identity`, kein Zugriff auf erratene Remote-Ressource |
+| Veralteter oder über eine Minute in der Zukunft liegender Directory-Zeitstempel | Grant wird über `Policy.Fresh` zurückgewiesen | `stale_directory_identity` anstelle einer vermeintlich sauberen Reconciliation |
+| Deaktivierte oder geschützte zugewiesene Identität | Neue Grants verboten | `ineligible_assigned_identity`, unabhängig vom gelesenen Remote-Mapping |
+
+Die Befunde führen beim normalen Reconcile-Worker zu `Conflict` und einem
+korrelierten `drift.detected`-Audit statt zur automatischen Heilung. Auch
+bereits ausgegebene Keycloak-Access-Tokens werden dadurch **nicht** sofort
+widerrufen. Ein administrativ verifizierter Entzug bleibt erforderlich;
+korrupten Identitätszuordnungen darf kein blindes Remote-Delete folgen.
+
+Ausführen: `dotnet test tests/Permora.Tests/Permora.Tests.csproj -c Release`
+oder über [Permora CI](../.github/workflows/ci.yml). Vor einer Einstufung
+als **nachgewiesen** sind die Checks am **exakten Commit** zu prüfen.
+
 ## Neuester nachgewiesener Integrationsumfang (18.10.2026)
 
 Maßgeblich ist der getestete Commit

@@ -13,6 +13,24 @@
 > Ein grünes CI-Ergebnis ersetzt keine reale AD-/Multi-Host-/Penetrations-/
 > Datenschutzabnahme.
 
+**Engineering-Checkpoint 20.10.2026 (nicht mit 1.0-Abnahme verwechseln):** Der
+aktuelle Referenzstand von `main` ist
+[`e56f1389`](https://github.com/Cenn0/Permora/commit/e56f13891780e1309fe94334e0b07e2086d3b24e).
+Die Kern-CI, die echte isolierte Keycloak-/LDAP-Systemprüfung, der
+Worker-/Recovery-Lauf, Accessibility und öffentliche Dokumentation waren
+auf diesem Commit erfolgreich. Ältere Zahlen und V2-Checkboxen unten sind
+**historische Planpunkte**, keine fehlenden Implementierungsnachweise.
+Das wegen unzureichender Privilegientrennung weiter relevante
+[Security-Issue #46](https://github.com/Cenn0/Permora/issues/46) ist
+geöffnet. Die nächste P4-Verbesserung verhindert mehrdeutige
+Directory-Zielauflösung vor Grants/Remote-Writes und liefert
+Reconcile-Driftbefunde bei doppelten, ungültigen, alten oder deaktivierten
+Identitäten. Die neuen Tests sind in der
+[Testmatrix](testing.md#directory-reconciliation-negativregressionen-20102026)
+beschrieben; ob sie ausgeführt bestanden haben, muss am jeweiligen
+CI-Commit überprüft werden. Das ersetzt weder Microsoft-AD-Tests noch
+realen Token-Widerruf.
+
 **Stand:** 17.10.2026 · **Basis:** Repository `Cenn0/Permora`, Branch `main`, Commit `dc7b7d8ef223f42d9a4b451850b97bd3b04cf5c1`.  
 **Status:** CI-verifizierter Entwicklungsstand; **keine** Produktionsfreigabe.  
 **Leitprinzip:** Erst die tatsächliche Sicherheitsgrenze und den gesamten Rechte-Lebenszyklus nachweisen, danach Komfort, Integration und Skalierung ausbauen.
@@ -231,15 +249,39 @@ Diese Szenarien erhalten für jeden Release getrennte Links zu **Testcode**, **A
 5. **Fail-closed bei unvollständiger Verzeichnis- oder Keycloak-Sicht**, aber sicherer kontrollierter Rechteentzug und sichtbarer Incident-Pfad.
 6. **Versionierter Vertragstest** statt Annahme, dass eine neuere Keycloak-Version automatisch die gleiche FGAP-Semantik hat.
 
-## 8. Nächste fünf konkrete Pull Requests
+## 8. Nächste priorisierte Umsetzungsschritte (aktualisiert 20.10.2026)
 
-1. **`test/security-oidc-bff`** – echter Keycloak-Browser-SSO, CSRF/Logout und Step-up-Tests; erst dann sicherheitsrelevante Logikfixes.
-2. **`test/fine-grained-delegation-matrix`** – FGAP-v2-Negativmatrix mit zwei Teams, Benutzer-/Gruppen-Zielen und Privilegieneskalations-Regressionen.
-3. **`fix/provisioning-state-machine`** – reproduzierbarer IAM-Onboarding-Flow mit geprüfter Audience/Scope-Bindung, Readback und ehrlichen UI-Zuständen.
-4. **`test/revocation-failure-recovery`** – PostgreSQL/Keycloak-Failure-Injection, Multi-Worker, Retry, Fairness und Entzug.
-5. **`feat/directory-sod-remediation`** – externe Directory-Änderungen erkennen, SoD-/Revocation-Remediation und Audit-Alarmierung.
+Die ursprünglichen PR-Vorschläge (OIDC-BFF, Keycloak-FGAP, Worker-Fehler,
+Directory-SoD) wurden inzwischen **teilweise bereits in CI und Code
+umgesetzt**. Aktueller Stand und offene Abnahmebedingungen stehen in
+[Release-Gates](release-checklist.md) und [Issue #3](https://github.com/Cenn0/Permora/issues/3).
+Eine erneute bloße Implementierung derselben Testnamen wäre kein Fortschritt.
 
-Anschließend P5–P7 ausbauen. PRs enthalten jeweils Quellcode **plus** reproduzierbare Tests, dokumentierte Einschränkungen und eine kurze Sicherheitsfolgenabschätzung.
+1. **P4: Directory-Fail-Closed und Remediation** — inkonsistente
+   Directory-IDs, unbekannte Typen und inaktive/stale Identitäten beim
+   Soll-/Ist-Abgleich korrekt als Konflikt ausweisen und vor Keycloak-Writes
+   blockieren. Unit-/HTTP-Regressionen laufen in der normalen CI;
+   **reale Federationsänderungen und gezielte Revocation bleiben separate Gates**.
+2. **P2: FGAP-Gruppen-Privilegien** — [Issue #46](https://github.com/Cenn0/Permora/issues/46):
+   echte Keycloak-Admin-REST-Negativmatrix mit *demselben*
+   Gruppen-Assignment-Servicekonto, nicht nur API-Allowlist; egress,
+   Key-Rotation, Auditmonitoring und dokumentierte zentrale IAM-Risikoannahme.
+   Standardmäßig bleiben neue Gruppengrants gesperrt.
+3. **P4: Vollständige externe Directory-Drift** — in echten Keycloak-/LDAP-
+   Integrationstests Deaktivierung, verschachtelte Mitgliedschaften und
+   kollidierende Gruppenrollen verändern; verifizierte Soll-/Ist- und
+   gesondert freigegebene Entzugsmaßnahmen nachweisen.
+4. **P6: Repräsentativer Betriebsnachweis** — TLS-Reverse-Proxy, isolierte
+   Service-Credentials, automatische Secret-Rotation sowie mindestens zwei
+   API-/Worker-Hosts und echte PostgreSQL-/Keycloak-Failover-Drills.
+   Nicht als erreicht markieren, solange reale Infrastruktur und Messwerte fehlen.
+5. **P6/P7: Koordinierter Recovery- und Release-Gate-Lauf** — Keycloak,
+   PostgreSQL, BFF-Data-Protection-Keys und Secrets gemeinsam restaurieren;
+   RPO/RTO/Entzugslatenzen messen. SBOM/Vulnerability-/Lizenzbefunde und
+   unabhängige WCAG-/Datenschutz-/Security-Abnahme separat erfassen.
+
+Keine Produktionsberechtigung allein aus CI; Pull Requests benötigen
+Quellcode, Tests, genaue Versionsbindung und nachvollziehbare offene Risiken.
 
 ## 9. Definition of Done
 

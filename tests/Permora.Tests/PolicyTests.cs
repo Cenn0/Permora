@@ -53,6 +53,14 @@ public sealed class PolicyTests
     { var f = new Fixture(); Assert.Equal("stale_identity", Assert.Throws<DomainException>(() => f.Plan(f.Grant(), directory: [f.Employee with { SyncedAt = f.Clock.Now.AddMinutes(-16) }])).Code); }
     [Fact] public void Future_dated_directory_record_is_rejected()
     { var f = new Fixture(); Assert.Equal("stale_identity", Assert.Throws<DomainException>(() => f.Plan(f.Grant(), directory: [f.Employee with { SyncedAt = f.Clock.Now.AddMinutes(2) }])).Code); }
+    [Fact] public void Duplicate_directory_identifiers_are_rejected_before_queueing_a_grant()
+    {
+        var f = new Fixture();
+        var duplicate = f.Employee with { KeycloakId = "different-keycloak-identity", Kind = PrincipalKind.Group };
+        var error = Assert.Throws<DomainException>(() => f.Plan(f.Grant(), directory: [f.Employee, duplicate]));
+        Assert.Equal("ambiguous_directory_identity", error.Code);
+        Assert.Equal(409, error.Status);
+    }
     [Fact] public void Cross_realm_target_is_rejected()
     { var f = new Fixture(); Assert.Equal("not_found", Assert.Throws<DomainException>(() => f.Plan(f.Grant(), directory: [f.Employee with { RealmKey = "foreign" }])).Code); }
     [Fact] public void High_risk_self_assignment_is_rejected()

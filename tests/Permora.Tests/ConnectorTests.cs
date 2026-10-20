@@ -292,6 +292,112 @@ public sealed class ConnectorTests
             p => p.Method == HttpMethod.Post && p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Duplicate_directory_identity_blocks_remote_role_mapping_even_during_revocation()
+    {
+        var f = new Fixture();
+        var assignment = f.Assignment();
+        var before = f.App with { Assignments = [assignment] };
+        var duplicate = f.Employee with { KeycloakId = "another-remote-identity", Kind = PrincipalKind.Group };
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+            request.RequestUri!.AbsolutePath.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)
+                ? SafeClient(f) : Json(Array.Empty<object>()));
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            fixture.Connector.ApplyAsync(before, f.App,
+                new Change { Kind = ChangeKind.RevokeAccess, TargetId = assignment.Id, Reason = "Ambiguous identity" },
+                [f.Employee, duplicate], TestContext.Current.CancellationToken));
+        Assert.Equal("ambiguous_directory_identity", error.Code);
+        Assert.DoesNotContain(fixture.Handler.Paths,
+            p => p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Reconciliation_reports_conflicting_directory_records_without_guessing_a_remote_resource()
+    {
+        var f = new Fixture();
+        var assignment = f.Assignment();
+        var app = f.App with { Assignments = [assignment] };
+        var duplicate = f.Employee with { KeycloakId = "another-remote-identity", Kind = PrincipalKind.Group };
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+            request.RequestUri!.AbsolutePath.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)
+                ? SafeClient(f) : Json(Array.Empty<object>()));
+        var findings = await fixture.Connector.InspectAsync(app, [f.Employee, duplicate], TestContext.Current.CancellationToken);
+        Assert.Contains(findings, finding => finding.Resource == assignment.Id.ToString()
+            && finding.Code == "ambiguous_directory_identity");
+        Assert.DoesNotContain(fixture.Handler.Paths,
+            p => p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Reconciliation_reports_invalid_kind_or_empty_remote_identity_without_guessing_a_group(bool emptyKeycloakId)
+    {
+        var f = new Fixture();
+        var invalid = emptyKeycloakId
+            ? f.Employee with { KeycloakId = "" }
+            : f.Employee with { Kind = (PrincipalKind)32767 };
+        var assignment = f.Assignment(principal: invalid.Id);
+        var app = f.App with { Assignments = [assignment] };
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+            request.RequestUri!.AbsolutePath.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)
+                ? SafeClient(f) : Json(Array.Empty<object>()));
+        var findings = await fixture.Connector.InspectAsync(app, [invalid], TestContext.Current.CancellationToken);
+        Assert.Contains(findings, finding => finding.Resource == assignment.Id.ToString()
+            && finding.Code == "invalid_directory_identity");
+        Assert.DoesNotContain(fixture.Handler.Paths,
+            p => p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Reconciliation_reports_stale_directory_identity_instead_of_clean_access()
+    {
+        var f = new Fixture();
+        var stale = f.Employee with { SyncedAt = f.Clock.Now.AddHours(-1) };
+        var assignment = f.Assignment(principal: stale.Id);
+        var app = f.App with { Assignments = [assignment] };
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+            request.RequestUri!.AbsolutePath.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal)
+                ? SafeClient(f) : Json(Array.Empty<object>()));
+        var findings = await fixture.Connector.InspectAsync(app, [stale], TestContext.Current.CancellationToken);
+        Assert.Contains(findings, finding => finding.Resource == assignment.Id.ToString()
+            && finding.Code == "stale_directory_identity");
+        Assert.DoesNotContain(fixture.Handler.Paths,
+            p => p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Reconciliation_reports_disabled_identity_even_if_the_role_is_remote_readable()
+    {
+        var f = new Fixture();
+        var disabled = f.Employee with { Enabled = false };
+        var assignment = f.Assignment(principal: disabled.Id);
+        var app = f.App with { Assignments = [assignment] };
+        var mappedRole = new { id = Guid.NewGuid().ToString(), name = "role.reader",
+            clientRole = true, containerId = f.App.KeycloakClientUuid, composite = false,
+            attributes = new Dictionary<string, string[]> {
+                ["permora.application"] = [f.App.Id.ToString()],
+                ["permora.entity"] = [f.Reader.Id.ToString()] } };
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            // Role-mapping URLs also end in /clients/{uuid}: dispatch them
+            // before the application's client-metadata route.
+            if (path.Contains("/role-mappings/", StringComparison.Ordinal))
+                return Json(new[] { mappedRole });
+            if (path.EndsWith("/clients/" + f.App.KeycloakClientUuid, StringComparison.Ordinal))
+                return SafeClient(f);
+            return Json(Array.Empty<object>());
+        });
+        var findings = await fixture.Connector.InspectAsync(app, [disabled], TestContext.Current.CancellationToken);
+        Assert.Contains(findings, finding => finding.Resource == assignment.Id.ToString()
+            && finding.Code == "ineligible_assigned_identity");
+        Assert.Contains(fixture.Handler.Paths, p => p.Method == HttpMethod.Get
+            && p.Path.Contains("/role-mappings/", StringComparison.Ordinal));
+        Assert.DoesNotContain(fixture.Handler.Paths, p => p.Method != HttpMethod.Get
+            && !p.Path.EndsWith("/token", StringComparison.Ordinal));
+    }
+
     [Fact] public void Stable_directory_identifiers_separate_realm_and_kind()
     { Assert.NotEqual(KeycloakConnector.StableId("one", "user", "123"), KeycloakConnector.StableId("two", "user", "123")); Assert.NotEqual(KeycloakConnector.StableId("one", "user", "123"), KeycloakConnector.StableId("one", "group", "123")); }
     private static HttpResponseMessage SafeClient(Fixture f) => Json(new { id = f.App.KeycloakClientUuid, clientId = f.App.KeycloakClientId, protocol = "openid-connect", enabled = true, fullScopeAllowed = false, serviceAccountsEnabled = false, implicitFlowEnabled = false,
