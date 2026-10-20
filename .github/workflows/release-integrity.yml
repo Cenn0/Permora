@@ -9,12 +9,23 @@ on:
       - 'deploy/Dockerfile'
       - 'Directory.*.props'
       - 'scripts/*release*'
+      # Any change to security acceptance logic invalidates previous source
+      # evidence; ensure fresh PR scans and trusted-main candidates.
+      - 'scripts/ci-federation.py'
+      - 'scripts/ci_federation_worker.py'
+      - 'scripts/ci-worker-system.py'
+      - 'scripts/ci-keycloak-contract.py'
+      - 'scripts/ci-oidc-bff.py'
+      - 'scripts/ci-api-smoke.py'
       - 'scripts/install-syft.py'
       - 'scripts/install-grype.py'
       - 'scripts/scan-release-vulnerabilities.py'
       - 'scripts/vulnerability_policy.py'
       - 'scripts/test_vulnerability_policy.py'
       - '.github/workflows/release-integrity.yml'
+      - '.github/workflows/system-acceptance.yml'
+      - '.github/workflows/worker-system.yml'
+      - '.github/workflows/multiworker-load.yml'
   push:
     branches: [main]
     paths:
@@ -27,6 +38,14 @@ on:
       - 'global.json'
       - 'tools/accessibility/**'
       - 'scripts/*release*'
+      # Any change to security acceptance logic invalidates previous source
+      # evidence; ensure fresh PR scans and trusted-main candidates.
+      - 'scripts/ci-federation.py'
+      - 'scripts/ci_federation_worker.py'
+      - 'scripts/ci-worker-system.py'
+      - 'scripts/ci-keycloak-contract.py'
+      - 'scripts/ci-oidc-bff.py'
+      - 'scripts/ci-api-smoke.py'
       - 'scripts/install-syft.py'
       - 'scripts/install-grype.py'
       - 'scripts/vulnerability_policy.py'
@@ -34,6 +53,7 @@ on:
       - '.github/workflows/ci.yml'
       - '.github/workflows/system-acceptance.yml'
       - '.github/workflows/worker-system.yml'
+      - '.github/workflows/multiworker-load.yml'
       - '.github/workflows/accessibility.yml'
       - '.github/workflows/release-integrity.yml'
   workflow_dispatch:
