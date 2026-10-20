@@ -175,6 +175,10 @@ def run_worker_acceptance(kc, workspace, realm, base, subject_user,
             base + "/clients?clientId=realm-management")[1] if c["clientId"] == "realm-management")
         view = kc.request("GET", base + "/clients/" + management + "/roles/view-users")[1]
         kc.request("POST", base + "/users/" + account + "/role-mappings/clients/" + management, [view])
+        # With Full Scope Allowed disabled, a service account role must ALSO
+        # be in its client's explicit role scope. Otherwise the resulting
+        # token lacks view-users and Keycloak GET /users returns HTTP 403.
+        kc.request("POST", base + "/clients/" + cid + "/scope-mappings/clients/" + management, [view])
         # Probe the *exact directory credential* used by the real worker.
         # The service may read user lists yet have no access to nested group
         # membership; that must fail the acceptance instead of claiming sync.
