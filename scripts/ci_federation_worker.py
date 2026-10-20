@@ -274,7 +274,7 @@ def run_worker_acceptance(kc, workspace, realm, base, subject_user,
                 diagnostic = Path(log.name).read_text(errors="replace")
                 for sensitive in (password, scoped_secret, directory_secret):
                     diagnostic = diagnostic.replace(sensitive, "[REDACTED]")
-                diagnostic = re.sub(r"eyJ[A-Za-z0-9_-]+\\.eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+",
+                diagnostic = re.sub(r"[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}",
                                     "[REDACTED-TOKEN]", diagnostic)
                 for line in diagnostic.splitlines()[-35:]:
                     print("CI-WORKER-DIAG:", line[:350], flush=True)
