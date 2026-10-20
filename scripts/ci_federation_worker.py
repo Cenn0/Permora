@@ -175,6 +175,24 @@ def run_worker_acceptance(kc, workspace, realm, base, subject_user,
             base + "/clients?clientId=realm-management")[1] if c["clientId"] == "realm-management")
         view = kc.request("GET", base + "/clients/" + management + "/roles/view-users")[1]
         kc.request("POST", base + "/users/" + account + "/role-mappings/clients/" + management, [view])
+        # Probe the *exact directory credential* used by the real worker.
+        # The service may read user lists yet have no access to nested group
+        # membership; that must fail the acceptance instead of claiming sync.
+        directory_token = kc.request("POST",
+            "/realms/" + realm + "/protocol/openid-connect/token",
+            {"grant_type": "client_credentials", "client_id": directory_name,
+             "client_secret": directory_secret}, admin=False, form=True)[1]["access_token"]
+        directory_users = kc.request("GET",
+            base + "/users?first=0&max=100&briefRepresentation=false",
+            token=directory_token)[1]
+        kc.request("GET", base + "/groups?first=0&max=100&briefRepresentation=false",
+                   token=directory_token)
+        kc.request("GET", base + "/groups/" + group["id"] + "/members?first=0&max=100",
+                   token=directory_token)
+        kc.request("GET", base + "/groups/" + group["id"] + "/children?first=0&max=100",
+                   token=directory_token)
+        check(any(u["id"] == other_user["id"] for u in directory_users),
+              "Worker directory token sees imported federated target user")
         assignments_token = kc.request("POST",
             "/realms/" + realm + "/protocol/openid-connect/token",
             {"grant_type": "client_credentials", "client_id": "limited-mapper",
@@ -240,6 +258,22 @@ def run_worker_acceptance(kc, workspace, realm, base, subject_user,
             if count("SELECT count(*) FROM directory WHERE id=" + quote(group_guid)) == 1:
                 break
             time.sleep(1)
+        if count("SELECT count(*) FROM directory WHERE id=" + quote(group_guid)) != 1:
+            print("CI-DIAG: persisted directory rows=" +
+                  str(count("SELECT count(*) FROM directory")) +
+                  " groupRows=" + str(count("SELECT count(*) FROM directory WHERE document->>'kind'='Group'")),
+                  flush=True)
+            # Diagnostics are bounded and scrubbed; never expose client secrets.
+            import re
+            for log in logs:
+                log.flush()
+                diagnostic = Path(log.name).read_text(errors="replace")
+                for sensitive in (password, scoped_secret, directory_secret):
+                    diagnostic = diagnostic.replace(sensitive, "[REDACTED]")
+                diagnostic = re.sub(r"eyJ[A-Za-z0-9_-]+\\.eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+",
+                                    "[REDACTED-TOKEN]", diagnostic)
+                for line in diagnostic.splitlines()[-35:]:
+                    print("CI-WORKER-DIAG:", line[:350], flush=True)
         check(count("SELECT count(*) FROM directory WHERE id=" + quote(group_guid)) == 1,
               "Actual worker persisted the Keycloak/LDAPS group snapshot into PostgreSQL")
         check(count("SELECT count(*) FROM operations") == 0,
