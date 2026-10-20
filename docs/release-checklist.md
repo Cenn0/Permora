@@ -1,5 +1,40 @@
 # Permora 1.0 — verifiable engineering and production release gates
 
+## New verified engineering evidence — 20 October 2026
+
+The merged [PR #57](https://github.com/Cenn0/Permora/pull/57) is present
+on `main` commit
+[`c83711c269204ada7f3dade33b68a036e373962c`](https://github.com/Cenn0/Permora/commit/c83711c269204ada7f3dade33b68a036e373962c).
+All six workflows passed on the **same** merged commit:
+[core xUnit/build/BFF](https://github.com/Cenn0/Permora/actions/runs/39416605015)
+(221 xUnit passed, none skipped),
+[real LDAPS federation](https://github.com/Cenn0/Permora/actions/runs/39416604931),
+[two-process worker/recovery](https://github.com/Cenn0/Permora/actions/runs/39416605037),
+[automated accessibility](https://github.com/Cenn0/Permora/actions/runs/39416604905),
+[artifact integrity](https://github.com/Cenn0/Permora/actions/runs/39416604980)
+and [documentation](https://github.com/Cenn0/Permora/actions/runs/39416605443).
+Artifact signing creates an **unpublished draft candidate**, not a production
+release or legal/security approval.
+
+**R07/P4 improvement, still PARTIAL:** The genuine OpenLDAP/LDAPS/Keycloak
+matrix now tests inherited effective client-role removal and restoration after
+an external LDAP member switch (import enabled and disabled). Domain and
+workflow regressions fail closed on stale/ambiguous directory evidence for
+automatic SoD revocations and access-review retention. These independent
+tests **do not** demonstrate that the running Permora worker observes and
+reconciles that same upstream change end to end. Its dedicated
+[acceptance issue #58](https://github.com/Cenn0/Permora/issues/58) remains
+open. Representative Microsoft Active Directory, FGAP `Groups.manage`
+blast-radius acceptance, real ingress TLS/secret rotation/multi-host HA,
+coordinated disaster recovery, independent accessibility/security/privacy
+and accountable vulnerability/license decisions remain outstanding
+[release gates #3](https://github.com/Cenn0/Permora/issues/3) and
+[security blocker #46](https://github.com/Cenn0/Permora/issues/46).
+
+The historical 18 October baseline and `5017624d` checkpoint below are
+retained solely for traceability, **not** as the current branch head.
+
+
 **Assessment date:** 18 October 2026. **Verified baseline commit:**
 `c0a5e0eed07006c20373ea08ff9b162ef831da52`.
 
