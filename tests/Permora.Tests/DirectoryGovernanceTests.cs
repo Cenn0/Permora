@@ -20,7 +20,7 @@ public sealed class DirectoryGovernanceTests
                 f.Assignment(f.Supervisor.Id, group.Id)
             ]
         };
-        Assert.Equal([app.Assignments[1].Id], DirectoryGovernance.GroupRevocationsForSeparation(app, [f.OwnerPrincipal, group]));
+        Assert.Equal([app.Assignments[1].Id], DirectoryGovernance.GroupRevocationsForSeparation(app, [f.OwnerPrincipal, group], f.Clock.Now));
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public sealed class DirectoryGovernanceTests
             Policy = f.App.Policy with { SeparationRules = [new(f.Reader.Id, f.Supervisor.Id, "Conflict")] },
             Assignments = [f.Assignment(f.Reader.Id, groupA.Id), f.Assignment(f.Supervisor.Id, groupB.Id)]
         };
-        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(app, [groupA, groupB]));
+        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(app, [groupA, groupB], f.Clock.Now));
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public sealed class DirectoryGovernanceTests
             Policy = f.App.Policy with { SeparationRules = [new(f.Reader.Id, f.Supervisor.Id, "Conflict")] },
             Assignments = [f.Assignment(f.Reader.Id, groupA.Id), f.Assignment(f.Supervisor.Id, groupB.Id)]
         };
-        Assert.Equal(app.Assignments.Select(a => a.Id).Order(), DirectoryGovernance.GroupRevocationsForSeparation(app, [groupA, groupB]));
+        Assert.Equal(app.Assignments.Select(a => a.Id).Order(), DirectoryGovernance.GroupRevocationsForSeparation(app, [groupA, groupB], f.Clock.Now));
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class DirectoryGovernanceTests
             Policy = f.App.Policy with { SeparationRules = [new(f.Reader.Id, f.Supervisor.Id, "Conflict")] },
             Assignments = [f.Assignment(f.Reader.Id, f.OwnerPrincipal.Id), f.Assignment(f.Supervisor.Id, group.Id)]
         };
-        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(app, [f.OwnerPrincipal, group]));
+        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(app, [f.OwnerPrincipal, group], f.Clock.Now));
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class DirectoryGovernanceTests
             Policy = f.App.Policy with { SeparationRules = [new(f.Reader.Id, f.Supervisor.Id, "Conflict")] },
             Assignments = [f.Assignment(f.Reader.Id, f.OwnerPrincipal.Id), f.Assignment(f.Supervisor.Id, group.Id)]
         };
-        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(app, [f.OwnerPrincipal, group]));
+        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(app, [f.OwnerPrincipal, group], f.Clock.Now));
     }
     [Fact]
     public void Incomplete_assigned_group_must_be_reported_as_unverifiable()
@@ -93,7 +93,7 @@ public sealed class DirectoryGovernanceTests
         var app = f.App with { Assignments = [grant] };
 
         Assert.Equal([grant.Id], DirectoryGovernance.UnverifiableGroupAssignments(app, [group], f.Clock.Now));
-        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(app, [group]));
+        Assert.Empty(DirectoryGovernance.GroupRevocationsForSeparation(app, [group], f.Clock.Now));
     }
 
     [Fact]
