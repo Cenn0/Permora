@@ -37,6 +37,19 @@ offen: `Groups.manage` ist keine Mapping-only-Berechtigung.
 Fremd-/Gruppen-, AD-, Netzwerk-/Secret-/Audit- und
 Mehrhost-/Recovery-Grenzen benötigen separate Betriebsnachweise.
 
+**P4-Nachtrag 20.10.2026 – bestehende unsichtbare Zuweisungen:**
+Ein anderer bislang nicht ausreichend getesteter SoD-Fall wird in
+[Policy](../src/Permora.Core/Policy.cs) abgesichert: Fehlt eine früher
+zugewiesene (potenziell weiterhin bei Keycloak wirksame) Identität
+in einem frischen Directory-Snapshot, werden zusätzliche Grants und
+Rollen-Eskalationen zurückgewiesen. Doppelte, veraltete,
+fremdrealmige, deaktivierte, geschützte und unvollständige
+Einträge scheitern ebenfalls; reine Entzüge bleiben möglich.
+Die zugehörigen [Regressionen](testing.md#p4-vorhandene-aber-unsichtbare-zuweisungen-20102026)
+gelten erst nach erfolgreichem CI-Lauf des neuen Commits als nachgewiesen.
+Die organisatorische Remediation und echte LDAP-/AD-Fehlerinjektionen
+stehen weiterhin aus.
+
 **Stand:** 17.10.2026 · **Basis:** Repository `Cenn0/Permora`, Branch `main`, Commit `dc7b7d8ef223f42d9a4b451850b97bd3b04cf5c1`.  
 **Status:** CI-verifizierter Entwicklungsstand; **keine** Produktionsfreigabe.  
 **Leitprinzip:** Erst die tatsächliche Sicherheitsgrenze und den gesamten Rechte-Lebenszyklus nachweisen, danach Komfort, Integration und Skalierung ausbauen.
