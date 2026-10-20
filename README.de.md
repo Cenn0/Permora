@@ -30,7 +30,7 @@ Permora ist ein eigenständiges, quelloffenes **C#-/Angular-Portal** für die ei
 > **Microsoft-AD-spezifische Integration, echter Multi-Host-TLS-/HA-Betrieb,
 > betriebliche Schlüssel-/Secret-Rotation und gemessene Recovery-Ziele,
 > manuelle Accessibility-Tests, Drittanbieter-Lizenzkonformität,
-> Datenschutz-Retention/WORM und unabhängige Penetrationstests sind ungeprüft.****
+> Datenschutz-Retention/WORM und unabhängige Penetrationstests sind ungeprüft.**
 
 ## Was Permora abdeckt
 
