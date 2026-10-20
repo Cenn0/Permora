@@ -242,7 +242,7 @@ def test_realm(kc, bind_secret, imported, group_members, workspace):
             # user-role writes are attempted in this worker fixture.
             from ci_federation_worker import run_worker_acceptance
             run_worker_acceptance(kc, workspace, realm, base, subject, other,
-                                  group, group_members, check)
+                                  group, group_members, check, ca, secret)
 
     finally:
         kc.request('DELETE', base, expected=(204, 404))
