@@ -156,6 +156,62 @@ public sealed class WorkflowTests
         var service = new ChangeService(store, f.Admins, f.Clock); var review = await service.StartReviewAsync(f.App.Id, f.Owner, "Quarterly review", f.Clock.Now.AddHours(1), Ct);
         Assert.Equal("self_certification", (await Assert.ThrowsAsync<DomainException>(() => service.ReviewAsync(f.App.Id, review.Id, assignment.Id, f.Owner, true, Ct))).Code);
     }
+
+    [Theory]
+    [InlineData("missing", "identity_missing")]
+    [InlineData("foreign", "identity_missing")]
+    [InlineData("duplicate", "ambiguous_directory_identity")]
+    [InlineData("unknown-kind", "invalid_directory_identity")]
+    [InlineData("empty-remote", "invalid_directory_identity")]
+    [InlineData("stale", "stale_identity")]
+    [InlineData("incomplete-group", "incomplete_group")]
+    [InlineData("disabled", "self_certification")]
+    public async Task Access_review_refuses_unreliable_directory_without_recording_certification(
+        string scenario, string expectedCode)
+    {
+        var f = new Fixture();
+        var store = new MemoryStore(f);
+        var assignment = f.Assignment();
+        store.App = store.App with { Assignments = [assignment] };
+        store.Directory = scenario switch
+        {
+            "missing" => [],
+            "foreign" => [f.Employee with { RealmKey = "another-realm" }],
+            "duplicate" => [f.Employee, f.Employee with { KeycloakId = "another-user" }],
+            "unknown-kind" => [f.Employee with { Kind = (PrincipalKind)999 }],
+            "empty-remote" => [f.Employee with { KeycloakId = "" }],
+            "stale" => [f.Employee with { SyncedAt = f.Clock.Now.AddHours(-1) }],
+            "incomplete-group" => [f.Employee with { Kind = PrincipalKind.Group, MembershipComplete = false }],
+            "disabled" => [f.Employee with { Enabled = false }],
+            _ => throw new InvalidOperationException()
+        };
+        var service = new ChangeService(store, f.Admins, f.Clock);
+        var review = await service.StartReviewAsync(
+            f.App.Id, f.Owner, "Quarterly review", f.Clock.Now.AddHours(1), Ct);
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            service.ReviewAsync(f.App.Id, review.Id, assignment.Id, f.Owner, true, Ct));
+        Assert.Equal(expectedCode, error.Code);
+        Assert.Equal("Pending", Assert.Single(store.Reviews[review.Id].Items).Decision);
+        Assert.Empty(store.Operations);
+    }
+
+    [Fact]
+    public async Task Valid_independent_reviewer_can_still_certify_access()
+    {
+        var f = new Fixture();
+        var store = new MemoryStore(f);
+        var assignment = f.Assignment();
+        store.App = store.App with { Assignments = [assignment] };
+        var service = new ChangeService(store, f.Admins, f.Clock);
+        var review = await service.StartReviewAsync(
+            f.App.Id, f.Owner, "Quarterly review", f.Clock.Now.AddHours(1), Ct);
+        var decided = await service.ReviewAsync(
+            f.App.Id, review.Id, assignment.Id, f.Owner, true, Ct);
+        Assert.Equal("Retained", Assert.Single(decided.Items).Decision);
+        Assert.True(decided.Closed);
+        Assert.Empty(store.Operations);
+    }
+
     [Fact] public async Task Pending_binding_never_activates_without_explicit_central_iam_attestation()
     {
         var f = new Fixture(); var store = new MemoryStore(f) { App = f.App with { Status = ApplicationStatus.AwaitingIam } };
