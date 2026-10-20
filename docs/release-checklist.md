@@ -1,5 +1,44 @@
 # Permora 1.0 — verifiable engineering and production release gates
 
+## 20 October 2026 — joined LDAP/worker integration and release boundary
+
+[PR #60](https://github.com/Cenn0/Permora/pull/60) merged at
+[`e3bfcf6ca6b2`](https://github.com/Cenn0/Permora/commit/e3bfcf6ca6b234d4f2082aaa633d95e95cfffbc4).
+All **seven exact-PR-SHA workflows** passed on `dacae649479d`,
+including [real system acceptance](https://github.com/Cenn0/Permora/actions/runs/39432701299),
+[worker recovery](https://github.com/Cenn0/Permora/actions/runs/39432701343),
+[bounded multiworker load](https://github.com/Cenn0/Permora/actions/runs/39432701364),
+[core CI](https://github.com/Cenn0/Permora/actions/runs/39432701392)
+and [candidate vulnerability/SBOM integrity](https://github.com/Cenn0/Permora/actions/runs/39432701640).
+
+This closes an **engineering evidence gap**, not release gate R07:
+the actual Release worker first persists a real imported-LDAPS
+Keycloak directory snapshot, then handles an upstream LDAP membership
+change that creates conflicting effective access. It queues and applies
+one targeted group revocation, preserves the unrelated direct user
+mapping, writes immutable audit evidence, and verifies remote Keycloak
+postconditions after recovery of group membership. An isolated earlier
+iteration measured 2.29 seconds from worker restart to verified revoke;
+this is **not** a production p95/p99 or approved SLO.
+
+Service-account `realm-management:view-users` must be both assigned to
+the directory principal **and** in the client role-scope mappings when
+`fullScopeAllowed=false`; this is a realm-wide read permission requiring
+separate central IAM approval, not an application-only minimal entitlement.
+The joined fixture intentionally reuses the known scoped group-mapping
+principal for two roles; real deployments still need independently reviewed
+separate credentials. See [Keycloak configuration](keycloak.md) and
+[exact acceptance issue #58](https://github.com/Cenn0/Permora/issues/58).
+
+**Still blocked:** joined non-imported LDAP worker and injected LDAP
+visibility-loss cases, actual Microsoft Active Directory, FGAP
+`Groups.manage` privilege acceptance (#46), operator TLS/HA/rotation,
+coordinated DR/RPO/RTO, independent penetration/WCAG/GDPR/DPIA,
+WORM/SIEM evidence, and accountable license/vulnerability signoffs.
+[Issue #3](https://github.com/Cenn0/Permora/issues/3) remains open.
+A signed draft candidate never means completed 1.0 approval.
+
+
 ## New verified engineering evidence — 20 October 2026
 
 The merged [PR #57](https://github.com/Cenn0/Permora/pull/57) is present
