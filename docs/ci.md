@@ -1,5 +1,31 @@
 # Permora CI: Tests, Belege und Grenzen
 
+## 20.10.2026 — gemeinsamer LDAPS-/Worker-Integrationstest
+
+[PR #60](https://github.com/Cenn0/Permora/pull/60) auf exaktem Test-SHA
+`dacae649479d0b23b7c18779e3a4cd3d73b3873e`:
+**alle sieben ausgelösten Workflows erfolgreich**. Der
+[System-Lauf](https://github.com/Cenn0/Permora/actions/runs/39432701299)
+prüft erstmals einen echten OpenLDAP-Gruppenwechsel bis zum verifizierten
+Entzug durch den tatsächlich gebauten .NET-Worker, mit PostgreSQL,
+SoD-Entscheidung, Audit und Keycloak-Readback. Die
+[Worker-/Recovery-CI](https://github.com/Cenn0/Permora/actions/runs/39432701343)
+validiert außerdem die effektive Directory-Servicekonto-Sicht, statt sich
+allein auf bereits im Test gespeicherte Directory-Zeilen zu verlassen.
+
+Aufgrund explizit deaktiviertem `FullScopeAllowed` benötigen Keycloak-
+Servicekonten neben `realm-management:view-users` eine **passende
+Role-Scope-Zuweisung am Service-Client**. Der reale Test hat das vorher
+fehlende Token-Recht als HTTP 403 reproduziert. Dieser Fix ist eine
+Test-/Konfigurationskorrektur, keine Behauptung minimaler Sichtbarkeit:
+`view-users` umfasst im Realm mehr als eine einzelne Permora-Anwendung.
+
+**Nicht bewiesen:** nicht importierter LDAP-Worker-End-to-End-Fall,
+Microsoft AD, reales Netz-/TLS-/Keycloak-/DB-Failover in mehreren Zonen,
+individuelle Betriebs-RPO/RTO, unabhängige Prüfungen oder Produktionsabnahme.
+Die nachfolgenden Zwischenstände von 16.–18.10. bleiben historisch.
+
+
 ## Verbindliche aktuelle Evidenz – 18.10.2026
 
 **Prüfstand:** [Produktionsfreigabe- und Testmatrix](release-checklist.md),
