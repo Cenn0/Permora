@@ -338,7 +338,7 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
         foreach (var assignmentId in DirectoryGovernance.UnverifiableGroupAssignments(app, directory, clock.GetUtcNow()))
             findings.Add(new(assignmentId.ToString(), "group_membership_unverified",
                 "Complete, fresh group membership is unavailable; effective access cannot be certified."));
-        foreach (var assignmentId in DirectoryGovernance.GroupRevocationsForSeparation(app, directory))
+        foreach (var assignmentId in DirectoryGovernance.GroupRevocationsForSeparation(app, directory, clock.GetUtcNow()))
             findings.Add(new(assignmentId.ToString(), "external_group_sod",
                 "Current directory group membership conflicts with the application's separation policy; revoke the group grant."));
         foreach (var item in expected)
