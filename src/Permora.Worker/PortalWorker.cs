@@ -46,7 +46,7 @@ public sealed class PortalWorker(IServiceProvider services, KeycloakOptions opti
                                     // approval. Revoke affected group grants, not unrelated direct
                                     // individual assignments, when current complete membership
                                     // makes a newly conflicting SoD pair effective.
-                                    foreach (var assignmentId in DirectoryGovernance.GroupRevocationsForSeparation(tx.Application, snapshot))
+                                    foreach (var assignmentId in DirectoryGovernance.GroupRevocationsForSeparation(tx.Application, snapshot, now))
                                         await ChangeService.QueueRevocationAsync(tx, assignmentId, "External group membership violates separation of duties", now, budget.Token);
                                     return true;
                                 }, budget.Token);
