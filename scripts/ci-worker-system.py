@@ -296,6 +296,9 @@ def run():
                     if profile=='directory':
                         read_role=kc.request('GET',base+'/clients/'+management+'/roles/view-users')
                         kc.request('POST',base+'/users/'+account+'/role-mappings/clients/'+management,[read_role])
+                        # FullScopeAllowed=false intentionally: both the service
+                        # account and its client role scope must include view-users.
+                        kc.request('POST',base+'/clients/'+cid+'/scope-mappings/clients/'+management,[read_role])
                 connection=f'Host=127.0.0.1;Port={PGPORT};Database=permora_test_portal;Username=permora_ci;Password={pg_secret}'
                 configurations[worker]={'ConnectionStrings':{'Portal':connection},
                     'Portal':{'Authority':issuer,'AllowHttpInDevelopment':True,'AdministratorSubjects':[]},
