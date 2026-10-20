@@ -86,7 +86,7 @@ class Keycloak:
         return status, parsed, location
 
 
-def test_realm(kc, bind_secret, imported, group_members):
+def test_realm(kc, bind_secret, imported, group_members, workspace):
     group_members('federated0')
     realm = 'permora-federation-' + uuid.uuid4().hex[:10]
     base, mode = '/admin/realms/' + realm, 'imported' if imported else 'non-imported'
@@ -235,6 +235,15 @@ def test_realm(kc, bind_secret, imported, group_members):
         kc.request('DELETE', group_path, [own], token=delegated)
         check(not any(r['id'] == own['id'] for r in kc.request('GET', effective)[1]), mode + ': inherited access revoked and verified')
         check(kc.request('GET', user_path(subject))[1]['enabled'], mode + ': denied account changes had no side effect')
+        if imported and os.environ.get('PERMORA_FEDERATION_WORKER') == 'isolated':
+            # Integration proof across all four real processes, not a portal mock.
+            # The non-imported mode remains covered by the preceding direct
+            # Keycloak inherited-role contract; no unsupported direct LDAP
+            # user-role writes are attempted in this worker fixture.
+            from ci_federation_worker import run_worker_acceptance
+            run_worker_acceptance(kc, workspace, realm, base, subject, other,
+                                  group, group_members, check)
+
     finally:
         kc.request('DELETE', base, expected=(204, 404))
 
@@ -327,7 +336,7 @@ access to * by * read
             else:
                 raise TimeoutError('Disposable Keycloak did not become ready')
             for imported in (True, False):
-                test_realm(kc, bind_secret, imported, group_members)
+                test_realm(kc, bind_secret, imported, group_members, root)
             print(json.dumps({'scope': 'real-openldap-ldaps-and-keycloak', 'checks': len(CHECKS),
                 'nonImportedReadOnlyDirectWrites': 'unsupported-and-rejection-verified',
                 'microsoftAD': 'not-executed', 'productionApproval': False}), flush=True)
