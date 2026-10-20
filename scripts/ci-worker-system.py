@@ -233,11 +233,28 @@ def run():
                     env=dict(os.environ, POSTGRES_PASSWORD=pg_secret))
             started_pg = True
             for _ in range(60):
-                if subprocess.run(['docker','exec',pg,'pg_isready','-U','permora_ci'],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5).returncode == 0: break
+                try:
+                    ready = subprocess.run(['docker','exec',pg,'pg_isready','-U','permora_ci'],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5).returncode == 0
+                    if ready and sql('postgres','SELECT 1') == '1':
+                        break
+                except RuntimeError:
+                    pass  # PostgreSQL can accept readiness probes before SQL connections stabilize.
                 time.sleep(1)
-            else: raise TimeoutError('Own PostgreSQL did not become ready')
-            sql('postgres','CREATE DATABASE permora_test_portal; CREATE DATABASE permora_test_keycloak;')
+            else:
+                raise TimeoutError('Own PostgreSQL did not accept a real SQL connection')
+            for database in ('permora_test_portal', 'permora_test_keycloak'):
+                # Connection-drop ambiguity around CREATE DATABASE must not turn
+                # an already-committed create into a spurious duplicate error.
+                for _ in range(15):
+                    try:
+                        if sql('postgres','SELECT count(*) FROM pg_database WHERE datname=' + quote(database)) == '0':
+                            sql('postgres','CREATE DATABASE ' + database + ';')
+                        break
+                    except RuntimeError:
+                        time.sleep(1)
+                else:
+                    raise TimeoutError('Disposable PostgreSQL failed to initialize databases')
             kc = start_keycloak('permora_test_keycloak')
             kc.request('POST','/admin/realms',{'realm':realm,'enabled':True,'adminPermissionsEnabled':True})
             def client(name, app=None, service=False):
