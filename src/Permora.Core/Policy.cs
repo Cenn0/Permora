@@ -111,13 +111,10 @@ public static partial class Policy
                 else
                 {
                     var previous = Get(app.Roles, r => r.Id == change.TargetId);
-                    foreach (var assignment in app.Assignments.Where(a => a.RoleId == previous.Id))
-                    {
-                        var principal = Get(directory, p => p.Id == assignment.PrincipalId);
-                        Fresh(principal, now);
-                        if (principal.Kind == PrincipalKind.Group && !principal.MembershipComplete)
-                            throw new DomainException("incomplete_group", "Effective members must be verified before editing an assigned role.", 409);
-                    }
+                    // A hidden or ambiguous existing group grant can contain the
+                    // current actor. Do not rely on a partial effective-role view
+                    // before granting privileged permissions through a role edit.
+                    RequireReliableAssignedDirectory(app, directory, now);
                     if (permissions.Any(p => p.Risk == Risk.High && !previous.PermissionIds.Contains(p.Id))
                         && EffectiveRoleIds(app, actor.Key, directory).Contains(previous.Id))
                         throw new DomainException("self_escalation", "You cannot add privileged permissions to your own effective role.", 403);
@@ -159,12 +156,10 @@ public static partial class Policy
                 if (change.ExpiresAt is { } expiry && (expiry <= now || expiry > now.AddDays(app.Policy.MaxGrantDays)))
                     throw new DomainException("invalid_expiry", "Expiration exceeds the application's policy.");
                 Unique(app.Assignments.Any(a => a.PrincipalId == target.Id && a.RoleId == assignedRole.Id));
-                foreach (var group in directory.Where(p => p.Kind == PrincipalKind.Group
-                    && app.Assignments.Any(a => a.PrincipalId == p.Id)))
-                {
-                    Fresh(group, now);
-                    if (!group.MembershipComplete) throw new DomainException("incomplete_group", "An existing group assignment needs verification.", 409);
-                }
+                // A currently invisible existing assignment could represent a
+                // group with conflicting inherited roles. Checking only groups
+                // present in today's directory silently misses that exposure.
+                RequireReliableAssignedDirectory(app, directory, now);
                 // An empty group can acquire members later. Check its own grants as well as today's members.
                 var direct = app.Assignments.Where(a => a.PrincipalId == target.Id).Select(a => a.RoleId).Append(assignedRole.Id).ToHashSet();
                 if (app.Policy.SeparationRules.Any(rule => direct.Contains(rule.FirstRoleId) && direct.Contains(rule.SecondRoleId)))
@@ -192,6 +187,45 @@ public static partial class Policy
         var requiresApproval = !systemRevocation && change.Kind is not (ChangeKind.RevokeAccess or ChangeKind.Reconcile)
             && (app.Policy.RequireApproval || privileged);
         return new Plan(next with { Revision = app.Revision + 1 }, requiresApproval, $"{change.Kind}: {change.Reason}");
+    }
+
+    /// <summary>
+    /// Fail closed on incomplete visibility of ANY existing assignment before
+    /// creating a new grant or increasing an assigned role's authority. An
+    /// existing user/group may still have a Keycloak mapping while absent from
+    /// the current portal snapshot; that must not erase potential SoD conflicts.
+    /// This check is intentionally NOT used by RevokeAccess.
+    /// </summary>
+    private static void RequireReliableAssignedDirectory(ApplicationDocument app,
+        IReadOnlyList<DirectoryPrincipal> directory, DateTimeOffset now)
+    {
+        if (app.Assignments.Count == 0) return;
+
+        // One indexed pass avoids multiplying directory size by the number of
+        // assignments (up to 10,000 per application).
+        var scoped = directory.Where(p => p.RealmKey == app.RealmKey)
+            .GroupBy(p => p.Id)
+            .ToDictionary(g => g.Key, g => g.Take(2).ToArray());
+        foreach (var id in app.Assignments.Select(a => a.PrincipalId).Distinct())
+        {
+            if (!scoped.TryGetValue(id, out var matches))
+                throw new DomainException("directory_incomplete",
+                    "An existing assignment is not visible in the current realm directory. Reconcile before granting access.", 409);
+            if (matches.Length != 1)
+                throw new DomainException("ambiguous_directory_identity",
+                    "An existing assignment resolves to multiple directory identities. Reconcile before granting access.", 409);
+            var principal = matches[0];
+            if (!Enum.IsDefined(principal.Kind) || string.IsNullOrWhiteSpace(principal.KeycloakId))
+                throw new DomainException("invalid_directory_identity",
+                    "An existing assignment has an invalid directory identity.", 409);
+            Fresh(principal, now);
+            if (principal.Kind == PrincipalKind.Group && !principal.MembershipComplete)
+                throw new DomainException("incomplete_group",
+                    "An existing assigned group's effective membership must be verified before changing access.", 409);
+            if (!principal.Enabled || principal.Protected)
+                throw new DomainException("ineligible_existing_identity",
+                    "An existing assignment targets a disabled or protected identity. Reconcile and revoke it before granting more access.", 409);
+        }
     }
 
     public static IReadOnlySet<Guid> EffectiveRoleIds(ApplicationDocument app, string subjectKey, IReadOnlyList<DirectoryPrincipal> directory)

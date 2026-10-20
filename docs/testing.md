@@ -1,5 +1,36 @@
 # Teststrategie und Ausführung
 
+## P4: vorhandene, aber unsichtbare Zuweisungen (20.10.2026)
+
+Neue `PolicyTests` adressieren einen bislang nicht ausreichend
+abgesicherten Grant-/SoD-Pfad: Frühere Rollen-Zuweisungen können weiterhin
+in Keycloak bestehen, obwohl eine Benutzer- oder Gruppenidentität aus dem
+heutigen Directory-Snapshot fehlt. Ein solcher Eintrag darf weder
+als leere Gruppe noch als sicher nicht vorhandene effektive Rolle gelten.
+
+Vor **GrantAccess** und **UpdateRole** validiert der Domain-Plan sämtliche
+bestehenden Zuweisungsziele anhand eines eindeutigen, frischen
+In-Realm-Snapshots (einmalig nach lokaler ID indiziert):
+
+- Fehlendes Ziel oder nur fremder Realm: `directory_incomplete` (409).
+- Doppelte lokale Identität: `ambiguous_directory_identity` (409).
+- Ungültige Principal-Art/Keycloak-ID: `invalid_directory_identity` (409).
+- Veralteter/Zukunfts-Zeitstempel: `stale_identity` (409).
+- Unvollständige zugewiesene Gruppe: `incomplete_group` (409).
+- Deaktivierte/geschützte zugewiesene Identität:
+  `ineligible_existing_identity` (409).
+
+**RevokeAccess bleibt davon ausgenommen**: Ein notwendiger Entzug darf
+durch den unvollständigen Snapshot nicht wegen dieser neuen Grant-Sperre
+verhindert werden. Das tatsächliche Keycloak-Ziel muss der Connector
+separat eindeutig verifizieren; bei unklaren Remote-IDs ist manuelle
+Klärung nötig.
+
+Die Tests enthalten außerdem einen zulässigen Grant bei vollständiger
+Directory-Sicht. Erst ein erfolgreicher `dotnet test`- und
+GitHub-CI-Lauf am konkreten Commit belegt die Ausführung. Die Regel
+ersetzt weder echte LDAP-/AD-Fehlerszenarien noch sofortigen JWT-Widerruf.
+
 ## Erweiterte Keycloak-FGAP-Gruppenadministrationsmatrix (20.10.2026)
 
 `scripts/ci-keycloak-contract.py` erweitert den isolierten **echten

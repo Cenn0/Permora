@@ -61,6 +61,108 @@ public sealed class PolicyTests
         Assert.Equal("ambiguous_directory_identity", error.Code);
         Assert.Equal(409, error.Status);
     }
+    [Fact]
+    public void Invisible_existing_group_cannot_hide_a_separation_conflict()
+    {
+        var f = new Fixture();
+        // A group grant may remain effective in Keycloak although the directory
+        // snapshot omitted the group. Its members are unknown, not empty.
+        var hiddenGroup = f.OwnerPrincipal with { Kind = PrincipalKind.Group, EffectiveMemberKeys = [f.Employee.SubjectKey] };
+        var app = f.App with
+        {
+            Assignments = [f.Assignment(f.Reader.Id, hiddenGroup.Id)],
+            Policy = f.App.Policy with { SeparationRules = [new(f.Reader.Id, f.Supervisor.Id, "Isolation")] }
+        };
+        var error = Assert.Throws<DomainException>(() =>
+            f.Plan(f.Grant(f.Supervisor.Id, f.Employee.Id), app, directory: [f.Employee]));
+        Assert.Equal("directory_incomplete", error.Code);
+        Assert.Equal(409, error.Status);
+    }
+
+    [Fact]
+    public void Existing_assignment_in_a_foreign_realm_does_not_count_as_visible()
+    {
+        var f = new Fixture();
+        var foreign = f.Employee with { RealmKey = "external", Kind = PrincipalKind.Group };
+        var app = f.App with { Assignments = [f.Assignment(principal: foreign.Id)] };
+        var error = Assert.Throws<DomainException>(() =>
+            f.Plan(f.Grant(principal: f.OwnerPrincipal.Id), app,
+                directory: [foreign, f.OwnerPrincipal]));
+        Assert.Equal("directory_incomplete", error.Code);
+    }
+
+    [Fact]
+    public void Duplicate_existing_principals_are_not_silently_deduplicated()
+    {
+        var f = new Fixture();
+        var app = f.App with { Assignments = [f.Assignment(principal: f.Employee.Id)] };
+        var duplicate = f.Employee with { KeycloakId = "ambiguous-other-remote-id", Kind = PrincipalKind.Group };
+        var error = Assert.Throws<DomainException>(() =>
+            f.Plan(f.Grant(principal: f.OwnerPrincipal.Id), app,
+                directory: [f.Employee, duplicate, f.OwnerPrincipal]));
+        Assert.Equal("ambiguous_directory_identity", error.Code);
+    }
+
+    [Fact]
+    public void Stale_existing_group_blocks_new_grants_even_to_a_different_principal()
+    {
+        var f = new Fixture();
+        var staleGroup = f.Employee with { Kind = PrincipalKind.Group, SyncedAt = f.Clock.Now.AddMinutes(-16) };
+        var app = f.App with { Assignments = [f.Assignment(principal: staleGroup.Id)] };
+        var error = Assert.Throws<DomainException>(() =>
+            f.Plan(f.Grant(principal: f.OwnerPrincipal.Id), app,
+                directory: [staleGroup, f.OwnerPrincipal]));
+        Assert.Equal("stale_identity", error.Code);
+    }
+
+    [Fact]
+    public void Invalid_or_disabled_existing_assignment_cannot_be_used_to_extend_access()
+    {
+        var f = new Fixture();
+        var app = f.App with { Assignments = [f.Assignment(principal: f.Employee.Id)] };
+        var invalid = f.Employee with { Kind = (PrincipalKind)999 };
+        Assert.Equal("invalid_directory_identity", Assert.Throws<DomainException>(() =>
+            f.Plan(f.Grant(principal: f.OwnerPrincipal.Id), app,
+                directory: [invalid, f.OwnerPrincipal])).Code);
+        var disabled = f.Employee with { Enabled = false };
+        Assert.Equal("ineligible_existing_identity", Assert.Throws<DomainException>(() =>
+            f.Plan(f.Grant(principal: f.OwnerPrincipal.Id), app,
+                directory: [disabled, f.OwnerPrincipal])).Code);
+    }
+
+    [Fact]
+    public void Unverified_prior_mapping_does_not_block_an_emergency_revocation()
+    {
+        var f = new Fixture();
+        var assignment = f.Assignment();
+        var app = f.App with { Assignments = [assignment] };
+        var revoke = f.Plan(new Change { Kind = ChangeKind.RevokeAccess, TargetId = assignment.Id,
+            Reason = "Remove access despite incomplete directory" }, app, directory: []);
+        Assert.Empty(revoke.Next.Assignments);
+    }
+
+    [Fact]
+    public void Privileged_role_edit_cannot_ignore_an_unseen_existing_assignment()
+    {
+        var f = new Fixture();
+        var app = f.App with { Assignments = [f.Assignment(principal: f.Employee.Id)] };
+        var update = new Change { Kind = ChangeKind.UpdateRole,
+            TargetId = f.Reader.Id, Name = "Reader", Description = "Elevated",
+            PermissionIds = [f.Read.Id, f.Approve.Id], Reason = "Elevate role" };
+        Assert.Equal("directory_incomplete", Assert.Throws<DomainException>(() =>
+            f.Plan(update, app, directory: [f.OwnerPrincipal])).Code);
+    }
+
+    [Fact]
+    public void Complete_existing_directory_allows_nonconflicting_access()
+    {
+        var f = new Fixture();
+        var app = f.App with { Assignments = [f.Assignment(principal: f.Employee.Id)] };
+        var plan = f.Plan(f.Grant(principal: f.OwnerPrincipal.Id), app, directory: f.Directory);
+        Assert.Equal(2, plan.Next.Assignments.Count);
+        Assert.True(plan.ApprovalRequired);
+    }
+
     [Fact] public void Cross_realm_target_is_rejected()
     { var f = new Fixture(); Assert.Equal("not_found", Assert.Throws<DomainException>(() => f.Plan(f.Grant(), directory: [f.Employee with { RealmKey = "foreign" }])).Code); }
     [Fact] public void High_risk_self_assignment_is_rejected()

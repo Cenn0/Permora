@@ -65,6 +65,30 @@ Eine Rollenlöschung liest vor dem DELETE in Keycloak die zugehörigen Benutzer/
 
 [Threat Model](threat-model.md) und [Release-Gate-Matrix](release-checklist.md) trennen getestete Technik von operativer und unabhängiger Sicherheitsfreigabe.
 
+## Fail-closed vor neuen Grants und Rollenänderungen
+
+Der **aktuelle** Directory-Snapshot muss nicht nur das neue Ziel,
+sondern auch **alle bestehenden Anwendungs-Zuweisungsziele** eindeutig
+belegen. Ohne diese Prüfung könnte eine bereits in Keycloak gemappte,
+im Portal aber momentan unsichtbare Gruppe ihre effektive Rolle bei
+einer neuen SoD-/Self-Escalation-Prüfung verlieren und einen
+unzulässigen Grant ermöglichen. Dazu werden bestehende Zuweisungs-IDs
+pro Realm auf Missing/Duplicate/Unknown/Stale/Disabled/Protected und
+unvollständige Gruppenmitgliedschaften geprüft. Ungültige Zustände
+blockieren **GrantAccess** und **UpdateRole** vor dem Queueing sowie
+erneut vor einem Worker-Write; es erfolgt kein geratenes Keycloak-Mapping.
+
+Der Schutz gilt **nicht** als zusätzliche Hürde für einen
+**RevokeAccess**-Auftrag. Ein unklarer Remote-Identifikator darf
+allerdings nicht blind in einem Keycloak-DELETE verwendet werden:
+Directory neu synchronisieren, Quelle/Principal sicher verifizieren,
+den Istzustand gegen Keycloak abgleichen und dann gezielt entziehen.
+Schon ausgestellte JWTs bleiben bis zu ihrem tatsächlichen Ablauf bzw.
+einer app-spezifischen Widerrufsmaßnahme verwendbar.
+
+Die isolierten Tests stehen in [Teststrategie](testing.md);
+Microsoft-AD-/Föderations- und betriebliche Abnahmen sind getrennt.
+
 ## Unvollständige Gruppenansicht bei bestehenden Freigaben
 
 Reconciliation darf eine zugewiesene Keycloak-Gruppe nicht als **driftfrei** behandeln,
