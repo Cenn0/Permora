@@ -108,8 +108,19 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
             var assignment = tx.Application.Assignments.SingleOrDefault(a => a.Id == assignmentId);
             if (assignment is not null && retain)
             {
-                var principal = directory.SingleOrDefault(p => p.Id == assignment.PrincipalId)
-                    ?? throw new DomainException("identity_missing", "The identity must be refreshed before certification.", 409);
+                // Retention is a new authorization decision. Never certify a
+                // guessed identity, an ambiguous lookup or a foreign realm entry.
+                var matches = directory.Where(p => p.Id == assignment.PrincipalId
+                    && p.RealmKey == app.RealmKey).Take(2).ToArray();
+                if (matches.Length == 0)
+                    throw new DomainException("identity_missing", "The identity must be refreshed before certification.", 409);
+                if (matches.Length != 1)
+                    throw new DomainException("ambiguous_directory_identity",
+                        "Directory identities conflict. Refresh and reconcile before certification.", 409);
+                var principal = matches[0];
+                if (!Enum.IsDefined(principal.Kind) || string.IsNullOrWhiteSpace(principal.KeycloakId))
+                    throw new DomainException("invalid_directory_identity",
+                        "Invalid directory principal cannot be certified.", 409);
                 Policy.Fresh(principal, clock.GetUtcNow());
                 if (principal.Kind == PrincipalKind.Group && !principal.MembershipComplete)
                     throw new DomainException("incomplete_group", "Group membership must be verified before certification.", 409);
