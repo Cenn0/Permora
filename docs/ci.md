@@ -1,5 +1,24 @@
 # Permora CI: Tests, Belege und Grenzen
 
+## 22.10.2026 — Governance-Berichte und Trigger-Konsolidierung
+
+Die [Governance-Berichte](governance-reports.md) besitzen Unit-, echte
+PostgreSQL-/HTTP- sowie Browser-/Accessibility-Regressionsfälle. Ihre Summen
+werden vor der Paginierung ermittelt; der Datenbanktest verwendet 211 offene
+Reviews. Die zentralen Workflows bleiben unverändert verpflichtend.
+
+Der begrenzte Lastlauf wird jetzt auch bei Änderungen an Core, Infrastructure,
+Worker, zentralen .NET-Paketdefinitionen und SDK-Version ausgelöst. Zuvor
+führten nur Änderungen am Lasttest-Skript oder dessen Workflow diesen
+zusätzlichen Lauf aus. Er ergänzt den stets laufenden kleineren Recovery-Test.
+Es bleiben öffentliche Standard-Runner und lesende PR-Berechtigungen.
+
+Die Core-CI-Zusammenfassung trennt inzwischen implementierte isolierte
+MFA-/FGAP-/Datenbank-Restore-Prüfungen von separaten System- und Artefaktläufen
+sowie weiterhin offenen Betriebsabnahmen. Frühere pauschale Aussagen, diese
+Prüfbereiche seien vollständig ungetestet, sind historisch. Konkrete Teststände
+und Produktionsgrenzen bleiben commitbezogen nachzuweisen.
+
 ## 20.10.2026 — gemeinsamer LDAPS-/Worker-Integrationstest
 
 [PR #60](https://github.com/Cenn0/Permora/pull/60) auf exaktem Test-SHA

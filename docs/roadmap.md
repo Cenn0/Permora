@@ -9,6 +9,11 @@ neuen Rechteänderungen aus. Externe Benachrichtigungskanäle, umfassende SoD-Be
 und unabhängige Betriebsabnahmen bleiben offen. Die folgenden älteren CI-Belege
 gelten weiterhin nur für die jeweils genannten Commits.
 
+**P0/P7-Konsolidierung:** Core-/Persistence-/Worker-Änderungen sowie zentrale
+.NET-Versionen lösen nun auch den begrenzten Multiworker-Lastlauf aus. Die
+CI-Zusammenfassung wurde auf die tatsächlich getrennten Prüfschichten
+aktualisiert; [Details](ci.md). Organisatorische Release-Gates bleiben offen.
+
 **Verifizierter P4-Stand: 22.10.2026.** Der neue P4-Schritt ergänzt
 [periodische Rezertifizierung](access-reviews.md): Owner-konfigurierte Intervalle,
 verbindliche Fristen, automatische Kampagnen, nachvollziehbare Entzugsaufträge

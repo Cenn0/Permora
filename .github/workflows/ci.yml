@@ -282,10 +282,13 @@ jobs:
             echo "| Docker production image (no registry push) | $CONTAINER_RESULT |"
             echo "| Committed, reproducible dependency locks | $LOCKS_RESULT |"
             echo
-            echo "**Not covered by a green workflow:** successful MFA/step-up at production LoA, full delegated FGAP user/group mapping,"
-            echo "complete LDAP visibility, full production MFA,"
-            echo "external directory/HR writeback, SoD drift under changing external groups,"
-            echo "load/HA/restore/penetration testing, and production deployment."
+            echo "**Core scope:** isolated Keycloak FGAP/role/token contracts, genuine password/TOTP LoA2 BFF login,"
+            echo "HTTP scope/CSRF, real PostgreSQL tests and database restore, Angular/browser checks and production image build."
+            echo "**Separate workflows:** LDAPS/joined worker federation, two-worker fault/recovery, bounded load when triggered,"
+            echo "automated accessibility, and actual-artifact SBOM/vulnerability checks. Inspect each exact-source result."
+            echo "**Still outside CI acceptance:** representative Microsoft AD and complete directory coverage, deployed FGAP risk approval,"
+            echo "multi-host production TLS/HA/secret rotation, coordinated production DR and approved RPO/RTO,"
+            echo "external directory/HR writeback, independent penetration/accessibility/privacy and legal license acceptance."
             echo "No production secrets, deployments, or publishing are used."
           } >> "$GITHUB_STEP_SUMMARY"
           for result in "$STRUCTURE_RESULT" "$DOTNET_RESULT" "$OIDC_RESULT" "$ANGULAR_RESULT" "$KEYCLOAK_RESULT" "$CONTAINER_RESULT" "$LOCKS_RESULT"; do

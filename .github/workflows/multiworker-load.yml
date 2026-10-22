@@ -4,6 +4,12 @@ on:
   pull_request:
     branches: [main]
     paths:
+      # Scheduler, persistence and connector changes need the bounded load gate.
+      - 'src/Permora.Core/**'
+      - 'src/Permora.Infrastructure/**'
+      - 'src/Permora.Worker/**'
+      - 'Directory.*.props'
+      - 'global.json'
       - 'scripts/ci-worker-system.py'
       - '.github/workflows/multiworker-load.yml'
   workflow_dispatch:
