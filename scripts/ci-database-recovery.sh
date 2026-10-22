@@ -25,9 +25,13 @@ sql="SELECT
  (SELECT count(*)::text FROM applications) || ':' ||
  (SELECT count(*)::text FROM operations) || ':' ||
  (SELECT count(*)::text FROM directory) || ':' ||
+ (SELECT count(*)::text FROM access_reviews) || ':' ||
+ (SELECT count(*)::text FROM review_schedules) || ':' ||
  (SELECT count(*)::text FROM audit_events) || ':' ||
  (SELECT count(*)::text FROM schema_versions) || ':' ||
- coalesce((SELECT md5(string_agg(md5(document::text), '' ORDER BY id)) FROM applications), '')"
+ coalesce((SELECT md5(string_agg(md5(document::text), '' ORDER BY id)) FROM applications), '') || ':' ||
+ coalesce((SELECT md5(string_agg(md5(document::text), '' ORDER BY id)) FROM access_reviews), '') || ':' ||
+ coalesce((SELECT md5(string_agg(md5(document::text), '' ORDER BY application_id)) FROM review_schedules), '')"
 before="$(client psql -X -A -t -v ON_ERROR_STOP=1 -d "$PERMORA_CI_PGDATABASE" -c "$sql")"
 count="$(client psql -X -A -t -v ON_ERROR_STOP=1 -d "$PERMORA_CI_PGDATABASE" -c 'SELECT count(*) FROM applications')"
 [[ -n "$before" && "$count" =~ ^[0-9]+$ && "$count" -gt 0 ]] || { echo "CI application state missing" >&2; exit 1; }

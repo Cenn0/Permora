@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { resolve } from 'node:path';
+import type { ManagementRole } from '../src/app/models';
 
 // Synthetic view data is not evidence of server authorization or a Keycloak write.
 const id='10000000-0000-4000-8000-000000000099';
@@ -25,9 +26,13 @@ const team={id:teamId,name:'Testteam',revision:1,members:[{subjectKey:'A'.repeat
 const dashboard={applications:[app],counts:{applications:1,roles:1,identities:1,requests:1,failed:0},
  requests:[operation],recentOperations:[operation],activities:[]};
 
-async function fixtures(page:Page, authenticated=true, failure=false) {
+async function fixtures(page:Page, authenticated=true, failure=false, managementRole:ManagementRole='Owner') {
+ const future=(days:number)=>new Date(Date.now()+days*86_400_000).toISOString();
+ const reviewSchedule={name:'Regelmäßige Zugriffsprüfung',intervalDays:30,reviewWindowDays:7,
+  nextStartAt:future(14),enabled:true,revision:3};
+ const application={...app,assignments:app.assignments.map(assignment=>({...assignment,expiresAt:future(30)}))};
  await page.route('**/bff/session',route=>route.fulfill({json:{authenticated,name:'Testperson',
-  subjectKey:'A'.repeat(64),administrator:true,development:false,strongAuthentication:true}}));
+  subjectKey:'A'.repeat(64),administrator:managementRole==='Owner',development:false,strongAuthentication:true}}));
  await page.route('**/api/v1/**',route=>{
   const path=new URL(route.request().url()).pathname;
   if(path.endsWith('/dashboard')) return failure
@@ -37,10 +42,10 @@ async function fixtures(page:Page, authenticated=true, failure=false) {
   if(path==='/api/v1/teams')return route.fulfill({json:[team]});
   if(path==='/api/v1/realms')return route.fulfill({json:['enterprise']});
   if(path.endsWith('/operations'))return route.fulfill({json:[operation]});
-  if(path.endsWith('/reviews'))return route.fulfill({json:[review]});
+  if(path.endsWith('/reviews'))return route.fulfill({json:[{...review,dueAt:future(7),scheduledFor:future(-1)}]});
   if(path.endsWith('/audit'))return route.fulfill({json:{items:[],nextSequence:null}});
   if(path.endsWith('/identities'))return route.fulfill({json:[]});
-  if(path==='/api/v1/applications/'+id)return route.fulfill({json:{application:app,managementRole:'Owner',
+  if(path==='/api/v1/applications/'+id)return route.fulfill({json:{application,managementRole,reviewSchedule,
    principals:[{id:userId,name:'Zugewiesene Testperson',kind:'User'}]}});
   return route.fulfill({status:404,json:{title:'fixture_not_defined'}});
  });
@@ -81,6 +86,39 @@ for(const tab of ['Rollen','Berechtigungen','Zugriffe','Aufträge','Rezertifizie
   const button=page.getByRole('navigation',{name:'Anwendungsbereiche'}).getByRole('button',{name:tab,exact:true});
   await button.click();await expect(button).toHaveAttribute('aria-current','page');
   await expect(page.locator('main section.panel').first().getByRole('heading').first()).toBeVisible();
+  if(tab==='Rezertifizierung'){
+   await expect(page.getByRole('heading',{name:'Automatischer Prüfplan',exact:true})).toBeVisible();
+   await expect(page.getByText('Regelmäßige Zugriffsprüfung',{exact:true})).toBeVisible();
+   await expect(page.getByRole('button',{name:'Prüfplan bearbeiten',exact:true})).toBeVisible();
+  }
+  await audit(page);
+ });
+test('review-schedule-owner-editor',async({page})=>{
+ await fixtures(page);await page.goto('/applications/'+id+'?tab=reviews');
+ const edit=page.getByRole('button',{name:'Prüfplan bearbeiten',exact:true});
+ await edit.focus();await edit.press('Enter');
+ const form=page.getByRole('form',{name:'Prüfplan bearbeiten',exact:true});
+ await expect(form).toBeVisible();
+ const name=form.getByLabel('Planname',{exact:true});
+ await name.focus();await page.keyboard.press('Tab');
+ await expect(form.getByLabel('Intervall in Tagen',{exact:true})).toBeFocused();
+ await page.keyboard.press('Tab');
+ await expect(form.getByLabel('Bearbeitungsfrist in Tagen',{exact:true})).toBeFocused();
+ const enabled=form.getByLabel('Automatische Prüfungen aktivieren');
+ await enabled.focus();await page.keyboard.press('Space');await expect(enabled).not.toBeChecked();
+ await page.keyboard.press('Space');await expect(enabled).toBeChecked();
+ if(page.viewportSize()?.width===320)
+  await page.addStyleTag({content:'html { font-size: 200% !important; }'});
+ await audit(page);
+});
+for(const managementRole of ['Approver','Auditor'] as const)
+ test('review-schedule-readonly-'+managementRole,async({page})=>{
+  await fixtures(page,true,false,managementRole);await page.goto('/applications/'+id+'?tab=reviews');
+  await expect(page.getByText('Regelmäßige Zugriffsprüfung',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Prüfplan bearbeiten',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Prüfung starten',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Beibehalten',exact:true})).toHaveCount(managementRole==='Approver'?1:0);
+  await expect(page.getByRole('button',{name:'Entziehen',exact:true})).toHaveCount(managementRole==='Approver'?1:0);
   await audit(page);
  });
 test('role-editor',async({page})=>{

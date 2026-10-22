@@ -73,6 +73,43 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
         }, ct);
     }
 
+    public Task<AccessReviewSchedule> ConfigureReviewScheduleAsync(Guid appId, Actor actor,
+        AccessReviewSchedule schedule, long expectedRevision, CancellationToken ct)
+    {
+        return store.InApplicationAsync(appId, async tx =>
+        {
+            Policy.RequireVisible(actor, tx.Team, administrators);
+            if (Policy.Role(actor, tx.Team, administrators) != ManagementRole.Owner)
+                throw new DomainException("forbidden", "Only application owners may configure review schedules.", 403);
+            var current = await tx.ReviewScheduleAsync(ct);
+            if (expectedRevision != (current?.Revision ?? 0))
+                throw new DomainException("revision_conflict", "Reload the review schedule before editing.", 412);
+            var now = clock.GetUtcNow();
+            if (current is { Enabled: true } && current.NextStartAt <= now)
+                throw new DomainException("review_schedule_due",
+                    "A review is already due. Wait for the lifecycle worker to start it before changing the schedule.", 409);
+            Policy.Text(schedule.Name, "Review schedule name", 3, 120);
+            if (schedule.IntervalDays is < 1 or > 365 || schedule.ReviewWindowDays is < 1 or > 90
+                || schedule.ReviewWindowDays > schedule.IntervalDays)
+                throw new DomainException("invalid_review_schedule",
+                    "Use an interval of 1 to 365 days and a review window of 1 to 90 days, no longer than the interval.");
+            if (schedule.Enabled && (schedule.NextStartAt <= now || schedule.NextStartAt > now.AddDays(365)))
+                throw new DomainException("invalid_due_date", "The next review must start within the next 365 days.");
+            var updated = schedule with
+            {
+                Name = schedule.Name.Trim(), NextStartAt = schedule.NextStartAt.ToUniversalTime(),
+                Revision = checked((current?.Revision ?? 0) + 1)
+            };
+            await tx.SaveReviewScheduleAsync(updated, ct);
+            // Keep the human-entered name in the editable schedule, not immutable audit metadata.
+            await tx.AppendAuditAsync(actor, "review.schedule_updated", Wire.Serialize(new
+            {
+                updated.Revision, updated.Enabled, updated.IntervalDays, updated.ReviewWindowDays, updated.NextStartAt
+            }), now, ct);
+            return updated;
+        }, ct);
+    }
+
     public Task<AccessReview> StartReviewAsync(Guid appId, Actor actor, string name, DateTimeOffset dueAt, CancellationToken ct)
     {
         return store.InApplicationAsync(appId, async tx =>
@@ -83,8 +120,9 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
             Policy.Text(name, "Review name", 3, 120);
             if (dueAt <= clock.GetUtcNow() || dueAt > clock.GetUtcNow().AddDays(90))
                 throw new DomainException("invalid_due_date", "Review due date must be within the next 90 days.");
-            var review = new AccessReview(Guid.NewGuid(), appId, name, dueAt,
-                tx.Application.Assignments.Select(a => new ReviewItem(a.Id, "Pending")).ToArray());
+            var review = new AccessReview(Guid.NewGuid(), appId, name.Trim(), dueAt.ToUniversalTime(),
+                tx.Application.Assignments.Select(a => new ReviewItem(a.Id, "Pending")).ToArray(),
+                Closed: tx.Application.Assignments.Count == 0);
             await tx.SaveReviewAsync(review, ct);
             await tx.AppendAuditAsync(actor, "review.started", review.Id.ToString(), clock.GetUtcNow(), ct);
             return review;
@@ -100,7 +138,8 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
             Policy.RequireVisible(actor, tx.Team, administrators);
             if (Policy.Role(actor, tx.Team, administrators) is not (ManagementRole.Owner or ManagementRole.Approver))
                 throw new DomainException("forbidden", "Review is not permitted.", 403);
-            var review = (await tx.ReviewsAsync(ct)).SingleOrDefault(r => r.Id == reviewId)
+            var reviews = await tx.ReviewsAsync(ct);
+            var review = reviews.SingleOrDefault(r => r.Id == reviewId)
                 ?? throw new DomainException("not_found", "Review not found.", 404);
             if (review.Closed || review.DueAt <= clock.GetUtcNow()) throw new DomainException("review_closed", "The review is closed.", 409);
             if (!review.Items.Any(i => i.AssignmentId == assignmentId && i.Decision == "Pending"))
@@ -108,6 +147,18 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
             var assignment = tx.Application.Assignments.SingleOrDefault(a => a.Id == assignmentId);
             if (assignment is not null && retain)
             {
+                if (assignment.ExpiresAt <= clock.GetUtcNow())
+                    throw new DomainException("assignment_expired", "Expired access cannot be certified.", 409);
+                var now = clock.GetUtcNow();
+                var schedule = await tx.ReviewScheduleAsync(ct);
+                var missedScheduledDeadline = schedule is { Enabled: true } && schedule.NextStartAt <= now
+                    && ReviewScheduling.CatchUp(schedule, now).OverdueStart is { } overdueStart
+                    && assignment.GrantedAt <= overdueStart;
+                if (missedScheduledDeadline
+                    || reviews.Any(r => !r.Closed && r.DueAt <= now
+                        && r.Items.Any(i => i.AssignmentId == assignmentId && i.Decision == "Pending"))
+                    || await tx.HasUnresolvedRevocationAsync(assignmentId, ct))
+                    throw new DomainException("revocation_pending", "A requested revocation must be resolved before certification.", 409);
                 // Retention is a new authorization decision. Never certify a
                 // guessed identity, an ambiguous lookup or a foreign realm entry.
                 var matches = directory.Where(p => p.Id == assignment.PrincipalId
@@ -140,11 +191,24 @@ public sealed class ChangeService(IPortalStore store, IReadOnlySet<string> admin
     public static async Task QueueRevocationAsync(IApplicationTransaction tx, Guid assignmentId, string reason, DateTimeOffset now, CancellationToken ct)
     {
         var key = $"revoke:{assignmentId}";
-        if (await tx.IdempotentAsync("system", key, ct) is not null) return;
+        var existing = await tx.IdempotentAsync("system", key, ct);
+        if (existing is not null && existing.Status != OperationStatus.Rejected) return;
         var change = new Change { Kind = ChangeKind.RevokeAccess, TargetId = assignmentId, Reason = reason };
-        var operation = new Operation(Guid.NewGuid(), tx.Application.Id, new Actor("system", "Lifecycle worker"), change,
-            tx.Application.Revision, key, Wire.Hash(Wire.Serialize(change)), OperationStatus.Queued, now, now, 0, SystemRevocation: true);
+        var hash = Wire.Hash(Wire.Serialize(change));
+        // A successful reconciliation can abandon a failed remote write while
+        // the grant remains. A later independent deadline is a NEW revocation
+        // obligation; its idempotency key must not suppress work forever.
+        var operation = existing is null
+            ? new Operation(Guid.NewGuid(), tx.Application.Id, new Actor("system", "Lifecycle worker"), change,
+                tx.Application.Revision, key, hash, OperationStatus.Queued, now, now, 0, SystemRevocation: true)
+            : existing with
+            {
+                Change = change, ExpectedRevision = tx.Application.Revision, RequestHash = hash,
+                Status = OperationStatus.Queued, NextAttemptAt = now, Attempts = 0,
+                ErrorCode = null, DecisionReason = null, ApprovedBy = null, ApprovedAt = null
+            };
         await tx.SaveOperationAsync(operation, ct);
-        await tx.AppendAuditAsync(operation.RequestedBy, "revocation.queued", assignmentId.ToString(), now, ct);
+        await tx.AppendAuditAsync(operation.RequestedBy, existing is null ? "revocation.queued" : "revocation.requeued",
+            assignmentId.ToString(), now, ct);
     }
 }

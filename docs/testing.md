@@ -1,5 +1,37 @@
 # Teststrategie und Ausführung
 
+## Periodische Rezertifizierung (22.10.2026)
+
+Die neue Abdeckung ist nach Prüfebene getrennt:
+
+| Ebene | Reproduzierbarer Test | Geprüftes Verhalten |
+| --- | --- | --- |
+| Domain | `ReviewScheduleTests.cs` | Owner-/Teamgrenzen, Parameter, Revisionen, feste UTC-Kadenz, fehlende/abgelaufene Zuweisungen, laufende Entzüge, unveränderte Fristen |
+| PostgreSQL | `PostgresReviewScheduleTests.cs` | V1→V2-Upgrade, Datenerhalt, Rollback, zwei unabhängige Worker/Konfigurationsclients, Due-Queue und unveränderte genehmigte Grants |
+| HTTP | `scripts/ci-api-smoke.py` | Tatsächliche ASP.NET-Endpunkte, CSRF, 404/403, 412, Plan lesen/ändern/pausieren und vorhandene Kampagne erhalten |
+| Angular | `web/tests/review-model.test.mjs`, Browser-Suite | Zeitkonvertierung, Planformular, Owner/Approver/Auditor, Konflikte und präzise Entzugsanzeige |
+| Keycloak/Worker/Recovery | `scripts/ci-worker-system.py` | Zwei echte Worker nach Ausfall; genau eine Kampagne, ursprüngliche Deadline, realer Entzug nur vor dem Stichtag erteilter Rechte, Erhalt späterer Rechte, Backup/Restore von Plan und Review |
+
+Lokale Integration verwendet PostgreSQL 16.15; die vorhandene GitHub-CI prüft
+zusätzlich PostgreSQL 18 und die im Repository gepinnte Keycloak-Version.
+Ein lokaler Domain-/HTTP-Lauf ersetzt den tatsächlichen Worker-/Keycloak-Test
+nicht. Alle Ergebnisse müssen dem getesteten Commit zugeordnet werden.
+
+Für lokale HTTP-Tests ohne Docker kann ein nativer `psql` ausdrücklich mit
+`PERMORA_TEST_PSQL_BIN=/absoluter/pfad/psql` gewählt werden. Der gleiche SQL-
+Fixtureaufbau und alle Assertions bleiben aktiv; erlaubt sind weiterhin nur
+Loopback und eine frische `permora_test_*`-Datenbank. Ohne diesen Opt-in bleibt
+in CI der Client aus `postgres:18` aktiv. Beispielablauf:
+
+```bash
+PERMORA_TEST_POSTGRES='Host=127.0.0.1;Port=5432;Database=permora_test_local;Username=postgres' \
+PERMORA_TEST_PSQL_BIN=/usr/bin/psql python3 scripts/ci-api-smoke.py
+```
+
+Die lokale Datenbank muss vorher bereitstehen; der benötigte Benutzer und
+gegebenenfalls das Testpasswort sind passend zur isolierten Instanz zu setzen.
+Die Migrations- und Worker-Binaries müssen vorher im Release-Profil gebaut sein.
+
 ## P4: vorhandene, aber unsichtbare Zuweisungen (20.10.2026)
 
 Neue `PolicyTests` adressieren einen bislang nicht ausreichend

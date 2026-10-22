@@ -78,7 +78,8 @@ public static class ApiEndpoints
             var assignedIds = entity.Assignments.Select(a => a.PrincipalId).ToHashSet();
             var principals = (await store.DirectoryAsync(entity.RealmKey, ct)).Where(p => assignedIds.Contains(p.Id))
                 .Select(p => new { p.Id, p.Name, p.Kind, p.Enabled, p.SyncedAt });
-            return Results.Ok(new { application = entity, managementRole = Policy.Role(Actor(user, options), team, administrators), principals });
+            var reviewSchedule = await store.ReviewScheduleAsync(id, ct);
+            return Results.Ok(new { application = entity, managementRole = Policy.Role(Actor(user, options), team, administrators), principals, reviewSchedule });
         });
         api.MapGet("/applications/{id:guid}/identities", async (Guid id, string q, ClaimsPrincipal user, IPortalStore store, CancellationToken ct) =>
         {
@@ -136,6 +137,11 @@ public static class ApiEndpoints
         api.MapPost("/applications/{id:guid}/reviews/{reviewId:guid}/items/{assignmentId:guid}", async (Guid id, Guid reviewId, Guid assignmentId,
             ReviewDecision input, ClaimsPrincipal user, ChangeService changes, CancellationToken ct) =>
             await changes.ReviewAsync(id, reviewId, assignmentId, Actor(user, options), input.Retain, ct));
+        api.MapPut("/applications/{id:guid}/review-schedule", async (Guid id, UpdateReviewSchedule input,
+            ClaimsPrincipal user, ChangeService changes, CancellationToken ct) =>
+            await changes.ConfigureReviewScheduleAsync(id, Actor(user, options),
+                new AccessReviewSchedule(input.Name, input.IntervalDays, input.ReviewWindowDays,
+                    input.NextStartAt, input.Enabled, 0), input.ExpectedRevision, ct));
 
         var admin = api.MapGroup("/admin").RequireAuthorization("PlatformAdmin");
         // Aggregate health only: never expose per-user grants, client secrets, or realm identifiers.
@@ -257,6 +263,8 @@ public static class ApiEndpoints
     public sealed record Decision(bool Approve, string Reason);
     public sealed record StartReview(string Name, DateTimeOffset DueAt);
     public sealed record ReviewDecision(bool Retain);
+    public sealed record UpdateReviewSchedule(string Name, int IntervalDays, int ReviewWindowDays,
+        DateTimeOffset NextStartAt, bool Enabled, long ExpectedRevision);
     public sealed record SaveTeam(string Name, IReadOnlyList<TeamMember> Members, long ExpectedRevision);
     public sealed record Binding(string ClientUuid, string ClientId, string? LoginClientUuid, long ExpectedRevision);
     public sealed record ConfirmIamApproval(long ExpectedRevision, bool FgapVerified,

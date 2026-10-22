@@ -9,6 +9,7 @@ public sealed class MemoryStore(Fixture fixture) : IPortalStore
     public IReadOnlyList<DirectoryPrincipal> Directory { get; set; } = fixture.Directory;
     public Dictionary<Guid, Operation> Operations { get; private set; } = [];
     public Dictionary<Guid, AccessReview> Reviews { get; private set; } = [];
+    public AccessReviewSchedule? ReviewSchedule { get; set; }
     public List<AuditEvent> Audit { get; private set; } = [];
     public Task<IReadOnlyList<Team>> TeamsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Team>>([Team]);
     public Task SaveTeamAsync(Team team, long? expectedRevision, Actor actor, CancellationToken ct) { Team = team; return Task.CompletedTask; }
@@ -21,6 +22,7 @@ public sealed class MemoryStore(Fixture fixture) : IPortalStore
     public Task<IReadOnlyList<AuditEvent>> AuditAsync(Guid appId, long after, int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<AuditEvent>>(Audit.Where(e => e.Sequence > after && e.ApplicationId == appId).Take(limit).ToArray());
     public Task<IReadOnlyList<Operation>> OperationsAsync(Guid appId, int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<Operation>>(Operations.Values.Where(o => o.ApplicationId == appId).Take(limit).ToArray());
     public Task<IReadOnlyList<AccessReview>> ReviewsAsync(Guid appId, CancellationToken ct) => Task.FromResult<IReadOnlyList<AccessReview>>(Reviews.Values.Where(r => r.ApplicationId == appId).ToArray());
+    public Task<AccessReviewSchedule?> ReviewScheduleAsync(Guid appId, CancellationToken ct) => Task.FromResult(appId == App.Id ? ReviewSchedule : null);
     public Task<DashboardFeed> DashboardAsync(IReadOnlyCollection<Guid> appIds, CancellationToken ct)
     {
         var visible = Operations.Values.Where(o => appIds.Contains(o.ApplicationId)).ToArray();
@@ -33,21 +35,23 @@ public sealed class MemoryStore(Fixture fixture) : IPortalStore
         try
         {
             if (App.Id != id) throw new DomainException("not_found", "Not found", 404);
-            var session = new Session(App, Team, new(Operations), new(Reviews), new(Audit));
+            var session = new Session(App, Team, new(Operations), new(Reviews), new(Audit), ReviewSchedule);
             var result = await action(session);
             App = session.Application; Operations = session.Operations; Reviews = session.Reviews; Audit = session.Audit;
+            ReviewSchedule = session.ReviewSchedule;
             return result;
         }
         finally { gate.Release(); }
     }
     private sealed class Session(ApplicationDocument app, Team team, Dictionary<Guid, Operation> operations,
-        Dictionary<Guid, AccessReview> reviews, List<AuditEvent> audit) : IApplicationTransaction
+        Dictionary<Guid, AccessReview> reviews, List<AuditEvent> audit, AccessReviewSchedule? reviewSchedule) : IApplicationTransaction
     {
         public ApplicationDocument Application { get; set; } = app;
         public Team Team { get; } = team;
         public Dictionary<Guid, Operation> Operations { get; } = operations;
         public Dictionary<Guid, AccessReview> Reviews { get; } = reviews;
         public List<AuditEvent> Audit { get; } = audit;
+        public AccessReviewSchedule? ReviewSchedule { get; private set; } = reviewSchedule;
         public Task<Operation?> OperationAsync(Guid id, CancellationToken ct) => Task.FromResult(Operations.GetValueOrDefault(id));
         public Task<Operation?> IdempotentAsync(string actor, string key, CancellationToken ct) => Task.FromResult(Operations.Values.SingleOrDefault(o => o.RequestedBy.Key == actor && o.IdempotencyKey == key));
         public Task<IReadOnlyList<Operation>> UnresolvedMutationsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Operation>>(Operations.Values.Where(o => o.Status is OperationStatus.Conflict or OperationStatus.Failed).Where(o => o.Attempts > 0 && o.Change.Kind != ChangeKind.Reconcile).ToArray());
@@ -71,6 +75,11 @@ public sealed class MemoryStore(Fixture fixture) : IPortalStore
         public Task AppendAuditAsync(Actor actor, string action, string detail, DateTimeOffset now, CancellationToken ct) { Audit.Add(AuditChain.Create(Application.Id, actor.Key, action, detail, now, Audit.LastOrDefault())); return Task.CompletedTask; }
         public Task<IReadOnlyList<AccessReview>> ReviewsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<AccessReview>>(Reviews.Values.Where(r => !r.Closed).ToArray());
         public Task SaveReviewAsync(AccessReview review, CancellationToken ct) { Reviews[review.Id] = review; return Task.CompletedTask; }
+        public Task<AccessReviewSchedule?> ReviewScheduleAsync(CancellationToken ct) => Task.FromResult(ReviewSchedule);
+        public Task SaveReviewScheduleAsync(AccessReviewSchedule schedule, CancellationToken ct) { ReviewSchedule = schedule; return Task.CompletedTask; }
+        public Task<bool> HasUnresolvedRevocationAsync(Guid assignmentId, CancellationToken ct) => Task.FromResult(
+            Operations.Values.Any(o => o.ApplicationId == Application.Id && o.Status != OperationStatus.Rejected
+                && o.Change.Kind == ChangeKind.RevokeAccess && o.Change.TargetId == assignmentId));
     }
 }
 public sealed class FakeConnector : IAccessConnector

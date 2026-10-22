@@ -69,7 +69,11 @@ public sealed record AuditEvent(Guid Id, Guid ApplicationId, string ActorKey, st
     string Detail, DateTimeOffset At, long Sequence, string PreviousHash, string Hash);
 public sealed record ReviewItem(Guid AssignmentId, string Decision, string? ReviewedBy = null);
 public sealed record AccessReview(Guid Id, Guid ApplicationId, string Name, DateTimeOffset DueAt,
-    IReadOnlyList<ReviewItem> Items, bool Closed = false);
+    IReadOnlyList<ReviewItem> Items, bool Closed = false, DateTimeOffset? ScheduledFor = null);
+// Persisted separately from application revisions: a clock tick must not invalidate
+// an approved permission change. Configuration and execution share the app row lock.
+public sealed record AccessReviewSchedule(string Name, int IntervalDays, int ReviewWindowDays,
+    DateTimeOffset NextStartAt, bool Enabled, long Revision);
 public sealed record DriftFinding(string Resource, string Code, string Description);
 public sealed record Plan(ApplicationDocument Next, bool ApprovalRequired, string Summary);
 

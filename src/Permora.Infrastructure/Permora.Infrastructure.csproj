@@ -4,5 +4,6 @@
     <PackageReference Include="Npgsql" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <EmbeddedResource Include="schema.sql" />
+    <EmbeddedResource Include="schema-review-schedules.sql" />
   </ItemGroup>
 </Project>

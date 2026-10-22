@@ -16,7 +16,15 @@ Die .NET-Session ist absolut auf 30 Minuten begrenzt. Lokaler Logout beendet nic
 
 ## Health und Fehler
 
-`/health/live`: Prozess erreichbar. `/health/ready`: DB erreichbar und Schema v1 vorhanden. Readiness prüft derzeit **nicht** die vollständige Keycloak-/FGAP-Funktion oder alle Worker-Profile. Ein grüner HTTP-Healthcheck ist kein IAM-Gesundheitsnachweis.
+`/health/live`: Prozess erreichbar. `/health/ready`: DB erreichbar und Schema v2 vorhanden. Readiness prüft derzeit **nicht** die vollständige Keycloak-/FGAP-Funktion oder alle Worker-Profile. Ein grüner HTTP-Healthcheck ist kein IAM-Gesundheitsnachweis.
+
+**Upgrade für periodische Rezertifizierung:** Vor dem Neustart von API und
+Worker `Permora.Worker --migrate` mit der vorgesehenen Migrationsidentität
+ausführen. Version 2 ergänzt `review_schedules`; Laufzeitkonten benötigen
+Lese-/Schreibrechte auf dieser Tabelle. Bei Wiederanlauf werden ursprüngliche
+Prüffristen beibehalten. Nach längeren Ausfällen können deshalb sofort
+Entzugsaufträge entstehen. Ablauf, Planrevision und Backupumfang stehen im
+[Rezertifizierungsvertrag](access-reviews.md#persistenz-und-upgrade).
 
 **Entzugspriorität:** Automatische Entzüge laufen zuerst; manuell
 ausgelöste `RevokeAccess`-Aufträge dürfen ebenfalls ältere noch wartende

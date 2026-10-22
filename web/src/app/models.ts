@@ -13,10 +13,12 @@ export interface Principal { id: string; name: string; kind: 'User' | 'Group'; e
 export interface AppPolicy { requireApproval: boolean; maxGrantDays: number; separationRules: { firstRoleId: string; secondRoleId: string; reason: string }[] }
 export interface IamApproval { approvedBy: string; approvedAt: string; clientUuid: string; clientId: string; evidenceReference: string }
 export interface Application { id: string; teamId: string; realmKey: string; slug: string; name: string; description: string; environment: string; status: AppStatus; revision: number; keycloakClientUuid: string | null; keycloakClientId: string | null; loginClientUuid: string | null; policy: AppPolicy; permissions: Permission[]; roles: Role[]; assignments: Assignment[]; iamApproval: IamApproval | null }
-export interface AppDetail { application: Application; managementRole: ManagementRole; principals: Principal[] }
+export interface ReviewSchedule { name: string; intervalDays: number; reviewWindowDays: number; nextStartAt: string; enabled: boolean; revision: number }
+export interface ReviewScheduleInput { name: string; intervalDays: number; reviewWindowDays: number; nextStartAt: string; enabled: boolean; expectedRevision: number }
+export interface AppDetail { application: Application; managementRole: ManagementRole; principals: Principal[]; reviewSchedule?: ReviewSchedule | null }
 export interface Change { kind: string; targetId?: string; key?: string; name?: string; description?: string; risk?: Risk; permissionIds?: string[]; roleId?: string; principalId?: string; expiresAt?: string | null; reason: string }
 export interface Operation { id: string; applicationId: string; requestedBy: { key: string; name: string }; change: Change; expectedRevision: number; status: OperationStatus; createdAt: string; attempts: number; approvedBy: { key: string; name: string } | null; errorCode: string | null; systemRevocation: boolean }
 export interface AuditEvent { id: string; applicationId: string; actorKey: string; action: string; detail: string; at: string; sequence: number; hash: string; previousHash: string }
 export interface AuditPage { items: AuditEvent[]; nextSequence: number | null }
-export interface Review { id: string; applicationId: string; name: string; dueAt: string; closed: boolean; items: { assignmentId: string; decision: string; reviewedBy: string | null }[] }
+export interface Review { id: string; applicationId: string; name: string; dueAt: string; closed: boolean; scheduledFor?: string | null; items: { assignmentId: string; decision: string; reviewedBy: string | null }[] }
 export interface Dashboard { applications: AppSummary[]; counts: { applications: number; roles: number; identities: number; requests: number; failed: number }; requests: Operation[]; recentOperations: Operation[]; activities: AuditEvent[] }

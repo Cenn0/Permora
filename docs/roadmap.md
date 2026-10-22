@@ -1,108 +1,29 @@
 # Permora – Product & Engineering Roadmap (V2)
 
-> **Neuer P4-Checkpoint am 20.10.2026:** [PR #60](https://github.com/Cenn0/Permora/pull/60)
-> wurde als [`e3bfcf6ca6b2`](https://github.com/Cenn0/Permora/commit/e3bfcf6ca6b234d4f2082aaa633d95e95cfffbc4)
-> auf `main` gemergt. Alle **sieben** PR-Workflows auf dem exakten
-> Test-Commit `dacae649479d` bestanden: [echte durchgängige
-> LDAPS/Keycloak/PostgreSQL/Worker-Integration](https://github.com/Cenn0/Permora/actions/runs/39432701299),
-> [Core-CI](https://github.com/Cenn0/Permora/actions/runs/39432701392),
-> [Worker-/Recovery-Tests](https://github.com/Cenn0/Permora/actions/runs/39432701343),
-> [96-Entzüge-Lasttest](https://github.com/Cenn0/Permora/actions/runs/39432701364),
-> [Accessibility](https://github.com/Cenn0/Permora/actions/runs/39432701535),
-> [Public Docs](https://github.com/Cenn0/Permora/actions/runs/39432701384)
-> und [Artefaktintegrität](https://github.com/Cenn0/Permora/actions/runs/39432701640).
-> Der real laufende Worker verarbeitet nun in einem einzigen isolierten Test
-> eine externe LDAP-Gruppenänderung bis zur geprüften Keycloak-Rollenzuweisungs-
-> Entfernung. Die Test-Serviceidentität hat `fullScopeAllowed=false`
-> mit notwendiger expliziter Rollenscope-Zuweisung für Directory-Reads.
-> **P4/R07 ist dennoch nur TEILWEISE** abgeschlossen: Worker-End-to-End für
-> nicht importierte LDAP-Benutzer, Federationsausfälle und alle realen AD-
-> Spezialfälle fehlen weiterhin, siehe [#58](https://github.com/Cenn0/Permora/issues/58).
-> Auch die Betreiber-, Rechts-, Sicherheits- und Release-Gates aus
-> [#3](https://github.com/Cenn0/Permora/issues/3) sowie der breite
-> [`Groups.manage`-Scope #46](https://github.com/Cenn0/Permora/issues/46)
-> sind **offen**. Ein erfolgreicher CI-Lauf ist keine Produktionszulassung.
+**Aktueller Arbeitsstand: 22.10.2026.** Der neue P4-Schritt ergänzt
+[periodische Rezertifizierung](access-reviews.md): Owner-konfigurierte Intervalle,
+verbindliche Fristen, automatische Kampagnen, nachvollziehbare Entzugsaufträge
+und eine vollständige Bedienoberfläche. Plan- und Anwendungsrevisionen sind
+getrennt; die additive Schema-v2-Migration erhält bestehende Daten.
 
+Die überprüfbaren Szenarien und ihre Ausführung stehen in
+[Teststrategie](testing.md#periodische-rezertifizierung-22102026).
+Microsoft-AD-spezifische Föderation, weitere Directory-Ausfallkombinationen,
+repräsentative Mehrhost-/Recovery-Prüfungen und unabhängige Reviews bleiben
+separate offene Arbeitspakete. Die bekannten Keycloak-Gruppenscope-Grenzen
+werden in [Issue #46](https://github.com/Cenn0/Permora/issues/46) geführt.
 
-> **Aktueller Engineering-Checkpoint (20.10.2026):** `main` auf
-> [`c83711c26920`](https://github.com/Cenn0/Permora/commit/c83711c269204ada7f3dade33b68a036e373962c)
-> hat nach Merge von [PR #57](https://github.com/Cenn0/Permora/pull/57)
-> **alle sechs relevanten Workflows erfolgreich** durchlaufen:
-> [Core CI](https://github.com/Cenn0/Permora/actions/runs/39416605015)
-> (221/221 xUnit),
-> [echte LDAPS-/Keycloak-Föderation](https://github.com/Cenn0/Permora/actions/runs/39416604931),
-> [Worker/Recovery](https://github.com/Cenn0/Permora/actions/runs/39416605037),
-> [Accessibility](https://github.com/Cenn0/Permora/actions/runs/39416604905),
-> [Artefaktintegrität](https://github.com/Cenn0/Permora/actions/runs/39416604980)
-> und [Dokumentation](https://github.com/Cenn0/Permora/actions/runs/39416605443).
-> Die LDAP-Suite prüft jetzt den **realen Wechsel geerbter Keycloak-Rollen
-> beim externen Entfernen/Hinzufügen und Wiederherstellen** von Mitgliedschaften
-> (importierte und nicht importierte OpenLDAP-Benutzer). P4-Autorisierungs-
-> und SoD-Regressionen sind ergänzt. **Nicht nachgewiesen** ist ein
-> zusammenhängender Worker-zu-LDAPS-End-to-End-Entzug; siehe
-> [Issue #58](https://github.com/Cenn0/Permora/issues/58).
-> [Release #3](https://github.com/Cenn0/Permora/issues/3) und
-> [FGAP-Scope #46](https://github.com/Cenn0/Permora/issues/46)
-> bleiben offen. Die nachfolgenden Checkpoints vom 17.–18.10. bzw.
-> `5017624d` sind historische Zwischenstände, **keine** aktuellen
-> Produktionsfreigaben.
+**Vorheriger verifizierter Stand:** [PR #60](https://github.com/Cenn0/Permora/pull/60)
+belegt den echten LDAPS → Keycloak → PostgreSQL → Worker-Entzug nach externer
+Gruppenänderung; [PR #61](https://github.com/Cenn0/Permora/pull/61) synchronisierte
+die zugehörige Dokumentation. Weitere offene Directory-Szenarien stehen in
+[Issue #58](https://github.com/Cenn0/Permora/issues/58). Historische Checkpoints
+sind in der Git-Historie und im [Audit vom 18.10.2026](evidence/roadmap-audit-2026-10-18.md)
+nachvollziehbar. Die Bestandsmatrix in Abschnitt 2 ist ausdrücklich historisch;
+der aktuelle P4-Umfang ist in Abschnitt 3 beschrieben.
 
-
-> **Stand der Abnahme am 18.10.2026:** Die nachfolgende V2-Roadmap enthält
-> noch ihren **historischen Ist-Stand vom 17.10.2026** und bewusst offene
-> Plan-Checkboxen. Sie sind **keine aktuelle Aussage, dass alle darunter
-> genannten Tests fehlen**. Für den aktuellen Status gelten vorrangig
-> [Roadmap-Audit vom 18.10.2026](evidence/roadmap-audit-2026-10-18.md),
-> [Release-Gates](release-checklist.md) und die offenen Issues
-> [#3](https://github.com/Cenn0/Permora/issues/3) und
-> [#46](https://github.com/Cenn0/Permora/issues/46).
-> Sechs Workflows auf `main` / `2499f863` waren erfolgreich;
-> weder die 1.0-Produktionsfreigabe noch die FGAP-Gruppenscope-Abnahme sind erfolgt.
-> Ein grünes CI-Ergebnis ersetzt keine reale AD-/Multi-Host-/Penetrations-/
-> Datenschutzabnahme.
-
-**Engineering-Checkpoint 20.10.2026 – verifiziert:** `main` steht auf
-[`5017624d57ae`](https://github.com/Cenn0/Permora/commit/5017624d57aecb65758553a8d017a02d6636be4c).
-Sechs relevante Workflows auf diesem Commit
-[bestanden](https://github.com/Cenn0/Permora/actions/runs/39398135314);
-der dazugehörige [Artefaktintegritätslauf
-#39398135494](https://github.com/Cenn0/Permora/actions/runs/39398135494)
-hat erfolgreich einen SHA-gebundenen, signierten
-**unveröffentlichten Draft-Kandidaten** erstellt.
-Die im [Merge #54](https://github.com/Cenn0/Permora/pull/54)
-ergänzten Directory-Negativregressionen bestanden vor Merge mit
-198/198 xUnit-Tests und erneut auf `main`. Diese Nachweise betreffen
-die isolierte technische Abdeckung, nicht die externe 1.0-Abnahme.
-
-**Nächster P2-Sicherheitsschritt (in Bearbeitung):**
-Das [Keycloak-FGAP-Acceptance-Konzept](keycloak-fgap-acceptance.md)
-und die erweiterte echte Admin-REST-Negativmatrix prüfen den
-tatsächlichen Berechtigungsumfang **derselben**
-Gruppen-Mapping-Serviceidentität. Die zusätzlichen Tests werden erst
-nach einem grünen exakten GitHub-Commit als nachgewiesen eingestuft.
-[Issue #46](https://github.com/Cenn0/Permora/issues/46) bleibt
-offen: `Groups.manage` ist keine Mapping-only-Berechtigung.
-Fremd-/Gruppen-, AD-, Netzwerk-/Secret-/Audit- und
-Mehrhost-/Recovery-Grenzen benötigen separate Betriebsnachweise.
-
-**P4-Nachtrag 20.10.2026 – bestehende unsichtbare Zuweisungen:**
-Ein anderer bislang nicht ausreichend getesteter SoD-Fall wird in
-[Policy](../src/Permora.Core/Policy.cs) abgesichert: Fehlt eine früher
-zugewiesene (potenziell weiterhin bei Keycloak wirksame) Identität
-in einem frischen Directory-Snapshot, werden zusätzliche Grants und
-Rollen-Eskalationen zurückgewiesen. Doppelte, veraltete,
-fremdrealmige, deaktivierte, geschützte und unvollständige
-Einträge scheitern ebenfalls; reine Entzüge bleiben möglich.
-Die zugehörigen [Regressionen](testing.md#p4-vorhandene-aber-unsichtbare-zuweisungen-20102026)
-gelten erst nach erfolgreichem CI-Lauf des neuen Commits als nachgewiesen.
-Die organisatorische Remediation und echte LDAP-/AD-Fehlerinjektionen
-stehen weiterhin aus.
-
-**Stand:** 17.10.2026 · **Basis:** Repository `Cenn0/Permora`, Branch `main`, Commit `dc7b7d8ef223f42d9a4b451850b97bd3b04cf5c1`.  
-**Status:** CI-verifizierter Entwicklungsstand; **keine** Produktionsfreigabe.  
-**Leitprinzip:** Erst die tatsächliche Sicherheitsgrenze und den gesamten Rechte-Lebenszyklus nachweisen, danach Komfort, Integration und Skalierung ausbauen.
-
-Diese Roadmap ist **vorwärtsgerichtet**. Sie ersetzt den historisch gewachsenen, teils widersprüchlichen Stand der bisherigen `docs/roadmap.md`. Frühere Zwischenstände bleiben über die Git-Historie nachvollziehbar. Plantermine sind bewusst keine Zusagen: Abhängigkeiten und Abnahmen sind für die Reihenfolge wichtiger als Kalenderdaten.
+Diese Roadmap unterscheidet implementierte Funktionen, tatsächlich ausgeführte
+Tests und noch nicht geprüfte Umgebungen. Plantermine sind keine Lieferzusagen.
 
 ## 1. Produktziel und Nichtziele
 
@@ -117,7 +38,7 @@ Permora ermöglicht **delegierte, anwendungsspezifische Rechteverwaltung in Keyc
 
 **Nicht Teil des 1.0-Versprechens:** Ersatz der Keycloak-Admin-Konsole; automatisches Management beliebiger Realm-Ressourcen; vollständige HR-IGA-Suite; universelles ABAC/UMA; garantierter sofortiger Widerruf bereits ausgegebener JWTs; beliebige Cross-Issuer-Personenidentifikation; ein bereits zertifizierter oder offiziell von Keycloak unterstützter Permora-Betrieb.
 
-## 2. Tatsächlich bestätigter Ausgangspunkt
+## 2. Historischer Ausgangspunkt (17.10.2026)
 
 | Bereich | Zustand am Stichtag | Verifizierte Grenzen |
 | --- | --- | --- |
@@ -206,10 +127,12 @@ Permora ermöglicht **delegierte, anwendungsspezifische Rechteverwaltung in Keyc
 ### P4 — Governance, Directory und kontinuierliche SoD
 **Priorität: hoch · P2/P3 → P4 · Ziel: belastbarer Berechtigungslebenszyklus**
 
-**Ist:** Vier-Augen-Policy, einfache SoD, Rezertifizierungs- und Expiry-Logik im Code (`TEILWEISE`).
+**Ist am 22.10.2026:** Vier-Augen-Policy, SoD, manuelle und periodische Rezertifizierung, Frist- und Entzugslogik sowie Planverwaltung im Portal sind implementiert. Die weitergehenden Directory- und Benachrichtigungsfunktionen bleiben einzeln ausgewiesen.
 
 - [ ] Delegationsmandate, Entscheiderwechsel, Suspendierung, Owner-Entzug und konkurrierende Freigaben mit realen Identitäten testen.
-- [ ] Periodische Rezertifizierung mit Deadline, Eskalation, nicht bestätigten Fällen und tatsächlich ausgelöstem Keycloak-Entzug end-to-end.
+- [x] Periodische Prüfpläne, unveränderte Deadlines nach Worker-Ausfällen, separate Revisionen, Owner-/Approver-/Auditor-Oberfläche und idempotente Entzüge implementiert; [Vertrag und Upgrade](access-reviews.md).
+- [ ] Periodischer Start bis tatsächlichem Keycloak-Entzug im erweiterten Worker-Systemtest des neuen Commits erfolgreich nachweisen; [Testumfang](testing.md#periodische-rezertifizierung-22102026).
+- [ ] Optionale Erinnerungs- und Eskalationsbenachrichtigungen auf Basis des nachgewiesenen Review-/Auftragszustands ergänzen.
 - [ ] Externe Gruppenänderungen, direkte/effektive und verschachtelte Rollen sowie neu entstehende SoD-Konflikte erkennen; Drift markieren, Vergaben sperren und kontrollierte Remediation auslösen.
 - [ ] AD-/LDAP-Federation **zunächst nur lesend** in repräsentativen Keycloak-Installationen prüfen, einschließlich unvollständiger Seiten, nicht importierter Konten, deaktivierter Benutzer und Gruppen mit Mitgliederlimits.
 - [ ] Idempotente Reconciliation gegen externe Änderungen definieren: Fremdverwaltung nicht unautorisiert überschreiben; klarer Entscheid zwischen „beobachten“, „blockieren“ und „reparieren“.
@@ -316,7 +239,7 @@ Diese Szenarien erhalten für jeden Release getrennte Links zu **Testcode**, **A
 5. **Fail-closed bei unvollständiger Verzeichnis- oder Keycloak-Sicht**, aber sicherer kontrollierter Rechteentzug und sichtbarer Incident-Pfad.
 6. **Versionierter Vertragstest** statt Annahme, dass eine neuere Keycloak-Version automatisch die gleiche FGAP-Semantik hat.
 
-## 8. Nächste priorisierte Umsetzungsschritte (aktualisiert 20.10.2026)
+## 8. Nächste priorisierte Umsetzungsschritte (aktualisiert 22.10.2026)
 
 Die ursprünglichen PR-Vorschläge (OIDC-BFF, Keycloak-FGAP, Worker-Fehler,
 Directory-SoD) wurden inzwischen **teilweise bereits in CI und Code
@@ -324,11 +247,11 @@ umgesetzt**. Aktueller Stand und offene Abnahmebedingungen stehen in
 [Release-Gates](release-checklist.md) und [Issue #3](https://github.com/Cenn0/Permora/issues/3).
 Eine erneute bloße Implementierung derselben Testnamen wäre kein Fortschritt.
 
-1. **P4: Directory-Fail-Closed und Remediation** — inkonsistente
-   Directory-IDs, unbekannte Typen und inaktive/stale Identitäten beim
-   Soll-/Ist-Abgleich korrekt als Konflikt ausweisen und vor Keycloak-Writes
-   blockieren. Unit-/HTTP-Regressionen laufen in der normalen CI;
-   **reale Federationsänderungen und gezielte Revocation bleiben separate Gates**.
+1. **P4: Governance-Ausbau nach periodischer Rezertifizierung** —
+   Erinnerungs-/Eskalationskanäle und begrenzte Reports ergänzen. Der bestehende
+   Rechte- und Deadline-Vertrag bleibt dabei serverseitig maßgeblich. Die
+   bereits implementierten Directory-Fail-Closed- und Remediation-Regeln
+   werden mit weiteren realen Föderationsfehlern überprüft.
 2. **P2: FGAP-Gruppen-Privilegien** — [Issue #46](https://github.com/Cenn0/Permora/issues/46):
    direkte Same-Token-Admin-REST-Negativmatrix, anschließende
    [Betriebsabnahme](keycloak-fgap-acceptance.md) mit nachweislich
