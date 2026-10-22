@@ -2,6 +2,25 @@
 
 ## 22.10.2026 — Governance-Berichte und Trigger-Konsolidierung
 
+Die Angular-CI prüft nun auch Entwicklungsabhängigkeiten mit
+`npm audit --audit-level=high`. Der vorherige `--omit=dev`-Lauf erfasste
+unter anderem den verwendeten Vite-Entwicklungsserver nicht. Angular Build
+22.2.3 bindet Vite 8.3.0 exakt; ein enger projektspezifischer npm-Override
+setzt diese Abhängigkeit auf den Upstream-Sicherheitspatch 8.3.3.
+Quellen: [Hersteller-Advisory für die Windows-Befehlsinjektion](https://github.com/vitejs/launch-editor/security/advisories/GHSA-587h-7wmj-h5pm)
+und [Vite-Dateifreigabe-Advisory](https://github.com/vitejs/vite/security/advisories/GHSA-rq7h-c2jc-7f22).
+Die jeweiligen Ausnutzbarkeitsbedingungen unterscheiden sich; ein npm-High
+beweist keinen erfolgreichen Angriff auf die ausgelieferte Portal-Anwendung.
+
+**Einordnung:** Der Vite-Patch ist vom Upstream veröffentlicht. Die abweichende
+transitive Version ist eine hier getestete Projektkonfiguration, keine
+Behauptung einer von Angular offiziell freigegebenen Standardkombination.
+Der Override bleibt eng auf `@angular/build` begrenzt und soll entfallen,
+sobald das reguläre Angular-Paket einen ausreichend korrigierten Vite-Stand
+bindet. Sicherheitsziel ist die Beseitigung bekannter Befunde auch im
+Build-/Entwicklungswerkzeug; Build-, Browser- und Accessibility-Prüfungen
+belegen die hier getesteten Pfade, keine allgemeine Kompatibilitätsgarantie.
+
 Die [Governance-Berichte](governance-reports.md) besitzen Unit-, echte
 PostgreSQL-/HTTP- sowie Browser-/Accessibility-Regressionsfälle. Ihre Summen
 werden vor der Paginierung ermittelt; der Datenbanktest verwendet 211 offene

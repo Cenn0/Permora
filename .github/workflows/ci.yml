@@ -175,9 +175,9 @@ jobs:
         run: npm run test:e2e
         env:
           CI: 'true'
-      - name: Audit production npm dependencies
+      - name: Audit production and development npm dependencies
         working-directory: web
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --audit-level=high
       - name: Summarize Playwright evidence without upload
         if: always()
         shell: bash

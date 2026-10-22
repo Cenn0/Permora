@@ -29,5 +29,10 @@
     "@angular/compiler-cli": "22.2.3",
     "typescript": "~6.0.0",
     "@playwright/test": "1.55.1"
+  },
+  "overrides": {
+    "@angular/build": {
+      "vite": "8.3.3"
+    }
   }
 }
