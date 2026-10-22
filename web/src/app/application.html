@@ -5,6 +5,7 @@
 @if(detail();as d){
 <div class="page-heading"><div><span class="eyebrow">{{label(d.application.environment)}} · {{label(d.managementRole)}}</span><h1>{{d.application.name}}</h1><p>{{d.application.description}}</p></div><div class="inline-actions"><span [class]="'badge '+tone(d.application.status)">{{label(d.application.status)}}</span><button (click)="reload()" [disabled]="busy()||loading()" aria-label="Anwendung aktualisieren"><p-icon name="refresh" /></button></div></div>
 @if(!active()){<div class="alert warning">Neue Rechte und Zugriffsvergaben sind gesperrt, bis die Anbindung geprüft und die Anwendung aktiv ist. Bereits ausgestellte Tokens werden durch diesen Verwaltungsstatus nicht automatisch ungültig.</div>}
+<p><a [routerLink]="['/applications',d.application.id,'governance']">Governance-Bericht & Fristen</a></p>
 <nav class="tabs" aria-label="Anwendungsbereiche">@for(item of tabs;track item.id){<button [class.active]="tab()===item.id" [attr.aria-current]="tab()===item.id?'page':null" (click)="selectTab(item.id)">{{item.name}}</button>}</nav>
 <section class="panel">
 @switch(tab()){

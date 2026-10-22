@@ -22,3 +22,15 @@ export interface AuditEvent { id: string; applicationId: string; actorKey: strin
 export interface AuditPage { items: AuditEvent[]; nextSequence: number | null }
 export interface Review { id: string; applicationId: string; name: string; dueAt: string; closed: boolean; scheduledFor?: string | null; items: { assignmentId: string; decision: string; reviewedBy: string | null }[] }
 export interface Dashboard { applications: AppSummary[]; counts: { applications: number; roles: number; identities: number; requests: number; failed: number }; requests: Operation[]; recentOperations: Operation[]; activities: AuditEvent[] }
+export interface GovernanceCounts {
+ assignments: number; expiredAssignments: number; unverifiableAssignments: number;
+ groupSeparationRevocations: number; openReviews: number; pendingDecisions: number; overdueDecisions: number;
+}
+export interface GovernanceNotice {
+ key: string; code: string; severity: 'critical' | 'warning' | 'info';
+ count: number; dueAt: string | null; reviewId: string | null;
+}
+export interface GovernanceReport {
+ applicationId: string; applicationRevision: number; asOf: string; counts: GovernanceCounts;
+ totalNotices: number; notices: GovernanceNotice[]; nextOffset: number | null;
+}

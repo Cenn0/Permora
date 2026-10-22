@@ -330,6 +330,15 @@ def main():
                     raise AssertionError("Group grant HTTP fixture must be Active")
                 paused_schedule, open_review = review_schedule_contract(
                     jar, token, group_url, existing_assignment)
+                status, report = request_http(5080, "GET", group_url + "/governance?limit=1", jar)
+                assert_status(status, 200, "Owner can read server-derived governance report")
+                if (report["applicationId"] != group_app or report["counts"]["openReviews"] != 1
+                        or report["counts"]["pendingDecisions"] != 1
+                        or len(report["notices"]) != 1 or report["notices"][0]["reviewId"] != open_review["id"]):
+                    raise AssertionError("Governance report must reflect the actual persisted open review")
+                for query in ("offset=-1", "limit=0", "limit=51", "offset=1000001"):
+                    status, _ = request_http(5080, "GET", group_url + "/governance?" + query, jar)
+                    assert_status(status, 400, "Governance report rejects invalid page bounds")
                 group_grant = {"expectedRevision": 1, "change": {
                     "kind": "GrantAccess", "roleId": group_role, "principalId": group_id,
                     "expiresAt": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
@@ -380,6 +389,8 @@ def main():
                     foreign_resource + "/identities?q=owner",
                     foreign_resource + "/audit",
                     foreign_resource + "/reviews",
+                    foreign_resource + "/governance",
+                    foreign_resource + "/governance?limit=51",
                 ]
                 for path in scoped_routes:
                     status, _ = request_http(5081, "GET", path, foreign_jar)
@@ -476,6 +487,10 @@ def main():
                 assert_status(status, 200, "Approver can read the outstanding campaign")
                 if not any(review["id"] == open_review["id"] for review in reviews):
                     raise AssertionError("Approver must see campaigns belonging to the same team")
+                status, report = request_http(5084, "GET", group_url + "/governance", approver_jar)
+                assert_status(status, 200, "Approver can read governance without owner write privileges")
+                if report["counts"]["pendingDecisions"] != 1:
+                    raise AssertionError("Approver and owner governance scope must agree")
                 status, _ = request_http(5084, "PUT", group_url + "/review-schedule", approver_jar,
                     body={"name": "Unauthorized schedule change", "intervalDays": 30,
                           "reviewWindowDays": 7,

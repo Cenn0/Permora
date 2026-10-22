@@ -132,6 +132,9 @@ public static class ApiEndpoints
         });
         api.MapGet("/applications/{id:guid}/reviews", async (Guid id, ClaimsPrincipal user, IPortalStore store, CancellationToken ct) =>
         { await Visible(id, user, store, ct); return await store.ReviewsAsync(id, ct); });
+        api.MapGet("/applications/{id:guid}/governance", async (Guid id, int? offset, int? limit,
+            ClaimsPrincipal user, IPortalStore store, TimeProvider clock, CancellationToken ct) =>
+            await new GovernanceReporting(store, administrators, clock).ReadAsync(id, Actor(user, options), offset ?? 0, limit ?? 25, ct));
         api.MapPost("/applications/{id:guid}/reviews", async (Guid id, StartReview input, ClaimsPrincipal user, ChangeService changes, CancellationToken ct) =>
             await changes.StartReviewAsync(id, Actor(user, options), input.Name, input.DueAt, ct));
         api.MapPost("/applications/{id:guid}/reviews/{reviewId:guid}/items/{assignmentId:guid}", async (Guid id, Guid reviewId, Guid assignmentId,

@@ -10,6 +10,41 @@ public sealed class PostgresReviewScheduleTests
 
     [Fact]
     [Trait("Category", "PostgresIntegration")]
+    public async Task Governance_counts_all_open_reviews_without_200_row_truncation_and_preserves_state()
+    {
+        await using var db = await Database.OpenAsync();
+        var f = db.Fixture;
+        await db.SeedAsync(f.App);
+        await db.Store.InApplicationAsync(f.App.Id, async tx =>
+        {
+            for (var i = 0; i < 211; i++)
+                await tx.SaveReviewAsync(new(Guid.NewGuid(), f.App.Id, "Report fixture", f.Clock.Now,
+                    [new(Guid.NewGuid(), "Pending")]), Ct);
+            await tx.SaveReviewAsync(new(Guid.NewGuid(), f.App.Id, "Closed", f.Clock.Now,
+                [new(Guid.NewGuid(), "Pending")], true), Ct);
+            return true;
+        }, Ct);
+        var before = Wire.Serialize(await db.Store.ApplicationAsync(f.App.Id, Ct));
+        var audit = await db.Store.AuditAsync(f.App.Id, 0, 100, Ct);
+        var service = new GovernanceReporting(db.Store, f.Admins, f.Clock);
+        var first = await service.ReadAsync(f.App.Id, f.Auditor, 0, 50, Ct);
+        Assert.Equal(211, first.Counts.OpenReviews);
+        Assert.Equal(211, first.Counts.OverdueDecisions);
+        Assert.Equal(211, first.TotalNotices);
+        Assert.Equal(50, first.Notices.Count);
+        var last = await service.ReadAsync(f.App.Id, f.Owner, 200, 50, Ct);
+        Assert.Equal(11, last.Notices.Count);
+        Assert.Null(last.NextOffset);
+        Assert.Empty(first.Notices.Select(n => n.Key).Intersect(last.Notices.Select(n => n.Key)));
+        var denied = await Assert.ThrowsAsync<DomainException>(() => service.ReadAsync(f.App.Id, f.Outsider, 0, 25, Ct));
+        Assert.Equal(404, denied.Status);
+        Assert.Equal(before, Wire.Serialize(await db.Store.ApplicationAsync(f.App.Id, Ct)));
+        Assert.Equal(audit, await db.Store.AuditAsync(f.App.Id, 0, 100, Ct));
+        Assert.Empty(await db.Store.OperationsAsync(f.App.Id, 100, Ct));
+    }
+
+    [Fact]
+    [Trait("Category", "PostgresIntegration")]
     public async Task Version_one_database_upgrades_without_losing_existing_review_or_application_data()
     {
         await using var db = await Database.OpenAsync(migrate: false);

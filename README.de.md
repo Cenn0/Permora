@@ -5,6 +5,8 @@
 
 # Permora
 
+Neu: [Governance-Berichte und Fristenhinweise](docs/governance-reports.md) pro Anwendung, mit vollständigen offenen Review-Summen und begrenzten Hinweisseiten. Externe Benachrichtigungskanäle bleiben offen.
+
 **Marke und UI:** [Logo und Hell-/Dunkel-Designvorlagen](docs/branding/README.md) (ausschließlich Entwürfe).
 
 **Sprache:** [English](README.md) · **Deutsch**

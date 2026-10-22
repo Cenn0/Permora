@@ -31,6 +31,8 @@ Permora is an independent open-source **C# / Angular portal** designed to let ap
 
 ## Scope
 
+- **Governance reports:** Application-scoped counts, paginated review reminders and escalation cues for overdue reviews, expired assignments and detectable directory/group-SoD issues. [Contract and limits](docs/governance-reports.md).
+
 - **Applications and teams:** Application catalog, registration, and explicit Owner, Maintainer, AccessManager, Approver, and Auditor mandates.
 - **Permissions:** Application-scoped `perm.*` permissions and composite `role.*` business roles; user/group grants.
 - **Governance:** Four-eyes approval, separation of duties (SoD), expiring access, [scheduled recertification with enforced deadlines](docs/access-reviews.md), and an application-scoped change log.
