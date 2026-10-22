@@ -36,7 +36,7 @@ Permora ist ein eigenständiges, quelloffenes **C#-/Angular-Portal** für die ei
 
 - **Anwendungen und Teams:** Anwendungskatalog, Registrierung, Owner-, Maintainer-, AccessManager-, Approver- und Auditor-Mandate.
 - **Berechtigungen:** Anwendungsbezogene `perm.*`-Einzelrechte und zusammengesetzte `role.*`-Rollen; Benutzer- und Gruppenzuweisungen.
-- **Governance:** Vier-Augen-Freigaben, Funktionstrennung (SoD), Ablaufdaten, Rezertifizierung und anwendungsbezogenes Änderungsprotokoll.
+- **Governance:** Vier-Augen-Freigaben, Funktionstrennung (SoD), Ablaufdaten, [periodische Rezertifizierung mit verbindlichen Fristen](docs/access-reviews.md) und anwendungsbezogenes Änderungsprotokoll.
 - **Provisionierung:** Persistente Änderungsaufträge, Wiederholungen, Soll-/Ist-Abgleich und Rückprüfung tatsächlicher Keycloak-Zuweisungen.
 - **Oberfläche:** Responsives Angular-Dashboard mit Anwendungskarten, Aufgaben und Aktivitäten.
 

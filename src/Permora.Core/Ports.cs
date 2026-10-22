@@ -15,6 +15,7 @@ public interface IPortalStore
     Task<IReadOnlyList<AuditEvent>> AuditAsync(Guid appId, long after, int limit, CancellationToken ct);
     Task<IReadOnlyList<Operation>> OperationsAsync(Guid appId, int limit, CancellationToken ct);
     Task<IReadOnlyList<AccessReview>> ReviewsAsync(Guid appId, CancellationToken ct);
+    Task<AccessReviewSchedule?> ReviewScheduleAsync(Guid appId, CancellationToken ct);
 }
 
 public interface IApplicationTransaction
@@ -29,6 +30,9 @@ public interface IApplicationTransaction
     Task AppendAuditAsync(Actor actor, string action, string detail, DateTimeOffset now, CancellationToken ct);
     Task<IReadOnlyList<AccessReview>> ReviewsAsync(CancellationToken ct);
     Task SaveReviewAsync(AccessReview review, CancellationToken ct);
+    Task<AccessReviewSchedule?> ReviewScheduleAsync(CancellationToken ct);
+    Task SaveReviewScheduleAsync(AccessReviewSchedule schedule, CancellationToken ct);
+    Task<bool> HasUnresolvedRevocationAsync(Guid assignmentId, CancellationToken ct);
 }
 
 public interface IIdentityConnector

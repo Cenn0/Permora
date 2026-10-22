@@ -26,8 +26,64 @@
 }
 @case('reviews'){
  <h2>Rezertifizierung</h2><p class="muted">Prüfe bestehende Zugriffe. Nicht rechtzeitig bestätigte Einträge werden zum Entzug vorgemerkt.</p>
- @if(d.managementRole==='Owner'){<form class="compact-form" (ngSubmit)="startReview()"><label>Name<input name="reviewName" [(ngModel)]="reviewName" required minlength="3" maxlength="120" /></label><label>Fällig am<input name="reviewDue" type="datetime-local" [(ngModel)]="reviewDue" required /></label><button type="submit" class="primary" [disabled]="busy()">Prüfung starten</button></form>}
- @for(reviewItem of reviews();track reviewItem.id){<article class="review-card"><h3>{{reviewItem.name}}</h3><p class="muted small">Fällig {{reviewItem.dueAt|date:'dd.MM.yyyy HH:mm'}} · {{reviewItem.closed?'Abgeschlossen':'Offen'}}</p>@for(item of reviewItem.items;track item.assignmentId){<div class="review-line"><code>{{item.assignmentId}}</code><span class="badge">{{label(item.decision)}}</span>@if(!reviewItem.closed&&item.decision==='Pending'&&approve()){<button [disabled]="busy()" (click)="review(reviewItem,item.assignmentId,true)">Beibehalten</button><button [disabled]="busy()" (click)="review(reviewItem,item.assignmentId,false)">Entziehen</button>}</div>}</article>}@empty{<p class="empty">Noch keine Rezertifizierungen.</p>}
+ <section class="review-schedule" aria-labelledby="review-schedule-title">
+  <div class="section-heading"><h3 id="review-schedule-title">Automatischer Prüfplan</h3>
+   @if(d.managementRole==='Owner'&&!scheduleEditing()){<button [disabled]="busy()||loading()" (click)="openReviewSchedule()">{{d.reviewSchedule?'Prüfplan bearbeiten':'Prüfplan einrichten'}}</button>}
+  </div>
+  @if(d.reviewSchedule;as schedule){
+   <dl class="details">
+    <dt>Name</dt><dd>{{schedule.name}}</dd>
+    <dt>Status</dt><dd><span [class]="'badge '+(schedule.enabled?'good':'neutral')">{{schedule.enabled?'Aktiviert':'Deaktiviert'}}</span></dd>
+    <dt>Intervall</dt><dd>Alle {{schedule.intervalDays}} Tage</dd>
+    <dt>Bearbeitungsfrist</dt><dd>{{schedule.reviewWindowDays}} Tage ab geplantem Start</dd>
+    <dt>{{schedule.enabled?'Nächster Start':'Gespeicherter Start'}}</dt><dd>{{schedule.nextStartAt|date:'dd.MM.yyyy HH:mm'}} (lokale Zeit)</dd>
+   </dl>
+  } @else {<p class="muted">Noch kein automatischer Prüfplan eingerichtet. Einzelne Prüfungen können manuell gestartet werden.</p>}
+  @if(scheduleEditing()&&d.managementRole==='Owner'){
+   <form class="form-panel review-schedule-form" #scheduleForm="ngForm" (ngSubmit)="scheduleForm.valid&&saveReviewSchedule()" aria-label="Prüfplan bearbeiten">
+    <label>Planname<input name="scheduleName" [(ngModel)]="scheduleName" required minlength="3" maxlength="120" /></label>
+    <div class="two-columns">
+     <label>Intervall in Tagen<input name="scheduleInterval" type="number" [(ngModel)]="scheduleInterval" required min="1" max="365" step="1" /></label>
+     <label>Bearbeitungsfrist in Tagen<input name="scheduleWindow" type="number" [(ngModel)]="scheduleWindow" required min="1" [max]="scheduleInterval<90?scheduleInterval:90" step="1" /></label>
+    </div>
+    <label>Nächster Start<input name="scheduleNextStart" type="datetime-local" step="1" [(ngModel)]="scheduleNextStart" required aria-describedby="schedule-time-help" /></label>
+    <p class="muted small" id="schedule-time-help">Eingabe in deiner lokalen Zeitzone. Der Rhythmus wird in festen Tagen mit je 24 Stunden fortgeführt.</p>
+    <label class="checkbox"><input name="scheduleEnabled" type="checkbox" [(ngModel)]="scheduleEnabled" /><span>Automatische Prüfungen aktivieren</span></label>
+    <p class="muted small">Die Frist beginnt am geplanten Termin. Nach einer Unterbrechung werden überfällige Zugriffe zum Entzug vorgemerkt; die Frist wird nicht verlängert. Erfasst werden die zum geplanten Start bereits bestehenden Zuweisungen. Weitere verpasste Intervalle werden übersprungen.</p>
+    <p class="muted small">Planänderungen und Deaktivierung verändern bereits gestartete Prüfungen und ihre Fristen nicht.</p>
+    <div class="form-actions"><button type="button" [disabled]="busy()" (click)="scheduleEditing.set(false)">Abbrechen</button><button class="primary" type="submit" [disabled]="busy()||scheduleForm.invalid">Prüfplan speichern</button></div>
+   </form>
+  }
+ </section>
+ @if(d.managementRole==='Owner'){
+  <h3>Einmalige Prüfung</h3>
+  <form class="compact-form" #reviewForm="ngForm" (ngSubmit)="reviewForm.valid&&startReview()" aria-label="Einmalige Prüfung starten"><label>Name<input name="reviewName" [(ngModel)]="reviewName" required minlength="3" maxlength="120" /></label><label>Fällig am<input name="reviewDue" type="datetime-local" [(ngModel)]="reviewDue" required /></label><button type="submit" class="primary" [disabled]="busy()||reviewForm.invalid">Prüfung starten</button></form>
+ }
+ <h3 class="review-list-title">Prüfungen</h3>
+ @for(reviewItem of reviews();track reviewItem.id){
+  <article class="review-card" [attr.aria-label]="reviewItem.name">
+   <h4>{{reviewItem.name}}</h4>
+   <p class="muted small">Fällig {{reviewItem.dueAt|date:'dd.MM.yyyy HH:mm'}} · {{reviewItem.closed?'Abgeschlossen':reviewOpen(reviewItem)?'Offen':'Frist abgelaufen'}}</p>
+   @if(reviewItem.scheduledFor){<p class="muted small">Automatisch · geplanter Start {{reviewItem.scheduledFor|date:'dd.MM.yyyy HH:mm'}}</p>}
+   @if(!reviewItem.closed&&!reviewOpen(reviewItem)){<p class="alert warning">Die Frist ist abgelaufen. Entscheidungen sind gesperrt; ausstehende Einträge werden automatisch zum Entzug vorgemerkt.</p>}
+   @for(item of reviewItem.items;track item.assignmentId){
+    <div class="review-line">
+     @if(reviewTarget(item.assignmentId);as target){
+      <div class="review-target"><strong>{{target.name}}</strong><small>{{target.role}}@if(target.kind){ · {{label(target.kind)}}}</small><small class="muted">Zuweisung: <code>{{item.assignmentId}}</code></small></div>
+      <span [class]="'badge '+tone(item.decision)">{{label(item.decision)}}</span>
+      @if(reviewOpen(reviewItem)&&item.decision==='Pending'&&approve()){
+       <div class="review-actions">
+        @if(target.present){<button [disabled]="busy()||!canRetain(item.assignmentId)" (click)="review(reviewItem,item.assignmentId,true)">Beibehalten</button>}
+        <button [disabled]="busy()" (click)="review(reviewItem,item.assignmentId,false)">{{target.present?'Entziehen':'Als entfernt bestätigen'}}</button>
+       </div>
+       @if(target.present&&!canRetain(item.assignmentId)){<small class="review-hint">Der Zugriff ist abgelaufen oder ein Entzug wurde angefordert. Beibehalten ist nicht möglich.</small>}
+      }
+     }
+     @if(item.decision==='RevocationQueued'){<small class="review-hint">Der Entzug ist angefordert. Den bestätigten Keycloak-Zustand findest du unter <button type="button" class="text-button" (click)="selectTab('requests')">Aufträge</button>.</small>}
+    </div>
+   } @empty {<p class="muted">Keine Zuweisungen zum Prüfzeitpunkt vorhanden.</p>}
+  </article>
+ } @empty {<p class="empty">Noch keine Rezertifizierungen.</p>}
 }
 @case('audit'){
  <h2>Änderungsprotokoll</h2><p class="muted small">Fortlaufende Ereignisse mit Hash-Verkettung. Ein externer manipulationsgeschützter Export ist für erhöhte Audit-Anforderungen erforderlich.</p>

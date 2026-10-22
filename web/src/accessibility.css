@@ -19,6 +19,18 @@ main, .panel, .form-panel, .page-heading > div, .section-heading > div,
 .application-cards.wide { grid-template-columns: repeat(auto-fit,minmax(min(240px,100%),1fr)); }
 .application-card h2, .application-card h3, .page-heading h1 { overflow-wrap: anywhere; }
 .review-line code { min-width: 0; overflow-wrap: anywhere; }
+.review-schedule { padding-bottom: 20px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
+.review-schedule .section-heading h3 { margin: 0; }
+.review-schedule-form { padding-top: 12px; }
+.review-list-title { margin-top: 28px; }
+.review-card h4 { font-size: 1rem; margin: 0 0 10px; overflow-wrap: anywhere; }
+.review-target { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.review-target > small { display: block; margin-top: 5px; }
+.review-target code { display: inline; font-size: .75rem; }
+.review-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.review-hint { flex-basis: 100%; line-height: 1.6; color: #536b8f; }
+.review-schedule-form .two-columns > label { min-width: 0; }
+.review-schedule-form label { overflow-wrap: anywhere; }
 .details dd, .metric div > span, .quick-actions a > div { overflow-wrap: anywhere; }
 button, .button { max-width: 100%; }
 @media (max-width: 420px) {

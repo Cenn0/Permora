@@ -37,7 +37,8 @@ def isolated_test_size(name, default, low, high):
     return int(value)
 
 APPLICATIONS = isolated_test_size('PERMORA_CI_APPLICATIONS', 4, 2, 12)
-USERS = isolated_test_size('PERMORA_CI_USERS', 8, 2, 24)
+# The review scenario distinguishes original, intermediate and later grants.
+USERS = isolated_test_size('PERMORA_CI_USERS', 8, 3, 24)
 if APPLICATIONS * USERS > 192:
     raise SystemExit('Refusing oversized isolated worker load fixture')
 
@@ -404,24 +405,139 @@ def run():
                     check(not kc.request('GET',base+'/users/'+user['id']+'/role-mappings/clients/'+cid),'Actual Keycloak confirms revocation')
             check(faults.remote_deletes==APPLICATIONS*USERS,'Failover does not duplicate effective remote DELETEs')
             stop_workers()
+
+            # A separate live schedule scenario preserves every expiry/failover
+            # assertion above. Model a persisted schedule that became overdue
+            # during worker downtime, including a grant between missed cycles.
+            # These grants are NOT expired, so only the scheduled review can
+            # cause the two remote revocations; the latest grant must survive.
+            review_app_id = applications[0]['id']
+            review_client = remote_clients[0]
+            review_app = json.loads(sql('permora_test_portal',
+                'SELECT document::text FROM applications WHERE id='+quote(review_app_id)))
+            review_role = kc.request('GET',base+'/clients/'+review_client+'/roles/role.reader')
+            review_clock = datetime.now(timezone.utc)
+            earliest_missed_start = review_clock - timedelta(days=16)
+            scheduled_for = earliest_missed_start + timedelta(days=14)
+            old_grant, intermediate_grant, later_grant = (str(uuid.uuid4()) for _ in range(3))
+            assignments = []
+            for grant_id, user, granted_at in (
+                (old_grant, users[0], earliest_missed_start - timedelta(hours=1)),
+                (intermediate_grant, users[1], earliest_missed_start + timedelta(hours=1)),
+                (later_grant, users[2], scheduled_for + timedelta(hours=1)),
+            ):
+                kc.request('POST',base+'/users/'+user['id']+'/role-mappings/clients/'+review_client,[review_role])
+                assignments.append({'id':grant_id,'roleId':review_app['roles'][0]['id'],
+                    'principalId':stable_id(realm,'user',user['id']),'grantedBy':'A'*64,
+                    'grantedAt':granted_at.isoformat(),
+                    'expiresAt':(review_clock+timedelta(days=7)).isoformat()})
+            review_app['assignments'] = assignments
+            review_app['revision'] += 1
+            fixture_revision = review_app['revision']
+            schedule = {'name':'Overdue recurring review','intervalDays':7,'reviewWindowDays':1,
+                'nextStartAt':earliest_missed_start.isoformat(),'enabled':True,'revision':1}
+            sql('permora_test_portal',
+                'UPDATE applications SET revision='+str(fixture_revision)+',document='+
+                quote(compact(review_app))+'::jsonb WHERE id='+quote(review_app_id)+';'+
+                'INSERT INTO review_schedules(application_id,enabled,next_start_at,revision,document) VALUES ('+
+                quote(review_app_id)+',true,'+quote(schedule['nextStartAt'])+',1,'+
+                quote(compact(schedule))+'::jsonb);')
+            for user in users[:3]:
+                check([role['name'] for role in kc.request('GET',
+                    base+'/users/'+user['id']+'/role-mappings/clients/'+review_client)]==['role.reader'],
+                    'Unexpired review fixture grant really exists in Keycloak')
+
+            # Restart both actual workers against the same due schedule. Their
+            # application row lock must prevent duplicate campaigns and writes.
+            for worker in configurations:
+                path = directory/(worker+'.json')
+                log = (directory/(worker+'.schedule.log')).open('wb'); logs.append(log)
+                processes[worker] = subprocess.Popen(['dotnet',str(dll)],cwd=ROOT,
+                    env=dict(os.environ,PERMORA_CONFIG=str(path),DOTNET_ENVIRONMENT='Development'),
+                    stdout=log,stderr=subprocess.STDOUT)
+            schedule_deadline = time.monotonic()+90
+            while time.monotonic()<schedule_deadline:
+                if any(process.poll() is not None for process in processes.values()):
+                    raise RuntimeError('A worker exited while processing a due review schedule')
+                if count("SELECT count(*) FROM operations WHERE status='Applied'")==APPLICATIONS*USERS+2:
+                    break
+                time.sleep(.5)
+            check(count("SELECT count(*) FROM operations WHERE status='Applied'")==APPLICATIONS*USERS+2,
+                'A catch-up review revokes original and intermediate unexpired grants through the actual worker and Keycloak')
+            # Wait through a further real polling interval to check that the
+            # second process does not replay missed cycles or duplicate work.
+            time.sleep(3.5)
+            campaigns = json.loads(sql('permora_test_portal',
+                'SELECT coalesce(jsonb_agg(document),\'[]\'::jsonb)::text FROM access_reviews WHERE application_id='+quote(review_app_id)))
+            check(len(campaigns)==1,'Two real workers create exactly one catch-up review after multiple missed intervals')
+            campaign = campaigns[0]
+            check(datetime.fromisoformat(campaign['scheduledFor'])==scheduled_for,
+                'Catch-up review uses the latest missed cycle whose deadline has passed')
+            check(datetime.fromisoformat(campaign['dueAt'])==scheduled_for+timedelta(days=1),
+                'Worker downtime does not move the overdue review deadline forward')
+            check(campaign['closed'] and len(campaign['items'])==2
+                and {item['assignmentId'] for item in campaign['items']}=={old_grant,intermediate_grant}
+                and all(item['decision']=='RevocationQueued' for item in campaign['items']),
+                'Review includes intermediate grants without imposing an old deadline on later grants')
+            scheduled_audit = json.loads(sql('permora_test_portal',
+                "SELECT document->>'detail' FROM audit_events WHERE application_id="+
+                quote(review_app_id)+" AND document->>'action'='review.scheduled'"))
+            check(datetime.fromisoformat(scheduled_audit['earliestMissedStart'])==earliest_missed_start
+                and scheduled_audit['skippedCycles']==2,
+                'Audit records the original missed start and two omitted historical cycles')
+            stored_schedule = json.loads(sql('permora_test_portal',
+                'SELECT document::text FROM review_schedules WHERE application_id='+quote(review_app_id)))
+            check(stored_schedule['revision']==2 and stored_schedule['enabled']
+                and datetime.fromisoformat(stored_schedule['nextStartAt'])==earliest_missed_start+timedelta(days=21),
+                'Schedule advances once to the first future point on its fixed cadence')
+            reviewed_app = json.loads(sql('permora_test_portal',
+                'SELECT document::text FROM applications WHERE id='+quote(review_app_id)))
+            check(reviewed_app['revision']==fixture_revision+2,
+                'Only the two verified revocations advance the application revision')
+            check([assignment['id'] for assignment in reviewed_app['assignments']]==[later_grant],
+                'A post-cutoff grant is not retroactively revoked by the overdue campaign')
+            for user in users[:2]:
+                check(not kc.request('GET',base+'/users/'+user['id']+'/role-mappings/clients/'+review_client),
+                    'Keycloak readback confirms the original and intermediate scheduled-review revocations')
+            check([role['name'] for role in kc.request('GET',
+                base+'/users/'+users[2]['id']+'/role-mappings/clients/'+review_client)]==['role.reader'],
+                'Keycloak readback confirms the later grant remains effective')
+            check(count('SELECT count(*) FROM operations')==APPLICATIONS*USERS+2
+                and faults.remote_deletes==APPLICATIONS*USERS+2,
+                'Recurring review adds exactly two lifecycle operations and two effective remote DELETEs')
+            for grant_id in (old_grant, intermediate_grant):
+                check(count("SELECT count(*) FROM operations WHERE document->'change'->>'targetId'="+
+                    quote(grant_id)+" AND status='Applied' AND document->>'systemRevocation'='true'")==1,
+                    'Each review deadline revocation uses the normal system-revocation pipeline exactly once')
+            stop_workers()
             keys_before={k['kid'] for k in kc.request('GET','/realms/'+realm+'/protocol/openid-connect/certs',admin=False)['keys']}
             fingerprint=sql('permora_test_portal',"SELECT md5(string_agg(document::text,'' ORDER BY id)) FROM applications")
+            review_fingerprint=sql('permora_test_portal',"SELECT md5(string_agg(document::text,'' ORDER BY id)) FROM access_reviews")
+            schedule_fingerprint=sql('permora_test_portal',"SELECT md5(string_agg(document::text,'' ORDER BY application_id)) FROM review_schedules")
             execute(['docker','stop','-t','20',kc_name],timeout=40); started_kc=False
             for database in ('permora_test_portal','permora_test_keycloak'):
                 backup=execute(['docker','exec',pg,'pg_dump','-U','permora_ci','-Fc',database])
                 sql('postgres','CREATE DATABASE '+database+'_restore;')
                 execute(['docker','exec','-i',pg,'pg_restore','-U','permora_ci','--no-owner','--no-privileges','-d',database+'_restore'],data=backup)
             check(sql('permora_test_portal_restore',"SELECT md5(string_agg(document::text,'' ORDER BY id)) FROM applications")==fingerprint,'Restored portal retains identical application state')
-            check(int(sql('permora_test_portal_restore',"SELECT count(*) FROM operations WHERE status='Applied'"))==APPLICATIONS*USERS,'Restored portal retains completed operation evidence')
+            check(int(sql('permora_test_portal_restore',"SELECT count(*) FROM operations WHERE status='Applied'"))==APPLICATIONS*USERS+2,'Restored portal retains completed expiry and review operation evidence')
+            check(sql('permora_test_portal_restore',"SELECT md5(string_agg(document::text,'' ORDER BY id)) FROM access_reviews")==review_fingerprint,
+                'Restored portal retains the exact review deadline, cutoff and decisions')
+            check(sql('permora_test_portal_restore',"SELECT md5(string_agg(document::text,'' ORDER BY application_id)) FROM review_schedules")==schedule_fingerprint,
+                'Restored portal retains schedule cadence and independent revision')
             recovered=start_keycloak('permora_test_keycloak_restore')
             keys_after={k['kid'] for k in recovered.request('GET','/realms/'+realm+'/protocol/openid-connect/certs',admin=False)['keys']}
             check(keys_before==keys_after,'Keycloak restore preserves realm signing keys')
             for cid in remote_clients:
                 for user in users:
-                    check(not recovered.request('GET',base+'/users/'+user['id']+'/role-mappings/clients/'+cid),'Restored Keycloak does not resurrect revoked access')
+                    retained = cid==review_client and user['id']==users[2]['id']
+                    actual = [role['name'] for role in recovered.request('GET',base+'/users/'+user['id']+'/role-mappings/clients/'+cid)]
+                    check(actual==(['role.reader'] if retained else []),
+                        'Restored Keycloak preserves later access' if retained else 'Restored Keycloak does not resurrect revoked access')
             print(json.dumps({'scope':'two-real-worker-processes-real-keycloak','applications':APPLICATIONS,
                 'revocations':APPLICATIONS*USERS,'users':USERS,'elapsedSeconds':round(elapsed,3),
                 'throughputRevocationsPerSecond':round(APPLICATIONS*USERS/max(elapsed,0.001),3),
+                'scheduledReviewRevocations':2,'catchUpCampaigns':1,'postCutoffGrantsRetained':1,
                 'outageResponses':faults.outages,
                 'postCommitWorkerKills':1,'databaseRestores':2,'productionSlo':None,'multiHostHaApproval':False}),flush=True)
         finally:

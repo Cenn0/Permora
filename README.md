@@ -33,7 +33,7 @@ Permora is an independent open-source **C# / Angular portal** designed to let ap
 
 - **Applications and teams:** Application catalog, registration, and explicit Owner, Maintainer, AccessManager, Approver, and Auditor mandates.
 - **Permissions:** Application-scoped `perm.*` permissions and composite `role.*` business roles; user/group grants.
-- **Governance:** Four-eyes approval, separation of duties (SoD), expiring access, recertification, and an application-scoped change log.
+- **Governance:** Four-eyes approval, separation of duties (SoD), expiring access, [scheduled recertification with enforced deadlines](docs/access-reviews.md), and an application-scoped change log.
 - **Provisioning:** Persistent change requests, retries, desired/actual reconciliation, and verification of effective Keycloak assignments.
 - **Dashboard:** Responsive Angular UI with application cards, task queues, and activity feeds.
 

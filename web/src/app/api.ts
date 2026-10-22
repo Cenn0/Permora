@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import type { AppDetail, AppSummary, AuditPage, Change, Dashboard, Operation, Principal, Review, Session, Team } from './models';
+import type { AppDetail, AppSummary, AuditPage, Change, Dashboard, Operation, Principal, Review, ReviewSchedule, ReviewScheduleInput, Session, Team } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class PortalApi {
@@ -35,5 +35,8 @@ export class PortalApi {
  operations(id: string): Promise<Operation[]> { return this.get(`/api/v1/applications/${id}/operations`); }
  audit(id: string, after = 0): Promise<AuditPage> { return this.get(`/api/v1/applications/${id}/audit?after=${after}`); }
  reviews(id: string): Promise<Review[]> { return this.get(`/api/v1/applications/${id}/reviews`); }
+ reviewSchedule(id: string, input: ReviewScheduleInput): Promise<ReviewSchedule> {
+  return this.put(`/api/v1/applications/${encodeURIComponent(id)}/review-schedule`, input);
+ }
  async logout(): Promise<void> { await this.post('/bff/logout', {}); location.assign('/'); }
 }

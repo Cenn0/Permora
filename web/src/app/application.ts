@@ -7,6 +7,7 @@ import { PortalApi } from './api';
 import { Icon } from './icon';
 import type { AppDetail, AuditEvent, Change, Operation, Permission, Principal, Review, Role } from './models';
 import { label, problem, RequestKeys, safeExpiry, statusClass } from './view-model';
+import { localDateTime, retentionAvailable, reviewOpen, reviewTarget } from './review-model';
 
 type Tab='roles'|'permissions'|'access'|'requests'|'reviews'|'audit'|'settings';
 @Component({standalone:true,imports:[CommonModule,FormsModule,RouterLink,Icon],templateUrl:'./application.html'})
@@ -14,6 +15,7 @@ export class ApplicationPage {
  readonly api=inject(PortalApi); private readonly route=inject(ActivatedRoute); private readonly destroy=inject(DestroyRef);
  readonly detail=signal<AppDetail|null>(null); readonly error=signal(''); readonly notice=signal(''); readonly loading=signal(true); readonly busy=signal(false);
  readonly tab=signal<Tab>('roles'); readonly editor=signal<'permission'|'role'|'grant'|null>(null);
+ readonly scheduleEditing=signal(false);
  readonly operations=signal<Operation[]>([]);readonly reviews=signal<Review[]>([]);readonly events=signal<AuditEvent[]>([]);readonly nextSequence=signal<number|null>(null);
  readonly principals=signal<Principal[]>([]);readonly searching=signal(false);private version=0; private searchVersion=0;private id='';private readonly keys=new RequestKeys();
  readonly define=computed(()=>['Owner','Maintainer'].includes(this.detail()?.managementRole??''));
@@ -24,7 +26,9 @@ export class ApplicationPage {
  readonly tabs:{id:Tab;name:string}[]=[{id:'roles',name:'Rollen'},{id:'permissions',name:'Berechtigungen'},{id:'access',name:'Zugriffe'},{id:'requests',name:'Aufträge'},{id:'reviews',name:'Rezertifizierung'},{id:'audit',name:'Änderungsprotokoll'},{id:'settings',name:'Anbindung'}];
  editId='';key='';name='';description='';risk:'High'|'Standard'='High';permissionIds:string[]=[];reason='';query='';principalId='';roleId='';expiry='';reviewName='';reviewDue='';decisionReason='';clientUuid='';clientId='';loginClientUuid='';
  iamEvidence='';iamFgap=false;iamRoleProfile=false;iamAssignmentProfile=false;iamAudience=false;
- constructor(){this.route.paramMap.pipe(takeUntilDestroyed(this.destroy)).subscribe(p=>{this.id=p.get('id')??'';++this.searchVersion;this.searching.set(false);this.principals.set([]);this.operations.set([]);this.reviews.set([]);this.notice.set('');this.keys.clear();this.detail.set(null);this.events.set([]);this.editor.set(null);void this.reload();});this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroy)).subscribe(p=>{const tab=p.get('tab');if(this.tabs.some(t=>t.id===tab))this.tab.set(tab as Tab);});}
+ scheduleName='';scheduleInterval=90;scheduleWindow=14;scheduleNextStart='';scheduleEnabled=true;private scheduleRevision=0;private scheduleOriginalStart:string|null=null;
+ readonly reviewOpen=reviewOpen;
+ constructor(){this.route.paramMap.pipe(takeUntilDestroyed(this.destroy)).subscribe(p=>{this.id=p.get('id')??'';++this.searchVersion;this.searching.set(false);this.principals.set([]);this.operations.set([]);this.reviews.set([]);this.notice.set('');this.keys.clear();this.detail.set(null);this.events.set([]);this.editor.set(null);this.scheduleEditing.set(false);void this.reload();});this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroy)).subscribe(p=>{const tab=p.get('tab');if(this.tabs.some(t=>t.id===tab))this.tab.set(tab as Tab);});}
  async reload():Promise<void>{const version=++this.version;const id=this.id;this.loading.set(true);this.error.set('');try{const detail=await this.api.application(id);if(version!==this.version)return;this.detail.set(detail);const [operations,reviews,audit]=await Promise.all([this.api.operations(id),this.api.reviews(id),this.api.audit(id)]);if(version!==this.version)return;this.operations.set(operations);this.reviews.set(reviews);this.events.set(audit.items);this.nextSequence.set(audit.nextSequence);}catch(e){if(version===this.version)this.error.set(problem(e));}finally{if(version===this.version)this.loading.set(false);}}
  selectTab(tab:Tab):void{this.tab.set(tab);this.editor.set(null);}
  open(kind:'permission'|'role'|'grant',item?:Permission|Role):void{this.editor.set(kind);this.error.set('');this.notice.set('');this.editId=item?.id??'';this.key=item?.key??'';this.name=item?.name??'';this.description=item?.description??'';this.risk=item&&'risk'in item?item.risk:'High';this.permissionIds=item&&'permissionIds'in item?[...item.permissionIds]:[];this.reason='';this.query='';this.principalId='';this.roleId='';this.expiry='';this.principals.set([]);this.keys.clear();}
@@ -40,7 +44,40 @@ export class ApplicationPage {
  async decide(op:Operation,approve:boolean):Promise<void>{const reason=window.prompt(approve?'Freigabe begründen:':'Ablehnung begründen:');if(reason===null)return;await this.perform(()=>this.api.post(`/api/v1/applications/${this.id}/operations/${op.id}/decision`,{approve,reason}),'Entscheidung gespeichert.');}
  async retry(op:Operation):Promise<void>{await this.perform(()=>this.api.post(`/api/v1/applications/${this.id}/operations/${op.id}/retry`,{}),'Erneute Verarbeitung angefordert.');}
  async startReview():Promise<void>{const dueAt=safeExpiry(this.reviewDue);if(!dueAt){this.error.set('Bitte ein gültiges Fälligkeitsdatum wählen.');return;}await this.perform(()=>this.api.post(`/api/v1/applications/${this.id}/reviews`,{name:this.reviewName,dueAt}),'Rezertifizierung gestartet.');}
- async review(review:Review,assignmentId:string,retain:boolean):Promise<void>{await this.perform(()=>this.api.post(`/api/v1/applications/${this.id}/reviews/${review.id}/items/${assignmentId}`,{retain}),retain?'Berechtigung bestätigt.':'Entzug angefordert, noch nicht wirksam bestätigt.');}
+ async review(review:Review,assignmentId:string,retain:boolean):Promise<void>{await this.perform(()=>this.api.post<Review>(`/api/v1/applications/${this.id}/reviews/${review.id}/items/${assignmentId}`,{retain}),result=>{
+  const decision=result.items.find(item=>item.assignmentId===assignmentId)?.decision;
+  return decision==='AlreadyRevoked'?'Die Zuweisung ist bereits entfernt. Entscheidung gespeichert.':decision==='Retained'?'Berechtigung bestätigt.':decision==='RevocationQueued'?'Entzug angefordert, noch nicht wirksam bestätigt.':'Entscheidung gespeichert. Bitte den aktuellen Status prüfen.';
+ });}
+ reviewTarget(assignmentId:string){const detail=this.detail();return detail?reviewTarget(assignmentId,detail.application,detail.principals):null;}
+ canRetain(assignmentId:string):boolean{const detail=this.detail();return !!detail&&retentionAvailable(assignmentId,detail.application,this.operations());}
+ openReviewSchedule():void{
+  const schedule=this.detail()?.reviewSchedule;
+  this.scheduleName=schedule?.name??'Regelmäßige Zugriffsprüfung';
+  this.scheduleInterval=schedule?.intervalDays??90;this.scheduleWindow=schedule?.reviewWindowDays??14;
+  this.scheduleOriginalStart=schedule?.nextStartAt??null;
+  this.scheduleNextStart=localDateTime(schedule?.nextStartAt??new Date(Date.now()+60*60*1000).toISOString());
+  this.scheduleEnabled=schedule?.enabled??true;this.scheduleRevision=schedule?.revision??0;
+  this.error.set('');this.notice.set('');this.scheduleEditing.set(true);
+ }
+ async saveReviewSchedule():Promise<void>{
+  // Preserve an unchanged stored instant, including its offset at a repeated DST hour.
+  const nextStartAt=this.scheduleOriginalStart&&this.scheduleNextStart===localDateTime(this.scheduleOriginalStart)
+   ?this.scheduleOriginalStart:safeExpiry(this.scheduleNextStart);
+  if(!nextStartAt){this.error.set('Bitte einen gültigen nächsten Start angeben.');return;}
+  if(!Number.isInteger(this.scheduleInterval)||this.scheduleInterval<1||this.scheduleInterval>365
+    ||!Number.isInteger(this.scheduleWindow)||this.scheduleWindow<1||this.scheduleWindow>90||this.scheduleWindow>this.scheduleInterval){
+   this.error.set('Intervall: 1 bis 365 Tage. Bearbeitungsfrist: 1 bis 90 Tage und höchstens ein Intervall.');return;
+  }
+  const untilStart=Date.parse(nextStartAt)-Date.now();
+  if(this.scheduleEnabled&&(untilStart<=0||untilStart>365*24*60*60*1000)){
+   this.error.set('Der nächste Start eines aktiven Plans muss innerhalb der kommenden 365 Tage liegen.');return;
+  }
+  const id=this.id;
+  const input={name:this.scheduleName.trim(),intervalDays:this.scheduleInterval,reviewWindowDays:this.scheduleWindow,
+   nextStartAt,enabled:this.scheduleEnabled,expectedRevision:this.scheduleRevision};
+  await this.perform(async()=>{const result=await this.api.reviewSchedule(id,input);if(id===this.id)this.scheduleEditing.set(false);return result;},
+   input.enabled?'Prüfplan gespeichert. Der nächste Start erfolgt automatisch.':'Prüfplan deaktiviert. Bereits gestartete Prüfungen und ihre Fristen bleiben bestehen.');
+ }
  async reconcile():Promise<void>{await this.submit({kind:'Reconcile',reason:'Manueller Soll-Ist-Abgleich durch das Anwendungsteam'});}
  async binding():Promise<void>{await this.perform(()=>this.api.put(`/api/v1/admin/applications/${this.id}/binding`,{clientUuid:this.clientUuid,clientId:this.clientId,loginClientUuid:this.loginClientUuid||null,expectedRevision:this.detail()!.application.revision}),'Anbindung gespeichert. IAM-Freigabe muss separat dokumentiert werden.');}
  async approveIam():Promise<void>{await this.perform(()=>this.api.post(`/api/v1/admin/applications/${this.id}/iam-approval`,{
@@ -49,5 +86,5 @@ export class ApplicationPage {
    tokenAudienceVerified:this.iamAudience,evidenceReference:this.iamEvidence
  }),'IAM-Freigabe protokolliert; technische Rückprüfung wird ausgeführt.');}
  async moreAudit():Promise<void>{const after=this.nextSequence();const id=this.id;if(after===null)return;this.busy.set(true);try{const page=await this.api.audit(id,after);if(id!==this.id)return;this.events.update(items=>[...items,...page.items]);this.nextSequence.set(page.nextSequence);}catch(e){this.error.set(problem(e));}finally{this.busy.set(false);}}
- private async perform(action:()=>Promise<unknown>,notice:string):Promise<void>{if(this.busy())return;const id=this.id;this.busy.set(true);this.error.set('');try{await action();if(id!==this.id)return;this.notice.set(notice);await this.reload();}catch(e){this.error.set(problem(e));}finally{this.busy.set(false);}}
+ private async perform<T>(action:()=>Promise<T>,notice:string|((result:T)=>string)):Promise<void>{if(this.busy())return;const id=this.id;this.busy.set(true);this.error.set('');this.notice.set('');try{const result=await action();if(id!==this.id)return;this.notice.set(typeof notice==='function'?notice(result):notice);await this.reload();}catch(e){this.error.set(problem(e));}finally{this.busy.set(false);}}
 }

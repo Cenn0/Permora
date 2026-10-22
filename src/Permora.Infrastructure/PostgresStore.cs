@@ -7,6 +7,8 @@ namespace Permora.Infrastructure;
 
 public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
 {
+    public const int SchemaVersion = 2;
+
     public async Task MigrateAsync(CancellationToken ct)
     {
         await using var connection = await source.OpenConnectionAsync(ct);
@@ -21,6 +23,15 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
             using var reader = new StreamReader(stream);
             await ExecuteAsync(connection, transaction, await reader.ReadToEndAsync(ct), ct);
             await ExecuteAsync(connection, transaction, "INSERT INTO schema_versions(version) VALUES (1)", ct);
+        }
+        await using var reviewScheduleVersion = new NpgsqlCommand("SELECT COUNT(*) FROM schema_versions WHERE version = 2", connection, transaction);
+        if (Convert.ToInt32(await reviewScheduleVersion.ExecuteScalarAsync(ct)) == 0)
+        {
+            await using var stream = typeof(PostgresStore).Assembly.GetManifestResourceStream("Permora.Infrastructure.schema-review-schedules.sql")
+                ?? throw new InvalidOperationException("Review schedule migration is missing.");
+            using var reader = new StreamReader(stream);
+            await ExecuteAsync(connection, transaction, await reader.ReadToEndAsync(ct), ct);
+            await ExecuteAsync(connection, transaction, "INSERT INTO schema_versions(version) VALUES (2)", ct);
         }
         await transaction.CommitAsync(ct);
     }
@@ -255,10 +266,11 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
             SELECT id FROM applications a WHERE
               EXISTS (SELECT 1 FROM operations o WHERE o.application_id=a.id AND o.status='Queued' AND o.next_at<=@now)
               OR EXISTS (SELECT 1 FROM access_reviews r WHERE r.application_id=a.id AND NOT r.closed AND r.due_at<=@now)
+              OR EXISTS (SELECT 1 FROM review_schedules s WHERE s.application_id=a.id AND s.enabled AND s.next_start_at<=@now)
               OR EXISTS (SELECT 1 FROM jsonb_array_elements(a.document->'assignments') item
                 WHERE (item->>'expiresAt')::timestamptz<=@now AND NOT EXISTS (
                   SELECT 1 FROM operations o WHERE o.application_id=a.id AND o.actor_key='system'
-                  AND o.idempotency_key='revoke:'||(item->>'id')))
+                  AND o.status<>'Rejected' AND o.idempotency_key='revoke:'||(item->>'id')))
             -- Rotate across eligible IDs instead of repeatedly truncating to the
             -- same first 100 hot applications. When the cursor reaches the end,
             -- wrap to the beginning; a subsequent worker tick advances the cursor.
@@ -293,6 +305,13 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
         var command = new NpgsqlCommand("SELECT document::text FROM access_reviews WHERE application_id=@id ORDER BY due_at DESC LIMIT 200", connection);
         command.Parameters.AddWithValue("id", appId);
         return await DocumentsAsync<AccessReview>(command, ct);
+    }
+    public async Task<AccessReviewSchedule?> ReviewScheduleAsync(Guid appId, CancellationToken ct)
+    {
+        await using var connection = await source.OpenConnectionAsync(ct);
+        await using var command = new NpgsqlCommand("SELECT document::text FROM review_schedules WHERE application_id=@app", connection);
+        command.Parameters.AddWithValue("app", appId);
+        return await OneAsync<AccessReviewSchedule>(command, ct);
     }
 
     internal static void Json<T>(NpgsqlCommand command, string name, T value) => command.Parameters.AddWithValue(name, NpgsqlDbType.Jsonb, Wire.Serialize(value));
@@ -404,6 +423,40 @@ public sealed class PostgresStore(NpgsqlDataSource source) : IPortalStore
         }
         public Task AppendAuditAsync(Actor actor, string action, string detail, DateTimeOffset now, CancellationToken ct) =>
             PostgresStore.AppendAuditAsync(connection, transaction, applicationId, actor, action, detail, now, ct);
+        public async Task<bool> HasUnresolvedRevocationAsync(Guid assignmentId, CancellationToken ct)
+        {
+            await using var command = new NpgsqlCommand("""
+                SELECT EXISTS (SELECT 1 FROM operations WHERE application_id=@app AND status<>'Rejected'
+                    AND document->'change'->>'kind'='RevokeAccess'
+                    AND document->'change'->>'targetId'=@assignment)
+                """, connection, transaction);
+            command.Parameters.AddWithValue("app", applicationId);
+            command.Parameters.AddWithValue("assignment", assignmentId.ToString());
+            return (bool)(await command.ExecuteScalarAsync(ct))!;
+        }
+        public async Task<AccessReviewSchedule?> ReviewScheduleAsync(CancellationToken ct)
+        {
+            await using var command = new NpgsqlCommand("SELECT document::text FROM review_schedules WHERE application_id=@app", connection, transaction);
+            command.Parameters.AddWithValue("app", applicationId);
+            return await OneAsync<AccessReviewSchedule>(command, ct);
+        }
+        public async Task SaveReviewScheduleAsync(AccessReviewSchedule schedule, CancellationToken ct)
+        {
+            await using var command = new NpgsqlCommand("""
+                INSERT INTO review_schedules(application_id, enabled, next_start_at, revision, document)
+                VALUES (@app, @enabled, @next, @revision, @document)
+                ON CONFLICT(application_id) DO UPDATE
+                    SET enabled=@enabled, next_start_at=@next, revision=@revision, document=@document
+                    WHERE review_schedules.revision < @revision
+                """, connection, transaction);
+            command.Parameters.AddWithValue("app", applicationId);
+            command.Parameters.AddWithValue("enabled", schedule.Enabled);
+            command.Parameters.AddWithValue("next", schedule.NextStartAt.ToUniversalTime());
+            command.Parameters.AddWithValue("revision", schedule.Revision);
+            Json(command, "document", schedule);
+            if (await command.ExecuteNonQueryAsync(ct) != 1)
+                throw new InvalidOperationException("Review schedule revision must increase.");
+        }
         public async Task<IReadOnlyList<AccessReview>> ReviewsAsync(CancellationToken ct)
         {
             var command = new NpgsqlCommand("SELECT document::text FROM access_reviews WHERE application_id=@app AND NOT closed ORDER BY due_at", connection, transaction);

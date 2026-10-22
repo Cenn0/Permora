@@ -126,16 +126,55 @@ public sealed class OperationProcessor(IPortalStore store, IAccessConnector conn
         var now = clock.GetUtcNow();
         foreach (var assignment in tx.Application.Assignments.Where(a => a.ExpiresAt <= now))
             await ChangeService.QueueRevocationAsync(tx, assignment.Id, "Grant expired", now, ct);
+
+        var schedule = await tx.ReviewScheduleAsync(ct);
+        if (schedule is { Enabled: true } && schedule.NextStartAt <= now)
+        {
+            var cycles = ReviewScheduling.CatchUp(schedule, now);
+            async Task StartCycle(DateTimeOffset scheduledFor, DateTimeOffset? grantedAfter)
+            {
+                // Overdue cohorts must not inherit a new open deadline; newer
+                // grants must not inherit a deadline from before their own cycle.
+                var items = tx.Application.Assignments.Where(a => a.GrantedAt <= scheduledFor
+                        && (grantedAfter is null || a.GrantedAt > grantedAfter))
+                    .Select(a => new ReviewItem(a.Id, "Pending")).ToArray();
+                var review = new AccessReview(Guid.NewGuid(), appId, schedule.Name,
+                    scheduledFor.AddDays(schedule.ReviewWindowDays), items, Closed: items.Length == 0,
+                    ScheduledFor: scheduledFor);
+                await tx.SaveReviewAsync(review, ct);
+                await tx.AppendAuditAsync(new Actor("system", "Lifecycle worker"), "review.scheduled",
+                    Wire.Serialize(new { review.Id, review.ScheduledFor, review.DueAt, itemCount = items.Length,
+                        earliestMissedStart = schedule.NextStartAt, cycles.SkippedCycles }), now, ct);
+            }
+            if (cycles.OverdueStart is { } overdueStart) await StartCycle(overdueStart, null);
+            if (cycles.OpenStart is { } openStart) await StartCycle(openStart, cycles.OverdueStart);
+            // Bounded catch-up: at most two campaigns, then the first original
+            // UTC cadence point strictly after now. No unbounded replay loop.
+            await tx.SaveReviewScheduleAsync(schedule with
+            {
+                NextStartAt = cycles.NextStartAt,
+                Revision = checked(schedule.Revision + 1)
+            }, ct);
+        }
+
         foreach (var review in (await tx.ReviewsAsync(ct)).Where(r => !r.Closed && r.DueAt <= now))
         {
+            var assignedIds = tx.Application.Assignments.Select(a => a.Id).ToHashSet();
             foreach (var item in review.Items.Where(i => i.Decision == "Pending"))
-                if (tx.Application.Assignments.Any(a => a.Id == item.AssignmentId))
+                if (assignedIds.Contains(item.AssignmentId))
                     await ChangeService.QueueRevocationAsync(tx, item.AssignmentId, "Access review overdue", now, ct);
             await tx.SaveReviewAsync(review with
             {
                 Closed = true,
-                Items = review.Items.Select(i => i.Decision == "Pending" ? i with { Decision = "RevocationQueued" } : i).ToArray()
+                Items = review.Items.Select(i => i.Decision == "Pending" ? i with
+                {
+                    Decision = assignedIds.Contains(i.AssignmentId) ? "RevocationQueued" : "AlreadyRevoked"
+                } : i).ToArray()
             }, ct);
+            await tx.AppendAuditAsync(new Actor("system", "Lifecycle worker"), "review.overdue",
+                Wire.Serialize(new { review.Id, review.DueAt,
+                    revocations = review.Items.Count(i => i.Decision == "Pending" && assignedIds.Contains(i.AssignmentId)),
+                    alreadyRevoked = review.Items.Count(i => i.Decision == "Pending" && !assignedIds.Contains(i.AssignmentId)) }), now, ct);
         }
         return true;
     }, ct);

@@ -75,17 +75,28 @@ def seed_isolated_group_gate_fixture():
       INSERT INTO directory(id, realm_key, name, document)
       VALUES ('{group_id}'::uuid, 'enterprise', 'CI Test Group', {quoted_json(group)});
     """
-    docker_env = os.environ.copy()
-    docker_env.update({
+    postgres_env = os.environ.copy()
+    postgres_env.update({
         "PGHOST": host, "PGPORT": connection.get("Port", "5432"),
-        "PGUSER": connection["Username"], "PGPASSWORD": connection["Password"],
+        "PGUSER": connection["Username"], "PGPASSWORD": connection.get("Password", ""),
         "PGDATABASE": database
     })
+    # An explicit native psql path permits the identical isolated fixture on
+    # developer machines without Docker. CI retains its PostgreSQL 18 client;
+    # this changes only SQL transport, never the assertions or fixture data.
+    native_psql = os.environ.get("PERMORA_TEST_PSQL_BIN")
+    if native_psql:
+        binary = Path(native_psql)
+        if not binary.is_absolute() or not binary.is_file() or not os.access(binary, os.X_OK):
+            raise ValueError("PERMORA_TEST_PSQL_BIN must be an absolute executable psql path")
+        command = [str(binary), "-X", "-v", "ON_ERROR_STOP=1"]
+    else:
+        command = ["docker", "run", "--rm", "-i", "--network", "host",
+                   "-e", "PGHOST", "-e", "PGPORT", "-e", "PGUSER", "-e", "PGPASSWORD",
+                   "-e", "PGDATABASE", "postgres:18", "psql", "-X", "-v", "ON_ERROR_STOP=1"]
     subprocess.run(
-        ["docker", "run", "--rm", "-i", "--network", "host",
-         "-e", "PGHOST", "-e", "PGPORT", "-e", "PGUSER", "-e", "PGPASSWORD",
-         "-e", "PGDATABASE", "postgres:18", "psql", "-X", "-v", "ON_ERROR_STOP=1"],
-        input=sql, text=True, capture_output=True, check=True, timeout=60, env=docker_env)
+        command, input=sql, text=True, capture_output=True, check=True,
+        timeout=60, env=postgres_env)
 
     return app_id, new_role, group_id, assignment_id
 
@@ -109,7 +120,7 @@ def request_http(port, method, path, jar, body=None, xsrf=None, extra_headers=No
     except urllib.error.HTTPError as error:
         response = error
     with response:
-        raw = response.read(4096)
+        raw = response.read(1024 * 1024)
         try:
             payload = json.loads(raw) if raw else None
         except ValueError:
@@ -157,6 +168,75 @@ def launch(env, port, logfile):
     return p
 
 
+def review_schedule_contract(jar, token, application_path, assignment_id):
+    """Verify the real HTTP schedule contract without simulating a worker run."""
+    status, before = request_http(5080, "GET", application_path, jar)
+    assert_status(status, 200, "Owner can read the initial review schedule")
+    if "reviewSchedule" not in before or before["reviewSchedule"] is not None:
+        raise AssertionError("An application without a review schedule must return reviewSchedule=null")
+    revision = before["application"]["revision"]
+    schedule_path = application_path + "/review-schedule"
+    now = datetime.now(timezone.utc)
+    command = {"name": "Monthly access review", "intervalDays": 30,
+               "reviewWindowDays": 7, "nextStartAt": (now + timedelta(days=1)).isoformat(),
+               "enabled": True, "expectedRevision": 0}
+    status, _ = request_http(5080, "PUT", schedule_path, jar, body=command)
+    assert_status(status, 400, "Schedule configuration requires a CSRF token")
+    for label, invalid in (
+        ("zero interval", {"intervalDays": 0}),
+        ("interval longer than a year", {"intervalDays": 366}),
+        ("zero review window", {"reviewWindowDays": 0}),
+        ("review window beyond 90 days", {"intervalDays": 365, "reviewWindowDays": 91}),
+        ("review window exceeds interval", {"reviewWindowDays": 31}),
+        ("enabled schedule in the past", {"nextStartAt": (now - timedelta(days=1)).isoformat()}),
+        ("first review beyond a year", {"nextStartAt": (now + timedelta(days=366)).isoformat()}),
+    ):
+        status, _ = request_http(5080, "PUT", schedule_path, jar,
+            body={**command, **invalid}, xsrf=token)
+        assert_status(status, 400, "Schedule validation rejects " + label)
+    status, unchanged = request_http(5080, "GET", application_path, jar)
+    assert_status(status, 200, "Rejected schedule writes leave the application readable")
+    if unchanged["reviewSchedule"] is not None or unchanged["application"]["revision"] != revision:
+        raise AssertionError("Rejected schedule writes must not persist configuration or change application revision")
+
+    status, configured = request_http(5080, "PUT", schedule_path, jar, body=command, xsrf=token)
+    assert_status(status, 200, "Owner creates a recurring review schedule")
+    if (configured.get("revision") != 1 or configured.get("intervalDays") != 30
+            or configured.get("reviewWindowDays") != 7 or configured.get("enabled") is not True):
+        raise AssertionError("Saved schedule must expose its independent revision and exact configuration")
+    status, details = request_http(5080, "GET", application_path, jar)
+    assert_status(status, 200, "Application detail returns the persisted schedule")
+    if details["reviewSchedule"] != configured or details["application"]["revision"] != revision:
+        raise AssertionError("Schedule writes must not invalidate pending application changes")
+
+    # Disabling future scheduling must not close an already open campaign or
+    # erase its pending assignment decisions. No worker is running in this test.
+    status, review = request_http(5080, "POST", application_path + "/reviews", jar,
+        body={"name": "Campaign preserved on pause", "dueAt": (now + timedelta(days=2)).isoformat()},
+        xsrf=token)
+    assert_status(status, 200, "Owner starts an independent campaign before pausing the schedule")
+    if review.get("closed") or not any(item["assignmentId"] == assignment_id
+            and item["decision"] == "Pending" for item in review["items"]):
+        raise AssertionError("The open campaign must contain the existing assignment")
+    disabled = {**command, "enabled": False, "expectedRevision": 1,
+                "nextStartAt": (now - timedelta(days=1)).isoformat()}
+    status, paused = request_http(5080, "PUT", schedule_path, jar, body=disabled, xsrf=token)
+    assert_status(status, 200, "Owner can pause a schedule whose stored date is in the past")
+    if paused.get("revision") != 2 or paused.get("enabled") is not False:
+        raise AssertionError("Pausing must advance the schedule revision exactly once")
+    status, _ = request_http(5080, "PUT", schedule_path, jar, body=command, xsrf=token)
+    assert_status(status, 412, "An outdated schedule revision cannot overwrite a later change")
+    status, reviews = request_http(5080, "GET", application_path + "/reviews", jar)
+    assert_status(status, 200, "Existing reviews remain accessible after pausing")
+    if next((item for item in reviews if item["id"] == review["id"]), None) != review:
+        raise AssertionError("Pausing the schedule must preserve the existing campaign unchanged")
+    status, final = request_http(5080, "GET", application_path, jar)
+    assert_status(status, 200, "Schedule state is readable after a stale write is rejected")
+    if final["reviewSchedule"] != paused or final["application"]["revision"] != revision:
+        raise AssertionError("The stale request must not alter either saved schedule or application revision")
+    return paused, review
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="permora-api-ci-") as directory:
         tmp = Path(directory)
@@ -190,7 +270,7 @@ def main():
 
         group_app, group_role, group_id, existing_assignment = seed_isolated_group_gate_fixture()
         processes = []
-        with (tmp / "api.log").open("w") as owner_log, (tmp / "foreign.log").open("w") as foreign_log, (tmp / "approved.log").open("w") as approved_log, (tmp / "allowlisted.log").open("w") as allowlisted_log:
+        with (tmp / "api.log").open("w") as owner_log, (tmp / "foreign.log").open("w") as foreign_log, (tmp / "approved.log").open("w") as approved_log, (tmp / "allowlisted.log").open("w") as allowlisted_log, (tmp / "approver.log").open("w") as approver_log:
             try:
                 owner = launch(env, 5080, owner_log)
                 processes.append(owner)
@@ -248,6 +328,8 @@ def main():
                 assert_status(status, 200, "Isolated active group fixture is visible to the owner")
                 if details["application"]["status"] != "Active":
                     raise AssertionError("Group grant HTTP fixture must be Active")
+                paused_schedule, open_review = review_schedule_contract(
+                    jar, token, group_url, existing_assignment)
                 group_grant = {"expectedRevision": 1, "change": {
                     "kind": "GrantAccess", "roleId": group_role, "principalId": group_id,
                     "expiresAt": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
@@ -323,6 +405,14 @@ def main():
                     # regardless of payload validity.
                     assert_status(status, 404, "Cross-team mutation blocked: " + path)
 
+                for path in (group_url, "/api/v1/applications/" + str(uuid.uuid4())):
+                    status, _ = request_http(5081, "PUT", path + "/review-schedule", foreign_jar,
+                        body={"name": "x", "intervalDays": 0, "reviewWindowDays": 0,
+                              "nextStartAt": "2000-01-01T00:00:00Z", "enabled": True,
+                              "expectedRevision": 0}, xsrf=foreign_csrf)
+                    assert_status(status, 404,
+                        "Schedule scope is checked before disclosing configuration validation")
+
                 status, _ = request_http(5081, "PUT", "/api/v1/admin/applications/" + app_id + "/binding",
                     foreign_jar, body={"clientUuid": str(uuid.uuid4()), "clientId": "not-owned",
                     "expectedRevision": 1}, xsrf=foreign_csrf)
@@ -369,8 +459,35 @@ def main():
                 assert_status(status, 202, "Exact realm and Keycloak-group opt-in admits an approval request")
                 if accepted.get("status") != "AwaitingApproval":
                     raise AssertionError("Group allowlist must not claim a grant was remotely applied")
+
+                approver_env = env.copy()
+                approver_env["Portal__DevelopmentSubject"] = "demo-approver"
+                approver = launch(approver_env, 5084, approver_log)
+                processes.append(approver)
+                approver_jar = http.cookiejar.CookieJar()
+                status, _ = request_http(5084, "GET", "/bff/session", approver_jar)
+                assert_status(status, 200, "Approver session initialized")
+                approver_csrf = csrf(approver_jar)
+                status, details = request_http(5084, "GET", group_url, approver_jar)
+                assert_status(status, 200, "Approver can read application and schedule")
+                if details.get("managementRole") != "Approver" or details["reviewSchedule"] != paused_schedule:
+                    raise AssertionError("Approver must receive the saved schedule with read-only management role")
+                status, reviews = request_http(5084, "GET", group_url + "/reviews", approver_jar)
+                assert_status(status, 200, "Approver can read the outstanding campaign")
+                if not any(review["id"] == open_review["id"] for review in reviews):
+                    raise AssertionError("Approver must see campaigns belonging to the same team")
+                status, _ = request_http(5084, "PUT", group_url + "/review-schedule", approver_jar,
+                    body={"name": "Unauthorized schedule change", "intervalDays": 30,
+                          "reviewWindowDays": 7,
+                          "nextStartAt": (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
+                          "enabled": True, "expectedRevision": paused_schedule["revision"]}, xsrf=approver_csrf)
+                assert_status(status, 403, "Approver cannot configure an owner's review schedule")
+                status, final = request_http(5080, "GET", group_url, jar)
+                assert_status(status, 200, "Owner reads state after an unauthorized schedule mutation")
+                if final["reviewSchedule"] != paused_schedule:
+                    raise AssertionError("Unauthorized actors must not mutate the schedule")
             except BaseException:
-                for path in (tmp / "api.log", tmp / "foreign.log", tmp / "approved.log", tmp / "allowlisted.log"):
+                for path in (tmp / "api.log", tmp / "foreign.log", tmp / "approved.log", tmp / "allowlisted.log", tmp / "approver.log"):
                     if path.exists():
                         print(f"--- {path.name}: last 30 lines (isolated test only) ---")
                         print("\n".join(path.read_text(errors="replace").splitlines()[-30:]))
