@@ -128,11 +128,14 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Install headless Chromium for a real browser OIDC session
+      - name: Install exact OIDC browser fixture dependencies
+        timeout-minutes: 8
         working-directory: web
-        run: |
-          npm ci --fetch-retries=5 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=120000
-          npx playwright install chromium --with-deps
+        run: npm ci --fetch-retries=5 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=120000
+      - name: Install Chromium and OS dependencies for real OIDC
+        timeout-minutes: 8
+        working-directory: web
+        run: npx playwright install chromium --with-deps
       - name: Restore and build actual ASP.NET BFF and migration worker
         run: |
           dotnet restore Permora.slnx --locked-mode --verbosity minimal

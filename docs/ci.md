@@ -21,6 +21,13 @@ bindet. Sicherheitsziel ist die Beseitigung bekannter Befunde auch im
 Build-/Entwicklungswerkzeug; Build-, Browser- und Accessibility-Prüfungen
 belegen die hier getesteten Pfade, keine allgemeine Kompatibilitätsgarantie.
 
+Der OIDC-Job trennt die npm-Fixture-Installation und Chromium-/OS-Installation
+in zwei Schritte mit jeweils acht Minuten Zeitlimit. Ein zuvor festhängender
+kombinierter Schritt ließ nicht erkennen, welche Installationsphase betroffen
+war. Ein Timeout bleibt ein fehlgeschlagener Pflichtjob; kein Test wird dadurch
+übersprungen oder ein Fehler ignoriert. Ein erneuter Lauf benötigt weiterhin
+die vollständige echte OIDC-/MFA-Prüfung und die CI-Gesamtschranke.
+
 Die [Governance-Berichte](governance-reports.md) besitzen Unit-, echte
 PostgreSQL-/HTTP- sowie Browser-/Accessibility-Regressionsfälle. Ihre Summen
 werden vor der Paginierung ermittelt; der Datenbanktest verwendet 211 offene

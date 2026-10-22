@@ -19,7 +19,7 @@ export class ApplicationsPage {
  readonly label=label; readonly tone=statusClass; readonly color=applicationColor;
  constructor(){void this.load();} async load():Promise<void>{this.loading.set(true);try{this.apps.set(await this.api.applications());this.error.set('');}catch(e){this.error.set(problem(e));}finally{this.loading.set(false);}}
 }
-@Component({standalone:true,imports:[FormsModule,RouterLink,Icon],template:`
+@Component({standalone:true,imports:[FormsModule,RouterLink],template:`
 <a class="breadcrumb" routerLink="/applications">← Meine Anwendungen</a><div class="page-heading"><div><h1>Neue Anwendung</h1><p>Ein eigener Verwaltungsbereich für dein Team.</p></div></div>
 @if(error()){<div class="alert danger" role="alert">{{error()}}</div>}
 <form class="panel form-panel" (ngSubmit)="save()"><div class="alert neutral">Nach der Registrierung prüft das IAM-Team die Keycloak-Anbindung. Erst danach können Rechte verwaltet werden.</div>
