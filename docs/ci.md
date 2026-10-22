@@ -41,6 +41,13 @@ und idempotente Wiederholung. Die
 [Ubuntu-Dokumentation zur Archivprüfung](https://documentation.ubuntu.com/security/software-integrity/archive-verification/)
 beschreibt die weiterhin verwendete signierte Archiv-/Paketprüfung.
 
+Aktuelle GitHub-Runner verwenden zusätzlich `mirror+file:/etc/apt/apt-mirrors.txt`
+mit priorisierten URLs; siehe das
+[offizielle Runner-Setup](https://github.com/actions/runner-images/blob/main/images/ubuntu/scripts/build/configure-apt-sources.sh).
+Auch diese Datei wird berücksichtigt, einschließlich unverändertem
+`priority`-Metadatenformat und Security-Fallback. Nur die direkten
+`sources.list`-/Deb822-Dateien anzupassen reicht auf diesen Runnern nicht aus.
+
 Die [Governance-Berichte](governance-reports.md) besitzen Unit-, echte
 PostgreSQL-/HTTP- sowie Browser-/Accessibility-Regressionsfälle. Ihre Summen
 werden vor der Paginierung ermittelt; der Datenbanktest verwendet 211 offene

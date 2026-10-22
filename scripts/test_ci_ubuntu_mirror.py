@@ -6,6 +6,13 @@ from ci_ubuntu_mirror import main, primary_archive
 
 
 class UbuntuMirrorTests(unittest.TestCase):
+    def test_github_priority_mirror_list_keeps_priorities_and_security_fallback(self):
+        source = ("http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\n"
+                  "https://archive.ubuntu.com/ubuntu/\tpriority:2\n"
+                  "https://security.ubuntu.com/ubuntu/\tpriority:3\n")
+        self.assertEqual(source.replace("http://azure.archive.ubuntu.com/ubuntu/",
+                                        "https://archive.ubuntu.com/ubuntu/"), primary_archive(source))
+
     def test_plain_mirror_list_keeps_other_mirrors_and_comments(self):
         source = "# Ubuntu mirror list\nhttp://azure.archive.ubuntu.com/ubuntu/\nhttps://archive.ubuntu.com/ubuntu/\n"
         self.assertEqual("# Ubuntu mirror list\nhttps://archive.ubuntu.com/ubuntu/\nhttps://archive.ubuntu.com/ubuntu/\n",

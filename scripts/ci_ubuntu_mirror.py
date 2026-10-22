@@ -24,7 +24,7 @@ def main():
         raise SystemExit("Only an authorized disposable Ubuntu x64 GitHub runner may change its mirror")
     changed = 0
     for path in (Path("/etc/apt/sources.list"), Path("/etc/apt/sources.list.d/ubuntu.sources"),
-                 Path("/etc/apt/mirrors/ubuntu.list")):
+                 Path("/etc/apt/mirrors/ubuntu.list"), Path("/etc/apt/apt-mirrors.txt")):
         if not path.exists():
             continue
         if path.is_symlink():
