@@ -28,6 +28,19 @@ war. Ein Timeout bleibt ein fehlgeschlagener Pflichtjob; kein Test wird dadurch
 übersprungen oder ein Fehler ignoriert. Ein erneuter Lauf benötigt weiterhin
 die vollständige echte OIDC-/MFA-Prüfung und die CI-Gesamtschranke.
 
+Die Logs des abgebrochenen Laufs auf `efd68b9` zeigten die eigentliche
+Installationsverzögerung: 17,9 MB Ubuntu-Systempakete benötigten am
+Azure-Archivmirror 8 Minuten 35 Sekunden. Die Browserarchive selbst wurden
+anschließend in Sekunden geladen. Browserjobs wählen deshalb ausschließlich
+auf ihren kurzlebigen Ubuntu-x64-GitHub-Runnern das offizielle
+`https://archive.ubuntu.com/ubuntu` statt des Azure-Mirrors. Das Hilfsskript
+ändert weder `Signed-By`, Suites, Komponenten, den separaten Security-Mirror
+noch fremde Paketquellen und verweigert Ausführung außerhalb dieses CI-Kontexts.
+Tests prüfen auch unveränderte Signaturschlüssel, fremde/ähnliche Hostnamen
+und idempotente Wiederholung. Die
+[Ubuntu-Dokumentation zur Archivprüfung](https://documentation.ubuntu.com/security/software-integrity/archive-verification/)
+beschreibt die weiterhin verwendete signierte Archiv-/Paketprüfung.
+
 Die [Governance-Berichte](governance-reports.md) besitzen Unit-, echte
 PostgreSQL-/HTTP- sowie Browser-/Accessibility-Regressionsfälle. Ihre Summen
 werden vor der Paginierung ermittelt; der Datenbanktest verwendet 211 offene

@@ -29,6 +29,8 @@ jobs:
         run: |
           npm ci --prefix tools/accessibility --ignore-scripts
           npm ci --prefix web
+      - name: Use signed Ubuntu primary archive for browser OS dependencies
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS python3 scripts/ci_ubuntu_mirror.py
       - name: Install Chromium
         working-directory: web
         run: npx playwright install chromium --with-deps

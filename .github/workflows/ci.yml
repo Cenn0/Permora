@@ -33,6 +33,7 @@ jobs:
         run: |
           bash -n scripts/check.sh scripts/bootstrap-locks.sh
           python3 -m compileall -q scripts
+          python3 -m unittest discover -s scripts -p test_ci_ubuntu_mirror.py
       - name: Execute standalone TypeScript tests
         working-directory: web
         run: npm run test:logic
@@ -128,6 +129,8 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - name: Use signed Ubuntu primary archive for browser OS dependencies
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS python3 scripts/ci_ubuntu_mirror.py
       - name: Install exact OIDC browser fixture dependencies
         timeout-minutes: 8
         working-directory: web
@@ -170,6 +173,8 @@ jobs:
       - name: Compile production Angular templates
         working-directory: web
         run: npm run build
+      - name: Use signed Ubuntu primary archive for browser OS dependencies
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS python3 scripts/ci_ubuntu_mirror.py
       - name: Install Chromium and OS dependencies
         working-directory: web
         run: npx playwright install chromium --with-deps
