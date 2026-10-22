@@ -1,5 +1,7 @@
 # Permora documentation
 
+- [Governance reports and in-portal reminders](governance-reports.md): scope, counters, pagination and evidence limits.
+
 [← English README](../README.md) · [Deutsch](../README.de.md)
 
 Permora is an independent, open-source C# / Angular portal for **delegated Keycloak application management**. It is **not** a Keycloak component and is **not approved for production deployment**. Detailed guides are currently partly in German.

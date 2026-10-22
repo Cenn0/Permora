@@ -33,6 +33,7 @@ jobs:
         run: |
           bash -n scripts/check.sh scripts/bootstrap-locks.sh
           python3 -m compileall -q scripts
+          python3 -m unittest discover -s scripts -p test_ci_ubuntu_mirror.py
       - name: Execute standalone TypeScript tests
         working-directory: web
         run: npm run test:logic
@@ -128,11 +129,16 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Install headless Chromium for a real browser OIDC session
+      - name: Use signed Ubuntu primary archive for browser OS dependencies
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS python3 scripts/ci_ubuntu_mirror.py
+      - name: Install exact OIDC browser fixture dependencies
+        timeout-minutes: 8
         working-directory: web
-        run: |
-          npm ci --fetch-retries=5 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=120000
-          npx playwright install chromium --with-deps
+        run: npm ci --fetch-retries=5 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=120000
+      - name: Install Chromium and OS dependencies for real OIDC
+        timeout-minutes: 8
+        working-directory: web
+        run: npx playwright install chromium --with-deps
       - name: Restore and build actual ASP.NET BFF and migration worker
         run: |
           dotnet restore Permora.slnx --locked-mode --verbosity minimal
@@ -167,6 +173,8 @@ jobs:
       - name: Compile production Angular templates
         working-directory: web
         run: npm run build
+      - name: Use signed Ubuntu primary archive for browser OS dependencies
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS python3 scripts/ci_ubuntu_mirror.py
       - name: Install Chromium and OS dependencies
         working-directory: web
         run: npx playwright install chromium --with-deps
@@ -175,9 +183,9 @@ jobs:
         run: npm run test:e2e
         env:
           CI: 'true'
-      - name: Audit production npm dependencies
+      - name: Audit production and development npm dependencies
         working-directory: web
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --audit-level=high
       - name: Summarize Playwright evidence without upload
         if: always()
         shell: bash
@@ -282,10 +290,13 @@ jobs:
             echo "| Docker production image (no registry push) | $CONTAINER_RESULT |"
             echo "| Committed, reproducible dependency locks | $LOCKS_RESULT |"
             echo
-            echo "**Not covered by a green workflow:** successful MFA/step-up at production LoA, full delegated FGAP user/group mapping,"
-            echo "complete LDAP visibility, full production MFA,"
-            echo "external directory/HR writeback, SoD drift under changing external groups,"
-            echo "load/HA/restore/penetration testing, and production deployment."
+            echo "**Core scope:** isolated Keycloak FGAP/role/token contracts, genuine password/TOTP LoA2 BFF login,"
+            echo "HTTP scope/CSRF, real PostgreSQL tests and database restore, Angular/browser checks and production image build."
+            echo "**Separate workflows:** LDAPS/joined worker federation, two-worker fault/recovery, bounded load when triggered,"
+            echo "automated accessibility, and actual-artifact SBOM/vulnerability checks. Inspect each exact-source result."
+            echo "**Still outside CI acceptance:** representative Microsoft AD and complete directory coverage, deployed FGAP risk approval,"
+            echo "multi-host production TLS/HA/secret rotation, coordinated production DR and approved RPO/RTO,"
+            echo "external directory/HR writeback, independent penetration/accessibility/privacy and legal license acceptance."
             echo "No production secrets, deployments, or publishing are used."
           } >> "$GITHUB_STEP_SUMMARY"
           for result in "$STRUCTURE_RESULT" "$DOTNET_RESULT" "$OIDC_RESULT" "$ANGULAR_RESULT" "$KEYCLOAK_RESULT" "$CONTAINER_RESULT" "$LOCKS_RESULT"; do

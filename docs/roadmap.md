@@ -1,5 +1,19 @@
 # Permora – Product & Engineering Roadmap (V2)
 
+**Neuer P4/P5-Implementierungsschritt (22.10.2026):**
+[Governance-Berichte und Hinweise im Portal](governance-reports.md) ergänzen
+vollständige offene Review-Summen, begrenzte Hinweisseiten, 48-Stunden-Erinnerungen,
+Überfälligkeits- und Directory-/Gruppen-SoD-Hinweise. Der Bericht verwendet die
+aktuellen Anwendungsmandate und die bestehenden Worker-Regeln; er löst keine
+neuen Rechteänderungen aus. Externe Benachrichtigungskanäle, umfassende SoD-Berichte
+und unabhängige Betriebsabnahmen bleiben offen. Die folgenden älteren CI-Belege
+gelten weiterhin nur für die jeweils genannten Commits.
+
+**P0/P7-Konsolidierung:** Core-/Persistence-/Worker-Änderungen sowie zentrale
+.NET-Versionen lösen nun auch den begrenzten Multiworker-Lastlauf aus. Die
+CI-Zusammenfassung wurde auf die tatsächlich getrennten Prüfschichten
+aktualisiert; [Details](ci.md). Organisatorische Release-Gates bleiben offen.
+
 **Verifizierter P4-Stand: 22.10.2026.** Der neue P4-Schritt ergänzt
 [periodische Rezertifizierung](access-reviews.md): Owner-konfigurierte Intervalle,
 verbindliche Fristen, automatische Kampagnen, nachvollziehbare Entzugsaufträge
@@ -156,11 +170,17 @@ Permora ermöglicht **delegierte, anwendungsspezifische Rechteverwaltung in Keyc
 - [x] Periodische Prüfpläne, unveränderte Deadlines nach Worker-Ausfällen, separate Revisionen, Owner-/Approver-/Auditor-Oberfläche und idempotente Entzüge implementiert; [Vertrag und Upgrade](access-reviews.md).
 - [x] Periodischer Start bis tatsächlichem Keycloak-Entzug im isolierten erweiterten Worker-Systemtest erfolgreich nachgewiesen: [Worker-Lauf](https://github.com/Cenn0/Permora/actions/runs/39718804613) und [Lastlauf](https://github.com/Cenn0/Permora/actions/runs/39718804521), jeweils mit zwei zusätzlichen Rezertifizierungsentzügen; [Testumfang und Commit-Zuordnung](testing.md#periodische-rezertifizierung-22102026).
 - [ ] Optionale Erinnerungs- und Eskalationsbenachrichtigungen auf Basis des nachgewiesenen Review-/Auftragszustands ergänzen.
+- [x] Serverseitige, anwendungsbezogene Governance-Berichte und Hinweise im Portal implementiert: alle offenen Reviews vor Paginierung zählen, Deadline-Schwellen und erkennbare Directory-/Gruppen-SoD-Probleme ausweisen, bestehende Mandate unter Sperre prüfen; [Vertrag und Testumfang](governance-reports.md). Externer Versand ist nicht enthalten.
 - [ ] Externe Gruppenänderungen, direkte/effektive und verschachtelte Rollen sowie neu entstehende SoD-Konflikte erkennen; Drift markieren, Vergaben sperren und kontrollierte Remediation auslösen.
 - [ ] AD-/LDAP-Federation **zunächst nur lesend** in repräsentativen Keycloak-Installationen prüfen, einschließlich unvollständiger Seiten, nicht importierter Konten, deaktivierter Benutzer und Gruppen mit Mitgliederlimits.
 - [ ] Idempotente Reconciliation gegen externe Änderungen definieren: Fremdverwaltung nicht unautorisiert überschreiben; klarer Entscheid zwischen „beobachten“, „blockieren“ und „reparieren“.
 - [ ] Audit-Events für Antrag, Genehmigung, Ablehnung, Änderung, Drift und Löschung mit Korrelation/Operator nachprüfbar machen; Datenschutz, Aufbewahrung und Export getrennt behandeln.
 - [ ] SoD-/Rezertifizierungsberichte für Owner und IAM mit identischem Backend-Scope implementieren.
+
+  **Teilumfang implementiert:** begrenzter Rezertifizierungsbericht für alle
+  sichtbaren Verwaltungsmandate, inklusive Owner/IAM; Gruppen-SoD-Entzugsbedarf
+  entspricht dem bestehenden Worker-Detektor. Vollständige SoD-Konformität und
+  konsistente historische Exporte sind damit noch nicht abgedeckt.
 
 **Abnahme:** Eine externe Gruppenänderung kann nicht unbemerkt als dauerhaft konforme Berechtigung fortgeschrieben werden; manuelle Klärfälle werden sichtbar und prüfbar.
 

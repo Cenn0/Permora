@@ -6,6 +6,7 @@ import { App } from './app/app';
 bootstrapApplication(App, {providers:[provideZonelessChangeDetection(),provideHttpClient(withXsrfConfiguration({cookieName:'XSRF-TOKEN',headerName:'X-XSRF-TOKEN'})),provideRouter([
  {path:'',loadComponent:()=>import('./app/dashboard').then(m=>m.DashboardPage)},
  {path:'applications/new',loadComponent:()=>import('./app/applications').then(m=>m.RegisterPage)},
+ {path:'applications/:id/governance',loadComponent:()=>import('./app/governance').then(m=>m.GovernancePage)},
  {path:'applications/:id',loadComponent:()=>import('./app/application').then(m=>m.ApplicationPage)},
  {path:'applications',loadComponent:()=>import('./app/applications').then(m=>m.ApplicationsPage)},
  {path:'requests',loadComponent:()=>import('./app/secondary').then(m=>m.RequestsPage)},

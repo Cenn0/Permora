@@ -43,6 +43,9 @@ async function fixtures(page:Page, authenticated=true, failure=false, management
   if(path==='/api/v1/realms')return route.fulfill({json:['enterprise']});
   if(path.endsWith('/operations'))return route.fulfill({json:[operation]});
   if(path.endsWith('/reviews'))return route.fulfill({json:[{...review,dueAt:future(7),scheduledFor:future(-1)}]});
+  if(path.endsWith('/governance'))return route.fulfill({json:{applicationId:id,applicationRevision:1,asOf:future(0),
+   counts:{assignments:10,expiredAssignments:2,unverifiableAssignments:1,groupSeparationRevocations:1,openReviews:3,pendingDecisions:7,overdueDecisions:2},
+   totalNotices:1,nextOffset:null,notices:[{key:'review:one',code:'review_overdue',severity:'critical',count:2,dueAt:future(-1),reviewId:'one'}]}});
   if(path.endsWith('/audit'))return route.fulfill({json:{items:[],nextSequence:null}});
   if(path.endsWith('/identities'))return route.fulfill({json:[]});
   if(path==='/api/v1/applications/'+id)return route.fulfill({json:{application,managementRole,reviewSchedule,
@@ -76,7 +79,8 @@ async function audit(page:Page) {
 for(const view of [
  {name:'dashboard',path:'/'},{name:'application-list',path:'/applications'},
  {name:'registration',path:'/applications/new'},{name:'team-directory',path:'/teams'},
- {name:'approvals',path:'/requests'},{name:'help',path:'/help'}
+ {name:'approvals',path:'/requests'},{name:'help',path:'/help'},
+ {name:'governance-report',path:'/applications/'+id+'/governance'}
 ])test(view.name,async({page})=>{
  await fixtures(page);await page.goto(view.path);await expect(page.locator('main h1')).toBeVisible();await audit(page);
 });

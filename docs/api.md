@@ -113,3 +113,10 @@ Alle vier Prüfungen und ein Nachweis mit mindestens sechs Zeichen sind Pflicht.
 `GET /api/v1/admin/operations-health` returns aggregate queue counters (`queued`, `awaitingApproval`, `failed`, `conflict`, `dueRevocations`, `oldestDueRevocationSeconds`) from PostgreSQL. Only principals with the central `PlatformAdmin` mandate may call it; a foreign team receives `403`. Fields contain **no** user, group, role, application or realm identifiers. They are intended for alerting and incident response, not for making write/restore decisions without Keycloak readback.
 
 The endpoint measures PostgreSQL queue state only. It does **not** prove that Keycloak has applied an operation, does not measure revoked JWT validity, and is not an SLO commitment. A safe operator alarm baseline is `failed > 0`, `conflict > 0` or `dueRevocations > 0` for a sustained period. Verify actual thresholds with load and recovery tests before production.
+## Application governance report
+
+`GET /api/v1/applications/{id}/governance?offset=0&limit=25` returns scoped,
+server-derived counts and paginated in-portal notices. All existing application
+management roles can read; foreign mandates receive `404`. Limit 1–50, offset
+0–1,000,000. This endpoint performs no remote writes. See the
+[complete contract](governance-reports.md).

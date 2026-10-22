@@ -1,5 +1,70 @@
 # Permora CI: Tests, Belege und Grenzen
 
+## 22.10.2026 — Governance-Berichte und Trigger-Konsolidierung
+
+Die Angular-CI prüft nun auch Entwicklungsabhängigkeiten mit
+`npm audit --audit-level=high`. Der vorherige `--omit=dev`-Lauf erfasste
+unter anderem den verwendeten Vite-Entwicklungsserver nicht. Angular Build
+22.2.3 bindet Vite 8.3.0 exakt; ein enger projektspezifischer npm-Override
+setzt diese Abhängigkeit auf den Upstream-Sicherheitspatch 8.3.3.
+Quellen: [Hersteller-Advisory für die Windows-Befehlsinjektion](https://github.com/vitejs/launch-editor/security/advisories/GHSA-587h-7wmj-h5pm)
+und [Vite-Dateifreigabe-Advisory](https://github.com/vitejs/vite/security/advisories/GHSA-rq7h-c2jc-7f22).
+Die jeweiligen Ausnutzbarkeitsbedingungen unterscheiden sich; ein npm-High
+beweist keinen erfolgreichen Angriff auf die ausgelieferte Portal-Anwendung.
+
+**Einordnung:** Der Vite-Patch ist vom Upstream veröffentlicht. Die abweichende
+transitive Version ist eine hier getestete Projektkonfiguration, keine
+Behauptung einer von Angular offiziell freigegebenen Standardkombination.
+Der Override bleibt eng auf `@angular/build` begrenzt und soll entfallen,
+sobald das reguläre Angular-Paket einen ausreichend korrigierten Vite-Stand
+bindet. Sicherheitsziel ist die Beseitigung bekannter Befunde auch im
+Build-/Entwicklungswerkzeug; Build-, Browser- und Accessibility-Prüfungen
+belegen die hier getesteten Pfade, keine allgemeine Kompatibilitätsgarantie.
+
+Der OIDC-Job trennt die npm-Fixture-Installation und Chromium-/OS-Installation
+in zwei Schritte mit jeweils acht Minuten Zeitlimit. Ein zuvor festhängender
+kombinierter Schritt ließ nicht erkennen, welche Installationsphase betroffen
+war. Ein Timeout bleibt ein fehlgeschlagener Pflichtjob; kein Test wird dadurch
+übersprungen oder ein Fehler ignoriert. Ein erneuter Lauf benötigt weiterhin
+die vollständige echte OIDC-/MFA-Prüfung und die CI-Gesamtschranke.
+
+Die Logs des abgebrochenen Laufs auf `efd68b9` zeigten die eigentliche
+Installationsverzögerung: 17,9 MB Ubuntu-Systempakete benötigten am
+Azure-Archivmirror 8 Minuten 35 Sekunden. Die Browserarchive selbst wurden
+anschließend in Sekunden geladen. Browserjobs wählen deshalb ausschließlich
+auf ihren kurzlebigen Ubuntu-x64-GitHub-Runnern das offizielle
+`https://archive.ubuntu.com/ubuntu` statt des Azure-Mirrors. Das Hilfsskript
+ändert weder `Signed-By`, Suites, Komponenten, den separaten Security-Mirror
+noch fremde Paketquellen und verweigert Ausführung außerhalb dieses CI-Kontexts.
+Tests prüfen auch unveränderte Signaturschlüssel, fremde/ähnliche Hostnamen
+und idempotente Wiederholung. Die
+[Ubuntu-Dokumentation zur Archivprüfung](https://documentation.ubuntu.com/security/software-integrity/archive-verification/)
+beschreibt die weiterhin verwendete signierte Archiv-/Paketprüfung.
+
+Aktuelle GitHub-Runner verwenden zusätzlich `mirror+file:/etc/apt/apt-mirrors.txt`
+mit priorisierten URLs; siehe das
+[offizielle Runner-Setup](https://github.com/actions/runner-images/blob/main/images/ubuntu/scripts/build/configure-apt-sources.sh).
+Auch diese Datei wird berücksichtigt, einschließlich unverändertem
+`priority`-Metadatenformat und Security-Fallback. Nur die direkten
+`sources.list`-/Deb822-Dateien anzupassen reicht auf diesen Runnern nicht aus.
+
+Die [Governance-Berichte](governance-reports.md) besitzen Unit-, echte
+PostgreSQL-/HTTP- sowie Browser-/Accessibility-Regressionsfälle. Ihre Summen
+werden vor der Paginierung ermittelt; der Datenbanktest verwendet 211 offene
+Reviews. Die zentralen Workflows bleiben unverändert verpflichtend.
+
+Der begrenzte Lastlauf wird jetzt auch bei Änderungen an Core, Infrastructure,
+Worker, zentralen .NET-Paketdefinitionen und SDK-Version ausgelöst. Zuvor
+führten nur Änderungen am Lasttest-Skript oder dessen Workflow diesen
+zusätzlichen Lauf aus. Er ergänzt den stets laufenden kleineren Recovery-Test.
+Es bleiben öffentliche Standard-Runner und lesende PR-Berechtigungen.
+
+Die Core-CI-Zusammenfassung trennt inzwischen implementierte isolierte
+MFA-/FGAP-/Datenbank-Restore-Prüfungen von separaten System- und Artefaktläufen
+sowie weiterhin offenen Betriebsabnahmen. Frühere pauschale Aussagen, diese
+Prüfbereiche seien vollständig ungetestet, sind historisch. Konkrete Teststände
+und Produktionsgrenzen bleiben commitbezogen nachzuweisen.
+
 ## 20.10.2026 — gemeinsamer LDAPS-/Worker-Integrationstest
 
 [PR #60](https://github.com/Cenn0/Permora/pull/60) auf exaktem Test-SHA
