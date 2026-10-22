@@ -1,12 +1,35 @@
 # Permora – Product & Engineering Roadmap (V2)
 
-**Aktueller Arbeitsstand: 22.10.2026.** Der neue P4-Schritt ergänzt
+**Verifizierter P4-Stand: 22.10.2026.** Der neue P4-Schritt ergänzt
 [periodische Rezertifizierung](access-reviews.md): Owner-konfigurierte Intervalle,
 verbindliche Fristen, automatische Kampagnen, nachvollziehbare Entzugsaufträge
 und eine vollständige Bedienoberfläche. Plan- und Anwendungsrevisionen sind
 getrennt; die additive Schema-v2-Migration erhält bestehende Daten.
 
-Die überprüfbaren Szenarien und ihre Ausführung stehen in
+Alle **sieben Workflows** für [PR #62](https://github.com/Cenn0/Permora/pull/62)
+bestanden. Die Run-Metadaten referenzieren den PR-Head
+[`2a260e0632106499ef10e14f64144a5c2aae17ef`](https://github.com/Cenn0/Permora/commit/2a260e0632106499ef10e14f64144a5c2aae17ef);
+der tatsächlich ausgecheckte PR-Merge-Commit war
+[`e635db8f25b73e8460d2d5ef7c8b5c6dfb32b7af`](https://github.com/Cenn0/Permora/commit/e635db8f25b73e8460d2d5ef7c8b5c6dfb32b7af)
+gegen die damalige `main`-Basis
+[`763cdcddde9a17336e51c58cbe993455c0308811`](https://github.com/Cenn0/Permora/commit/763cdcddde9a17336e51c58cbe993455c0308811).
+Die Ergebnisse gelten für diesen Teststand; spätere Commits benötigen eigene CI.
+
+| Prüfebene | Ergebnis dieses PR-Laufs | Direkter Nachweis |
+| --- | --- | --- |
+| Backend, HTTP und Datenbank | 272/272 Tests, 0 Skips, PostgreSQL 18.6; HTTP-Scope/CSRF und isolierter Backup-/Restore-Fingerprint bestanden | [Core CI](https://github.com/Cenn0/Permora/actions/runs/39718804538) |
+| Frontend | 41 Logiktests und 40 Browserfälle bestanden; Browserfälle mit API-Fixtures | [Core CI](https://github.com/Cenn0/Permora/actions/runs/39718804538) |
+| Accessibility | 63 geprüfte Zustände, 0 automatisch erkannte Verstöße und 0 Overflow-Fälle | [Axe-/Reflow-Lauf](https://github.com/Cenn0/Permora/actions/runs/39718804573) |
+| Worker und Last | 32 + 2 beziehungsweise 96 + 2 Entzüge mit echten Workern/Keycloak; zusätzliche Rezertifizierungsentzüge und Recovery bestanden | [Worker](https://github.com/Cenn0/Permora/actions/runs/39718804613), [Lastlauf](https://github.com/Cenn0/Permora/actions/runs/39718804521) |
+| Föderation | 68 LDAPS-/Keycloak-Prüfungen sowie realer importierter LDAP → PostgreSQL → Worker → Keycloak-Entzug bestanden | [Systemtest](https://github.com/Cenn0/Permora/actions/runs/39718804516) |
+| OIDC/BFF | Echter Passwort-/OTP-Flow, Assurance-Sperre, gemeinsame Sitzung und Logout über zwei BFF-Prozesse bestanden | [OIDC-Job](https://github.com/Cenn0/Permora/actions/runs/39718804538/job/119627224622) |
+| Artefakte | Artefakt-/SBOM-Prüfung und Vulnerability-Gate bestanden; keine behebbaren High/Critical im getesteten Scope | [Artefaktintegrität](https://github.com/Cenn0/Permora/actions/runs/39718804559) |
+| Dokumentation | Öffentliche Dokumentationsprüfungen bestanden | [Public Docs](https://github.com/Cenn0/Permora/actions/runs/39718804575) |
+
+Die PR-Signierung wurde erwartungsgemäß übersprungen; dieser Lauf erzeugt keine
+Release-Freigabe. Automatische Accessibility-Checks sind keine vollständige
+WCAG-Abnahme, und ein bestandenes Vulnerability-Gate bedeutet nicht, dass sämtliche
+Schwachstellen ausgeschlossen sind. Details stehen in der
 [Teststrategie](testing.md#periodische-rezertifizierung-22102026).
 Microsoft-AD-spezifische Föderation, weitere Directory-Ausfallkombinationen,
 repräsentative Mehrhost-/Recovery-Prüfungen und unabhängige Reviews bleiben
@@ -131,7 +154,7 @@ Permora ermöglicht **delegierte, anwendungsspezifische Rechteverwaltung in Keyc
 
 - [ ] Delegationsmandate, Entscheiderwechsel, Suspendierung, Owner-Entzug und konkurrierende Freigaben mit realen Identitäten testen.
 - [x] Periodische Prüfpläne, unveränderte Deadlines nach Worker-Ausfällen, separate Revisionen, Owner-/Approver-/Auditor-Oberfläche und idempotente Entzüge implementiert; [Vertrag und Upgrade](access-reviews.md).
-- [ ] Periodischer Start bis tatsächlichem Keycloak-Entzug im erweiterten Worker-Systemtest des neuen Commits erfolgreich nachweisen; [Testumfang](testing.md#periodische-rezertifizierung-22102026).
+- [x] Periodischer Start bis tatsächlichem Keycloak-Entzug im isolierten erweiterten Worker-Systemtest erfolgreich nachgewiesen: [Worker-Lauf](https://github.com/Cenn0/Permora/actions/runs/39718804613) und [Lastlauf](https://github.com/Cenn0/Permora/actions/runs/39718804521), jeweils mit zwei zusätzlichen Rezertifizierungsentzügen; [Testumfang und Commit-Zuordnung](testing.md#periodische-rezertifizierung-22102026).
 - [ ] Optionale Erinnerungs- und Eskalationsbenachrichtigungen auf Basis des nachgewiesenen Review-/Auftragszustands ergänzen.
 - [ ] Externe Gruppenänderungen, direkte/effektive und verschachtelte Rollen sowie neu entstehende SoD-Konflikte erkennen; Drift markieren, Vergaben sperren und kontrollierte Remediation auslösen.
 - [ ] AD-/LDAP-Federation **zunächst nur lesend** in repräsentativen Keycloak-Installationen prüfen, einschließlich unvollständiger Seiten, nicht importierter Konten, deaktivierter Benutzer und Gruppen mit Mitgliederlimits.

@@ -2,18 +2,54 @@
 
 ## Periodische Rezertifizierung (22.10.2026)
 
+**Ausgeführter Nachweis:** Alle sieben Workflows für
+[PR #62](https://github.com/Cenn0/Permora/pull/62) sind erfolgreich.
+Die Run-Metadaten nennen den PR-Head
+[`2a260e0632106499ef10e14f64144a5c2aae17ef`](https://github.com/Cenn0/Permora/commit/2a260e0632106499ef10e14f64144a5c2aae17ef).
+`actions/checkout` prüfte den erzeugten PR-Merge-Commit
+[`e635db8f25b73e8460d2d5ef7c8b5c6dfb32b7af`](https://github.com/Cenn0/Permora/commit/e635db8f25b73e8460d2d5ef7c8b5c6dfb32b7af)
+aus diesem Head und der damaligen `main`-Basis
+[`763cdcddde9a17336e51c58cbe993455c0308811`](https://github.com/Cenn0/Permora/commit/763cdcddde9a17336e51c58cbe993455c0308811).
+Diese unveränderliche Zuordnung beschreibt den historischen Testlauf, nicht
+automatisch einen späteren Dokumentations- oder Merge-Commit.
+
+| Prüfung | Bestandenes Ergebnis | Ausführungsnachweis |
+| --- | --- | --- |
+| .NET / PostgreSQL / HTTP / Restore | 272/272 xUnit, 0 Skips, PostgreSQL 18.6; Plan-API mit Owner-/Approver-/Fremdteam-/CSRF-Prüfungen; isolierter Restore mit gleichem Fingerprint und Audittriggern | [Core CI, Backend-Job](https://github.com/Cenn0/Permora/actions/runs/39718804538/job/119627224737) |
+| Frontend-Logik und Browser | 41 Logiktests, 40 Playwright-Fälle; Angular-Produktionsbuild erfolgreich, Browserfälle mit API-Fixtures | [Angular-/Playwright-Job](https://github.com/Cenn0/Permora/actions/runs/39718804538/job/119627224550) |
+| Accessibility / Reflow | 63 Zustände, 0 automatisch erkannte Axe-Verstöße und 0 Overflow-Fälle | [Accessibility-Workflow](https://github.com/Cenn0/Permora/actions/runs/39718804573) |
+| Worker / Fehler / Recovery | 32 bestehende Entzüge plus 2 Rezertifizierungsentzüge; reale Worker und Keycloak, Frist- und Restore-Nachweise erfolgreich | [Worker-Workflow](https://github.com/Cenn0/Permora/actions/runs/39718804613) |
+| Begrenzter Last-/Failover-Lauf | 96 bestehende Entzüge plus 2 Rezertifizierungsentzüge; reale Worker-/Keycloak-Ausführung erfolgreich | [Last-Workflow](https://github.com/Cenn0/Permora/actions/runs/39718804521) |
+| OpenLDAP / LDAPS / Keycloak | 68 Prüfungen; zusätzlich tatsächlicher importierter LDAP → PostgreSQL → Worker → Keycloak-Gruppenentzug mit Readback | [System-Workflow](https://github.com/Cenn0/Permora/actions/runs/39718804516) |
+| Echter OIDC-BFF-Flow | Passwort-only-Schreibsperre, OTP/LoA2, gemeinsame Sitzung und Logout/Replay-Abweisung über zwei BFF-Prozesse | [OIDC-Job](https://github.com/Cenn0/Permora/actions/runs/39718804538/job/119627224622) |
+| Artefaktintegrität / SBOM / Vulnerabilities | API-, Worker-, Provisioner-Images und Frontend-SBOM geprüft; Vulnerability-Gate bestanden, keine behebbaren High/Critical im getesteten Scope | [Artefakt-Workflow](https://github.com/Cenn0/Permora/actions/runs/39718804559) |
+| Öffentliche Dokumentation | Dokumentationsprüfungen bestanden | [Public-Docs-Workflow](https://github.com/Cenn0/Permora/actions/runs/39718804575) |
+
+Die 272 Backendfälle umfassen **51 neue Regressionen** für diesen Schritt:
+43 Domainfälle und 8 echte PostgreSQL-Fälle. Sie prüfen unter anderem die auf
+höchstens zwei Kampagnen begrenzte Nachholung, getrennte überfällige/noch offene
+Prüfmengen und die erneute Einreihung zuvor verworfener Systementzüge.
+Der Worker-Systemtest bestätigt ergänzend den tatsächlichen periodischen
+Keycloak-Entzug; die Entzugszahlen sind keine zusätzliche Anzahl von xUnit-Tests.
+
+**Grenzen:** Die PR-Signierung ist erwartungsgemäß übersprungen. Die Nachweise
+belegen keine vollständige 1.0-, Microsoft-AD-, manuelle WCAG-, Mehrhost-/HA-
+oder koordinierte Disaster-Recovery-Abnahme. Der Scannerfolg ist keine Aussage,
+dass keine Schwachstellen vorhanden sind. Die folgenden älteren Checkpoints
+behalten ihren jeweils ausdrücklich datierten Prüfumfang.
+
 Die neue Abdeckung ist nach Prüfebene getrennt:
 
 | Ebene | Reproduzierbarer Test | Geprüftes Verhalten |
 | --- | --- | --- |
-| Domain | `ReviewScheduleTests.cs` | Owner-/Teamgrenzen, Parameter, Revisionen, feste UTC-Kadenz, fehlende/abgelaufene Zuweisungen, laufende Entzüge, unveränderte Fristen |
-| PostgreSQL | `PostgresReviewScheduleTests.cs` | V1→V2-Upgrade, Datenerhalt, Rollback, zwei unabhängige Worker/Konfigurationsclients, Due-Queue und unveränderte genehmigte Grants |
+| Domain | `ReviewScheduleTests.cs` | Owner-/Teamgrenzen, Parameter, Revisionen, feste UTC-Kadenz, Nachholung mit höchstens zwei getrennten Prüfmengen, fehlende/abgelaufene Zuweisungen, laufende Entzüge, unveränderte Fristen |
+| PostgreSQL | `PostgresReviewScheduleTests.cs` | V1→V2-Upgrade, Datenerhalt, Rollback, zwei unabhängige Worker/Konfigurationsclients, Due-Queue auch nach verworfenem Systementzug und unveränderte genehmigte Grants |
 | HTTP | `scripts/ci-api-smoke.py` | Tatsächliche ASP.NET-Endpunkte, CSRF, 404/403, 412, Plan lesen/ändern/pausieren und vorhandene Kampagne erhalten |
 | Angular | `web/tests/review-model.test.mjs`, Browser-Suite | Zeitkonvertierung, Planformular, Owner/Approver/Auditor, Konflikte und präzise Entzugsanzeige |
 | Keycloak/Worker/Recovery | `scripts/ci-worker-system.py` | Zwei echte Worker nach Ausfall; genau eine Kampagne, ursprüngliche Deadline, realer Entzug nur vor dem Stichtag erteilter Rechte, Erhalt späterer Rechte, Backup/Restore von Plan und Review |
 
-Lokale Integration verwendet PostgreSQL 16.15; die vorhandene GitHub-CI prüft
-zusätzlich PostgreSQL 18 und die im Repository gepinnte Keycloak-Version.
+Lokale Integration verwendet PostgreSQL 16.15; der oben verlinkte GitHub-Lauf
+verwendete zusätzlich PostgreSQL 18.6 und die im Repository gepinnte Keycloak-Version.
 Ein lokaler Domain-/HTTP-Lauf ersetzt den tatsächlichen Worker-/Keycloak-Test
 nicht. Alle Ergebnisse müssen dem getesteten Commit zugeordnet werden.
 
