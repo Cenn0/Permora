@@ -2,13 +2,16 @@
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import http.client
+import io
+from types import SimpleNamespace
 import threading
 import unittest
 from unittest.mock import patch
 import urllib.error
 import urllib.request
 
-from ci_federation_faults import FederationProxy, FaultState, start_proxy
+from ci_federation_faults import FederationProxy, FaultState, read_request_body, start_proxy
 
 PREFIX = "/admin/realms/permora-federation-unit/"
 
@@ -29,6 +32,12 @@ class Upstream(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         self.server.deletes += 1
+        length = int(self.headers.get("Content-Length", "0"))
+        payload = self.rfile.read(length) if length else None
+        if payload is None:
+            self.server.roles.clear()
+        else:
+            for role in json.loads(payload): self.server.roles.discard(role["id"])
         self.send_response(204)
         self.end_headers()
 
@@ -38,10 +47,12 @@ def fixture():
     upstream = ThreadingHTTPServer(("127.0.0.1", 0), Upstream)
     upstream.url = "http://127.0.0.1:" + str(upstream.server_port)
     upstream.reads = upstream.deletes = 0
+    upstream.roles = {"target", "unrelated"}
     handler = type("UnitProxy", (FederationProxy,), {"upstream": upstream.url})
     proxy = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     proxy.allowed_paths = (PREFIX,)
     proxy.faults = FaultState()
+    proxy.faults.proxy_port = proxy.server_port
     threads = [threading.Thread(target=s.serve_forever, daemon=True) for s in (upstream, proxy)]
     for thread in threads: thread.start()
 
@@ -109,6 +120,40 @@ class FederationFaultTests(unittest.TestCase):
         with fixture() as (_, upstream, request):
             self.assertEqual(request(PREFIX + "redirect")[0], 302)
             self.assertEqual(upstream.reads, 1)
+
+    def test_chunked_delete_preserves_unrelated_remote_role(self):
+        with fixture() as (faults, upstream, _):
+            connection = http.client.HTTPConnection("127.0.0.1", faults.proxy_port, timeout=3)
+            try:
+                connection.request("DELETE", PREFIX + "groups/g/role-mappings/clients/c",
+                    body=iter([b'[{"id":', b'"target"}]']),
+                    headers={"Content-Type": "application/json"}, encode_chunked=True)
+                response = connection.getresponse()
+                self.assertEqual(response.status, 204)
+                response.read()
+            finally:
+                connection.close()
+            self.assertEqual(upstream.roles, {"unrelated"})
+            self.assertEqual(faults.deletes, 1)
+
+    def test_content_length_body_is_preserved(self):
+        handler = SimpleNamespace(headers={"Content-Length": "3"}, rfile=io.BytesIO(b"123"))
+        self.assertEqual(read_request_body(handler), b"123")
+
+    def test_invalid_or_oversized_framing_is_rejected(self):
+        for headers, data in (
+            ({"Transfer-Encoding": "gzip"}, b""),
+            ({"Transfer-Encoding": "chunked", "Content-Length": "3"}, b""),
+            ({"Transfer-Encoding": "chunked"}, b"invalid\r\n"),
+            ({"Transfer-Encoding": "chunked"}, b"3\r\nx"),
+            ({"Transfer-Encoding": "chunked"}, b"9\r\n123456789\r\n0\r\n\r\n"),
+            ({"Content-Length": "-1"}, b""),
+            ({"Content-Length": "9"}, b"123456789"),
+            ({"Content-Length": "3"}, b"12"),
+        ):
+            with self.subTest(headers=headers, data=data):
+                handler = SimpleNamespace(headers=headers, rfile=io.BytesIO(data))
+                with self.assertRaises(ValueError): read_request_body(handler, limit=8)
 
     def test_outside_isolated_ci_fails_before_binding(self):
         with patch.dict("os.environ", {}, clear=True), patch("ci_federation_faults.ThreadingHTTPServer") as server:

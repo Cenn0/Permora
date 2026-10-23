@@ -210,7 +210,7 @@ Der erweiterte System-Workflow baut Worker **und API**. Der
 [aktuelle Testvertrag](joined-federation-acceptance.md) verlangt beide
 LDAP-Importmodi, tatsächlichen LDAPS-Sichtverlust, mehrdeutige Identitäten,
 Keycloak-503, verlorene Antwort nach bestätigtem Remote-DELETE und
-Worker-Neustart. Seine sechs Proxy-Tests laufen vor der Integration.
+Worker-Neustart. Seine neun Proxy-Tests laufen vor der Integration.
 Die HTTP-Zulassung verwendet explizite Development-Loopback-Authentifizierung;
 OIDC/MFA bleibt separat. Änderungen auch am neuen Fault-Helper und seinen
 Tests lösen die Artefaktintegritätsprüfung und einen frischen Main-Kandidaten

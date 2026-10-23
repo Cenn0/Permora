@@ -12,6 +12,51 @@ import urllib.error
 import urllib.request
 
 
+def read_request_body(handler, limit=1024 * 1024):
+    """Decode bounded HTTP/1.1 framing without changing DELETE semantics.
+
+    HttpClient's JsonContent normally uses chunked transfer encoding. Dropping
+    its body is dangerous: Keycloak interprets an absent DELETE role list as
+    removing ALL client-role mappings, rather than the selected role.
+    """
+    length = handler.headers.get("Content-Length")
+    encoding = handler.headers.get("Transfer-Encoding")
+    if encoding:
+        if encoding.lower() != "chunked" or length is not None:
+            raise ValueError("Unsupported or ambiguous HTTP body framing")
+        body = bytearray()
+        while True:
+            line = handler.rfile.readline(129)
+            if len(line) > 128 or not line.endswith(b"\r\n"):
+                raise ValueError("Invalid HTTP chunk size")
+            raw_size = line[:-2].split(b";", 1)[0]
+            if not raw_size or any(c not in b"0123456789abcdefABCDEF" for c in raw_size):
+                raise ValueError("Invalid HTTP chunk size")
+            size = int(raw_size, 16)
+            if len(body) + size > limit:
+                raise ValueError("HTTP body exceeds fixture budget")
+            if size == 0:
+                trailer_size = 0
+                while True:
+                    trailer = handler.rfile.readline(1025)
+                    trailer_size += len(trailer)
+                    if not trailer.endswith(b"\r\n") or trailer_size > 8192:
+                        raise ValueError("Invalid HTTP trailers")
+                    if trailer == b"\r\n": return bytes(body)
+            chunk = handler.rfile.read(size)
+            if len(chunk) != size or handler.rfile.read(2) != b"\r\n":
+                raise ValueError("Truncated HTTP chunk")
+            body.extend(chunk)
+    if length is None:
+        return None
+    if not length.isdecimal() or not 0 <= int(length) <= limit:
+        raise ValueError("Invalid or oversized Content-Length")
+    body = handler.rfile.read(int(length))
+    if len(body) != int(length):
+        raise ValueError("Truncated HTTP body")
+    return body
+
+
 class FaultState:
     def __init__(self):
         self.lock = threading.Lock()
@@ -44,16 +89,17 @@ class FederationProxy(BaseHTTPRequestHandler):
             self.wfile.write(content)
 
     def forward(self):
+        self.connection.settimeout(25)
         # Never become an arbitrary URL proxy, even in the isolated fixture.
         if not any(self.path.startswith(prefix) for prefix in self.server.allowed_paths):
             self.reply(404)
             return
-        length = int(self.headers.get("Content-Length", "0"))
-        if not 0 <= length <= 1024 * 1024:
-            self.reply(413)
+        try:
+            body = read_request_body(self)
+        except (ValueError, OSError):
+            self.reply(400)
             self.close_connection = True
             return
-        body = self.rfile.read(length) if length else None
         state = self.server.faults
         with state.lock:
             if state.offline:

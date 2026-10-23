@@ -51,11 +51,17 @@ user-role writes. A two-group conflict deliberately revokes both implicated
 assignments, rather than arbitrarily preserving one.
 
 The fault proxy binds only to loopback, forwards only this disposable realm,
-refuses redirects, bounds request/response bodies and never logs tokens or
+refuses redirects, preserves bounded Content-Length **and chunked JSON bodies**,
+bounds request/response bodies and never logs tokens or
 headers. It cannot fabricate successful writes. Its own tests use synthetic
 HTTP servers, without Docker or IAM credentials. SIGCONT, process termination,
 proxy shutdown and database/container cleanup run on the failure path too.
 There are no uploaded credential files, raw logs or database backups.
+The older multiworker proxy uses the same bounded body decoder. This is
+necessary for faithful tests: dropping a chunked role-list DELETE body
+would make Keycloak remove all client-role mappings. A regression sends
+chunked JSON through the proxy and requires an unrelated remote role to
+survive; the live emergency-revoke fixture checks unrelated roles too.
 
 Each successful mode prints sanitized UTC observation time, actual checkout
 SHA, versions, operation counts and isolated SoD revocation latency. On PRs

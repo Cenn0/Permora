@@ -455,6 +455,9 @@ def run_worker_acceptance(kc, workspace, realm, base, subject_user,
                  "Restart did not verify and finish the committed emergency revoke")
         check(faults.deletes == 1 and faults.grants == 0,
               "Restart reads the real postcondition without a duplicate DELETE or any grant")
+        surviving_roles = {r["id"] for r in kc.request("GET", group_path)[1]}
+        check({supervisor["id"], observer["id"]}.issubset(surviving_roles),
+              "Emergency deletion preserves the actual unrelated supervisor and observer mappings")
         check(count("SELECT count(*) FROM audit_events WHERE document->>'action'='change.retry_requested'") == 1
               and count("SELECT count(*) FROM audit_events WHERE document->>'action'='change.retry'") >= 1,
               "Owner retry and network retry are represented in the actual audit chain")
@@ -464,7 +467,8 @@ def run_worker_acceptance(kc, workspace, realm, base, subject_user,
         change_group_members("federated0", "federated1")
         kc.request("POST", base + "/clear-user-cache")
         effective = mapping("users", other_user["id"], remote_client) + "/composite"
-        check(any(r["id"] == supervisor["id"] for r in kc.request("GET", effective)[1]),
+        effective_roles = {r["id"] for r in kc.request("GET", effective)[1]}
+        check({reader["id"], supervisor["id"]}.issubset(effective_roles),
               "External LDAP join creates a real effective Keycloak SoD conflict")
         start = time.monotonic()
         sod_revocations = 1 if imported else 2
@@ -517,6 +521,10 @@ def run_worker_acceptance(kc, workspace, realm, base, subject_user,
         check(count("SELECT count(*) FROM operations") == total_revocations
               and faults.deletes == total_revocations and faults.grants == 0,
               "Membership loss/rejoin and another restart never regrant or duplicate a remote revoke")
+        final_effective = {r["id"] for r in kc.request("GET", effective)[1]}
+        check(supervisor["id"] not in final_effective and observer["id"] in final_effective
+              and (reader["id"] in final_effective) == imported,
+              "Independent final effective-role readback preserves unrelated rights after rejoin/restart")
         print(compact({"scope": "real-LDAPS-Keycloak-Postgres-Permora.Worker",
                        "observedAt": timestamp(),
                        "sourceCommit": command(["git", "-C", str(worker.parents[5]), "rev-parse", "HEAD"]).strip(),
