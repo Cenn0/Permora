@@ -330,3 +330,15 @@ Ein Punkt ist erst `ABGESCHLOSSEN`, wenn:
 **Nicht ausreichend:** nur Quellcode, nur grüne Mock-Tests, nur statische Prüfung, nur vorhandenes Dockerfile oder ein erfolgreich angenommenes HTTP-`202`.
 
 **Aktionspunkt:** Diese Roadmap nach Merge mit dem Release-Issue #3 und den verbliebenen historischen Aussagen in `docs/ci.md` / `docs/testing.md` synchronisieren. Die einzelnen Arbeitspakete sollen als nachvollziehbare GitHub-Issues mit Abhängigkeiten und Test-Checklisten gepflegt werden.
+
+## Issue-Paket: gemeinsame Föderationsfehler (23.10.2026)
+
+[Der erweiterte Abnahmevertrag](joined-federation-acceptance.md) implementiert
+die noch fehlenden ausführbaren Fälle aus #58 sowie den automatisierten
+API-/Worker-Entzugsteil aus #46: beide LDAP-Importmodi, realer Sichtverlust,
+mehrdeutige IDs, Keycloak-Ausfall, Remote-Commit mit Antwortverlust und
+Neustart. Der Erfolg ist am exakten CI-Quellstand zu verifizieren.
+Die zwei Gruppen einer nicht importierten SoD-Kollision werden beide
+entzogen; nicht betroffene Rechte bleiben bestehen. Neue Gruppengrants
+bleiben gesperrt. Betreiber-/IAM-Abnahme aus #46 und die externen Gates
+aus #3 bleiben eigenständige, offene Verpflichtungen.

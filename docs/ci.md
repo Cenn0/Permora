@@ -85,7 +85,7 @@ fehlende Token-Recht als HTTP 403 reproduziert. Dieser Fix ist eine
 Test-/Konfigurationskorrektur, keine Behauptung minimaler Sichtbarkeit:
 `view-users` umfasst im Realm mehr als eine einzelne Permora-Anwendung.
 
-**Nicht bewiesen:** nicht importierter LDAP-Worker-End-to-End-Fall,
+**Grenze dieses historischen Laufs:** nicht importierter LDAP-Worker-End-to-End-Fall,
 Microsoft AD, reales Netz-/TLS-/Keycloak-/DB-Failover in mehreren Zonen,
 individuelle Betriebs-RPO/RTO, unabhängige Prüfungen oder Produktionsabnahme.
 Die nachfolgenden Zwischenstände von 16.–18.10. bleiben historisch.
@@ -203,3 +203,15 @@ Bei der ersten Ausführung werden die tatsächlich erreichten Testzahlen und Com
 ## Nachweis des ersten erfolgreichen Funktionsdurchlaufs
 
 [GitHub Actions #38912134224](https://github.com/Cenn0/Permora/actions/runs/38912134224): Struktur erfolgreich; **102/102 C#-Tests einschließlich PostgreSQL** sowie gesonderter gestarteter ASP.NET-HTTP-Smoke-Test erfolgreich; Angular-Produktionsbuild, 32 isolierte Frontend-Unit-Tests und 8 Playwright-Tests erfolgreich; Keycloak 26.8.1 Rollen-/OIDC-Vertrag sowie clientbezogene FGAP-v2-Isolation erfolgreich; npm-Produktion-Audit ohne gemeldete Schwachstellen. **`dependency-locks` fehlgeschlagen:** echte aufgelöste, geprüfte NuGet/npm-Lockfiles sind noch nicht eingecheckt. Alle anderen Jobs waren grün. [Prüfprotokoll mit Grenzen](evidence/ci-2026-10-16.md).
+
+## Gemeinsame Föderations- und Fehlerabnahme (23.10.2026)
+
+Der erweiterte System-Workflow baut Worker **und API**. Der
+[aktuelle Testvertrag](joined-federation-acceptance.md) verlangt beide
+LDAP-Importmodi, tatsächlichen LDAPS-Sichtverlust, mehrdeutige Identitäten,
+Keycloak-503, verlorene Antwort nach bestätigtem Remote-DELETE und
+Worker-Neustart. Seine sechs Proxy-Tests laufen vor der Integration.
+Die HTTP-Zulassung verwendet explizite Development-Loopback-Authentifizierung;
+OIDC/MFA bleibt separat. Änderungen auch am neuen Fault-Helper und seinen
+Tests lösen die Artefaktintegritätsprüfung und einen frischen Main-Kandidaten
+aus. Für jede Erfolgsbehauptung ist der konkrete Workflow-Lauf maßgeblich.

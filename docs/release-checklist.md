@@ -1,6 +1,15 @@
 # Permora 1.0 — verifiable engineering and production release gates
 
-## 20 October 2026 — joined LDAP/worker integration and release boundary
+## Current joined-federation engineering contract (23 October 2026)
+
+The [expanded executable contract](joined-federation-acceptance.md) covers
+both imported/non-imported worker modes and the joined fault matrix for
+#58, plus the automated disabled-group-grant/revoke path of #46. Exact-source
+successful CI is required for verification. Production-specific #46 and #3
+obligations remain open; this does not supply AD, multi-host HA, coordinated
+DR or independent human approvals.
+
+## Historical 20 October 2026 — joined LDAP/worker integration and release boundary
 
 [PR #60](https://github.com/Cenn0/Permora/pull/60) merged at
 [`e3bfcf6ca6b2`](https://github.com/Cenn0/Permora/commit/e3bfcf6ca6b234d4f2082aaa633d95e95cfffbc4).

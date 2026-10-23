@@ -13,6 +13,8 @@ on:
       # evidence; ensure fresh PR scans and trusted-main candidates.
       - 'scripts/ci-federation.py'
       - 'scripts/ci_federation_worker.py'
+      - 'scripts/ci_federation_faults.py'
+      - 'scripts/test_ci_federation_faults.py'
       - 'scripts/ci-worker-system.py'
       - 'scripts/ci-keycloak-contract.py'
       - 'scripts/ci-oidc-bff.py'
@@ -42,6 +44,8 @@ on:
       # evidence; ensure fresh PR scans and trusted-main candidates.
       - 'scripts/ci-federation.py'
       - 'scripts/ci_federation_worker.py'
+      - 'scripts/ci_federation_faults.py'
+      - 'scripts/test_ci_federation_faults.py'
       - 'scripts/ci-worker-system.py'
       - 'scripts/ci-keycloak-contract.py'
       - 'scripts/ci-oidc-bff.py'
