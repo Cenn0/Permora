@@ -248,3 +248,43 @@ outage scenarios, Keycloak group `manage` overbreadth, organizational rights
 review and upstream token leakage are **not** certified by these tests.
 
 Reference: [Keycloak Service Accounts and Token Role Mappings](https://www.keycloak.org/docs/latest/server_admin/).
+
+## Explizite Directory-Sichtbarkeitsproben (Worker)
+
+`Keycloak:Realms:<realm>:DirectoryProbeUserIds` ist eine optionale Liste
+stabiler Keycloak-Benutzer-IDs (höchstens 32, jeweils maximal 1024 Zeichen).
+Für föderierte Verzeichnisse muss die zentrale IAM-Abnahme geeignete,
+aktivierte Probeidentitäten **je Quelle** festlegen und den tatsächlichen
+Ausfallpfad prüfen. Beispiel für den nicht importierten Speichermodus:
+
+```json
+"DirectoryProbeUserIds": ["f:provider-uuid:ldap-entry-uuid"]
+```
+
+Vor dem Aufbau eines neuen Gruppen-Snapshots liest der Directory-Connector
+jede Probe einzeln mit dem bestehenden **Directory**-Credential. ID,
+Aktivierung und normaler Benutzerstatus müssen passen. Zusätzlich muss
+jede Probe genau einmal in der paginierten Benutzersuche vorkommen. Fehlt
+eine Probe, wird sie doppelt geliefert, ist sie deaktiviert oder nicht
+lesbar, schlägt die Synchronisierung fehl (`directory_visibility_lost`
+beziehungsweise der konkrete Connectorfehler). Der Worker behält den
+letzten vollständigen Snapshot einschließlich seiner bisherigen Zeitstempel.
+Er darf einen nominell erfolgreichen, aber gefilterten Suchabruf dadurch
+nicht als neue vollständige Sicht bestätigen. Keine zusätzlichen Adminrechte
+werden angefordert und keine Probe wird automatisch angelegt oder verändert.
+
+Eine entfernte/umgezogene Probe erzeugt bewusst einen Klärfall. Betreiber
+prüfen die Quelle, ändern den verifizierten ID-Bestand und starten den
+Worker mit konsistenter Konfiguration neu. Probeidentitäten gehören nicht
+in fachliche Berechtigungsgruppen; normale Schutzlisten bleiben relevant.
+Die API braucht diese Worker-Probekonfiguration und Admin-Credentials nicht.
+
+**Grenzen:** Ohne konfigurierte Proben bleibt das bisherige Verhalten bestehen.
+Eine erreichbare oder zwischengespeicherte Probe beweist weder vollständige
+LDAP-/AD-Sicht noch aktuelle Mitgliedschaften aller Gruppen. Die Probe
+ersetzt keine authoritative Bestandsprüfung, Netzüberwachung oder Frische-
+und Live-Prüfungen vor Vergaben; sie friert nicht automatisch alle
+Realm-Aufträge ein. Importierte/cached Konten sind alleine keine
+LDAP-Verfügbarkeitsgarantie. Die [gemeinsame Abnahme](joined-federation-acceptance.md)
+prüft den konkreten Ausfall mit beiden READ_ONLY-Modi. Dies ist eine
+Permora-Schutzmaßnahme, keine Hersteller-Zertifizierung.

@@ -247,7 +247,7 @@ def run_worker_acceptance(kc, workspace, realm, base, subject_user,
             "Keycloak": {"AllowHttpInDevelopment": True, "Realms": {realm: {
                 "BaseUrl": proxy_url, "Realm": realm, "Issuer": issuer,
                 **profiles, "ProtectedSubjectIds": [], "AllowGroupRoleGrants": False,
-                "ApprovedGroupIds": []}}}}
+                "ApprovedGroupIds": [], "DirectoryProbeUserIds": [subject_user["id"]]}}}}
         path = workspace / ("ci-drift-worker-" + suffix + ".json")
         path.write_text(compact(config))
         path.chmod(0o600)

@@ -16,6 +16,7 @@ from pathlib import Path
 import secrets
 import socket
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -24,6 +25,9 @@ import urllib.parse
 import urllib.request
 import uuid
 
+# The diagnostic workflow invokes this file through runpy.run_path(), which
+# does not add the script directory to sys.path as direct execution does.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ci_federation_faults import read_request_body
 
 ROOT = Path(__file__).resolve().parents[1]

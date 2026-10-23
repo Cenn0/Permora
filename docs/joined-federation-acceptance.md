@@ -26,6 +26,12 @@ API and worker both keep **AllowGroupRoleGrants=false**, with no approved
 group IDs. The worker uses the preflighted FGAP credential; the separate
 directory identity has realm-wide `view-users` assigned and role-scoped.
 Both are explicit test concessions, not a least-privilege production approval.
+The worker configures a known federated `DirectoryProbeUserIds` entry. Before
+accepting a refresh it requires a live point read and unique search presence
+of that enabled normal user. This detects loss of the configured visibility
+sentinel even when federated search returns a nominally successful filtered
+list. It is an operator-configured guard, not proof of complete federation
+visibility; see [configuration and limitations](keycloak.md#explizite-directory-sichtbarkeitsproben-worker).
 
 ## Required observations
 

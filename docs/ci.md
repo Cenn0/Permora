@@ -210,8 +210,14 @@ Der erweiterte System-Workflow baut Worker **und API**. Der
 [aktuelle Testvertrag](joined-federation-acceptance.md) verlangt beide
 LDAP-Importmodi, tatsächlichen LDAPS-Sichtverlust, mehrdeutige Identitäten,
 Keycloak-503, verlorene Antwort nach bestätigtem Remote-DELETE und
-Worker-Neustart. Seine neun Proxy-Tests laufen vor der Integration.
+Worker-Neustart. Seine zehn Proxy-/Entrypoint-Tests laufen vor der Integration.
 Die HTTP-Zulassung verwendet explizite Development-Loopback-Authentifizierung;
 OIDC/MFA bleibt separat. Änderungen auch am neuen Fault-Helper und seinen
 Tests lösen die Artefaktintegritätsprüfung und einen frischen Main-Kandidaten
 aus. Für jede Erfolgsbehauptung ist der konkrete Workflow-Lauf maßgeblich.
+
+Die gemeinsame Abnahme konfiguriert jetzt eine explizite föderierte
+Directory-Sichtbarkeitsprobe. Ein positiver HTTP-Status allein reicht nicht
+zur Bestätigung eines neuen Snapshots: Einzelabruf und genau einmalige
+Suchsicht der bekannten ID müssen passen. Die Probe ist optional und
+beweist keine vollständige Quellsicht; [Betriebsvertrag](keycloak.md#explizite-directory-sichtbarkeitsproben-worker).

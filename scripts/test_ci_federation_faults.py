@@ -4,6 +4,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import http.client
 import io
+from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 import threading
 import unittest
@@ -159,6 +162,16 @@ class FederationFaultTests(unittest.TestCase):
         with patch.dict("os.environ", {}, clear=True), patch("ci_federation_faults.ThreadingHTTPServer") as server:
             with self.assertRaises(RuntimeError): start_proxy("permora-federation-unit")
             server.assert_not_called()
+
+    def test_worker_diagnostic_runpy_entrypoint_loads_shared_decoder(self):
+        # Match the workflow's root-level runpy invocation without starting
+        # Docker or running its destructive __main__ path. A fresh interpreter
+        # prevents this test suite's cached helper module from hiding a failure.
+        result = subprocess.run([sys.executable, "-c",
+            "import runpy; n=runpy.run_path('scripts/ci-worker-system.py'); "
+            "assert callable(n['read_request_body'])"],
+            cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":
