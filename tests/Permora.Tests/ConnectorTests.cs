@@ -7,6 +7,60 @@ namespace Permora.Tests;
 
 public sealed class ConnectorTests
 {
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("disabled")]
+    [InlineData("service-account")]
+    [InlineData("wrong-id")]
+    [InlineData("search-missing")]
+    [InlineData("search-duplicate")]
+    [InlineData("search-disabled")]
+    public async Task Directory_probe_failure_never_returns_a_fresh_membership_snapshot(string mode)
+    {
+        var f = new Fixture();
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/users/employee", StringComparison.Ordinal))
+            {
+                if (mode == "missing") return new(HttpStatusCode.NotFound);
+                return Json(new { id = mode == "wrong-id" ? "foreign" : "employee", username = "canary",
+                    enabled = mode != "disabled", serviceAccountClientId = mode == "service-account" ? "service" : null });
+            }
+            if (request.RequestUri.AbsolutePath.EndsWith("/users", StringComparison.Ordinal))
+            {
+                var user = new { id = "employee", username = "canary", enabled = mode != "search-disabled" };
+                return mode switch
+                {
+                    "search-duplicate" => Json(new[] { user, user }),
+                    "search-missing" => Json(Array.Empty<object>()),
+                    _ => Json(new[] { user })
+                };
+            }
+            throw new InvalidOperationException("Incomplete visibility must fail before reading group membership.");
+        }, directoryProbeUserIds: ["employee"]);
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            fixture.Connector.ReadDirectoryAsync("enterprise", TestContext.Current.CancellationToken));
+        Assert.Equal("directory_visibility_lost", error.Code);
+        Assert.DoesNotContain("employee", error.Message);
+        Assert.DoesNotContain(fixture.Handler.Paths,
+            p => p.Method != HttpMethod.Get && !p.Path.EndsWith("/token", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Directory_probe_requires_point_read_and_unique_search_visibility()
+    {
+        var f = new Fixture();
+        var user = new { id = "employee", username = "canary", enabled = true };
+        using var fixture = new ConnectorFixture(f, (request, _) =>
+            request.RequestUri!.AbsolutePath.EndsWith("/users/employee", StringComparison.Ordinal) ? Json(user)
+            : request.RequestUri.AbsolutePath.EndsWith("/users", StringComparison.Ordinal) ? Json(new[] { user })
+            : Json(Array.Empty<object>()), directoryProbeUserIds: ["employee"]);
+        var directory = await fixture.Connector.ReadDirectoryAsync("enterprise", TestContext.Current.CancellationToken);
+        Assert.Equal("employee", Assert.Single(directory).KeycloakId);
+        Assert.Contains(fixture.Handler.Paths, p => p.Path.EndsWith("/users/employee", StringComparison.Ordinal));
+        Assert.Contains(fixture.Handler.Paths, p => p.Path.EndsWith("/users", StringComparison.Ordinal));
+    }
+
     [Fact] public async Task Disabled_or_foreign_client_is_rejected_without_writes()
     {
         var f = new Fixture(); using var fixture = new ConnectorFixture(f, (request, _) =>
@@ -409,11 +463,12 @@ public sealed class ConnectorTests
         public RecordingHandler Handler { get; }
         public KeycloakConnector Connector { get; }
         public ConnectorFixture(Fixture f, Func<HttpRequestMessage,CancellationToken,HttpResponseMessage> handler,
-            bool allowGroupRoleGrants = false, IReadOnlyList<string>? approvedGroupIds = null)
+            bool allowGroupRoleGrants = false, IReadOnlyList<string>? approvedGroupIds = null,
+            IReadOnlyList<string>? directoryProbeUserIds = null)
         {
             File.WriteAllText(secretPath, "test-only-credential-not-a-real-secret"); Handler = new(handler); client = new(Handler);
             var credential = new ServiceCredential("test-service", secretPath);
-            var options = new KeycloakOptions { Realms = new() { ["enterprise"] = new("https://keycloak.example.test", "enterprise", Fixture.Issuer, credential, credential, credential, [], allowGroupRoleGrants, approvedGroupIds) } };
+            var options = new KeycloakOptions { Realms = new() { ["enterprise"] = new("https://keycloak.example.test", "enterprise", Fixture.Issuer, credential, credential, credential, [], allowGroupRoleGrants, approvedGroupIds, directoryProbeUserIds) } };
             Connector = new(client, options, f.Clock);
         }
         public void Dispose() { client.Dispose(); File.Delete(secretPath); }

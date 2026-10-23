@@ -60,3 +60,17 @@
 ## Risk acceptance record
 
 For every production-impacting change, record scope, risk owner, test matrix, immutable commit, rollback procedure, monitoring and security-review decision. Keep secrets, personal identifiers and token evidence out of public issues.
+
+## Joined federation visibility guard (23 October 2026 implementation)
+
+T07/T08 now have an explicit optional operator-configured
+`DirectoryProbeUserIds` guard. Directory refresh requires each known enabled
+normal user in both a point read and exactly one search result. Probe
+absence, ambiguity or failure prevents replacement of the prior complete
+snapshot; old timestamps remain old. Unit negatives and the joined live
+LDAP outage fixture must pass on the exact source before calling this
+verified. This is not full filtered-list detection: an accessible/cached
+probe can coexist with incomplete group visibility. Operators still need
+source-specific canaries, authoritative visibility comparison and monitoring.
+Existing snapshot freshness windows and live grant checks remain relevant;
+the probe does not globally pause all mutations or resolve #46.

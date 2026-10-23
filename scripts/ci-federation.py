@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import signal
 import socket
 import ssl
 import subprocess
@@ -86,7 +87,7 @@ class Keycloak:
         return status, parsed, location
 
 
-def test_realm(kc, bind_secret, imported, group_members, workspace):
+def test_realm(kc, bind_secret, imported, group_members, workspace, ldap_available):
     group_members('federated0')
     realm = 'permora-federation-' + uuid.uuid4().hex[:10]
     base, mode = '/admin/realms/' + realm, 'imported' if imported else 'non-imported'
@@ -235,14 +236,23 @@ def test_realm(kc, bind_secret, imported, group_members, workspace):
         kc.request('DELETE', group_path, [own], token=delegated)
         check(not any(r['id'] == own['id'] for r in kc.request('GET', effective)[1]), mode + ': inherited access revoked and verified')
         check(kc.request('GET', user_path(subject))[1]['enabled'], mode + ': denied account changes had no side effect')
-        if imported and os.environ.get('PERMORA_FEDERATION_WORKER') == 'isolated':
-            # Integration proof across all four real processes, not a portal mock.
-            # The non-imported mode remains covered by the preceding direct
-            # Keycloak inherited-role contract; no unsupported direct LDAP
-            # user-role writes are attempted in this worker fixture.
+        if os.environ.get('PERMORA_FEDERATION_WORKER') == 'isolated':
+            # Non-imported READ_ONLY accounts cannot receive direct mappings.
+            # A second genuine LDAP group supplies the conflicting reader role.
+            second_group = next(g for g in kc.request('GET', user_path(other) + '/groups')[1]
+                                if g['name'] == 'team-b')
+            if not imported:
+                permission = next(p for p in kc.request('GET', authz + '/permission?name=allowed-group')[1]
+                                  if p['name'] == 'allowed-group')
+                kc.request('PUT', authz + '/permission/scope/' + permission['id'],
+                    {'id': permission['id'], 'name': 'allowed-group', 'resourceType': 'Groups',
+                     'resources': [group['id'], second_group['id']], 'scopes': ['view', 'manage'],
+                     'policies': ['only-mapper']})
             from ci_federation_worker import run_worker_acceptance
             run_worker_acceptance(kc, workspace, realm, base, subject, other,
-                                  group, group_members, check, ca, secret)
+                                  group, group_members, check, ca, secret,
+                                  imported=imported, reader_group=second_group,
+                                  ldap_available=ldap_available)
 
     finally:
         kc.request('DELETE', base, expected=(204, 404))
@@ -296,6 +306,12 @@ access to * by * read
         def group_members(*users):
             ldap_write('ldapmodify', f'dn: cn=team-a,ou=groups,{DN}\nchangetype: modify\nreplace: member\n' +
                        ''.join(f'member: uid={user},ou=people,{DN}\n' for user in users) + '\n')
+        def ldap_available(available):
+            # Suspend only the fixture-owned slapd process. TLS remains enabled;
+            # Keycloak experiences actual LDAPS read timeouts, not a mock response.
+            if server.poll() is not None:
+                raise RuntimeError('Disposable LDAP process exited')
+            server.send_signal(signal.SIGCONT if available else signal.SIGSTOP)
         try:
             context = ssl.create_default_context(cafile=str(root / 'ldap.crt'))
             for _ in range(40):
@@ -318,6 +334,7 @@ access to * by * read
                          f'cn: Federated {i}\nsn: Fixture\ngivenName: User{i}\nmail: federated{i}@permora.invalid\n'
                          f'userPassword: {ssha(user_secret)}\n\n')
             ldif += f'dn: cn=team-a,ou=groups,{DN}\nobjectClass: groupOfNames\ncn: team-a\nmember: uid=federated0,ou=people,{DN}\n\n'
+            ldif += f'dn: cn=team-b,ou=groups,{DN}\nobjectClass: groupOfNames\ncn: team-b\nmember: uid=federated1,ou=people,{DN}\n\n'
             ldif += f'dn: cn=parent-a,ou=groups,{DN}\nobjectClass: groupOfNames\ncn: parent-a\nmember: cn=team-a,ou=groups,{DN}\n\n'
             ldap_write('ldapadd', ldif)
             command(['docker', 'run', '-d', '--rm', '--name', container, '--network', 'host',
@@ -336,11 +353,13 @@ access to * by * read
             else:
                 raise TimeoutError('Disposable Keycloak did not become ready')
             for imported in (True, False):
-                test_realm(kc, bind_secret, imported, group_members, root)
+                test_realm(kc, bind_secret, imported, group_members, root, ldap_available)
             print(json.dumps({'scope': 'real-openldap-ldaps-and-keycloak', 'checks': len(CHECKS),
                 'nonImportedReadOnlyDirectWrites': 'unsupported-and-rejection-verified',
                 'microsoftAD': 'not-executed', 'productionApproval': False}), flush=True)
         finally:
+            if server.poll() is None:
+                server.send_signal(signal.SIGCONT)
             if started:
                 subprocess.run(['docker', 'rm', '-f', container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
             server.terminate()

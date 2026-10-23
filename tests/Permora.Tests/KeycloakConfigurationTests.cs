@@ -29,6 +29,7 @@ public sealed class KeycloakConfigurationTests
         Assert.Empty(realm.ProtectedSubjectIds);
         Assert.False(realm.AllowGroupRoleGrants);
         Assert.Empty(realm.ApprovedGroupIds ?? []);
+        Assert.Empty(realm.DirectoryProbeUserIds ?? []);
     }
 
     [Theory]
@@ -125,4 +126,28 @@ public sealed class KeycloakConfigurationTests
         Assert.Throws<InvalidOperationException>(() => KeycloakConfiguration.Read(config));
     }
 
+    [Fact]
+    public void Directory_probes_are_explicit_optional_bounded_and_preserve_non_imported_ids()
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["BaseUrl"] = "https://sso.example.test", ["Realm"] = "test", ["Issuer"] = Fixture.Issuer,
+            ["Roles:ClientId"] = "roles", ["Roles:SecretFile"] = "/run/secrets/roles",
+            ["Assignments:ClientId"] = "assign", ["Assignments:SecretFile"] = "/run/secrets/assign",
+            ["Directory:ClientId"] = "directory", ["Directory:SecretFile"] = "/run/secrets/directory"
+        };
+        KeycloakOptions Read(params string[] ids)
+        {
+            var all = values.ToDictionary(p => "Keycloak:Realms:test:" + p.Key, p => p.Value);
+            for (var i = 0; i < ids.Length; i++) all["Keycloak:Realms:test:DirectoryProbeUserIds:" + i] = ids[i];
+            return KeycloakConfiguration.Read(new ConfigurationBuilder().AddInMemoryCollection(all).Build());
+        }
+        const string federated = "f:provider-uuid:ldap-entry-uuid";
+        Assert.Equal(new[] { federated }, Read(federated).Realms["test"].DirectoryProbeUserIds);
+        Assert.Empty(Read().Realms["test"].DirectoryProbeUserIds ?? []);
+        foreach (var ids in new[] { new[] { "" }, new[] { " probe" }, new[] { "probe " },
+            new[] { "duplicate", "duplicate" }, new[] { new string('x', 1025) },
+            Enumerable.Range(0, 33).Select(i => "probe-" + i).ToArray() })
+            Assert.Throws<InvalidOperationException>(() => Read(ids));
+    }
 }

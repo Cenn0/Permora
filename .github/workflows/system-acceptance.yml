@@ -26,10 +26,12 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
           global-json-file: global.json
-      - name: Build real worker for joined federation acceptance
+      - name: Build real worker and Portal API for joined federation acceptance
         run: |
           dotnet restore src/Permora.Worker/Permora.Worker.csproj --locked-mode
+          dotnet restore src/Permora.Api/Permora.Api.csproj --locked-mode
           dotnet build src/Permora.Worker/Permora.Worker.csproj -c Release --no-restore
+          dotnet build src/Permora.Api/Permora.Api.csproj -c Release --no-restore
       - name: Install isolated LDAP server and clients
         run: |
           sudo apt-get update -qq
@@ -41,7 +43,9 @@ jobs:
           sudo install -d -m 0700 -o "$(id -u)" -g "$(id -g)" /var/lib/ldap/permora-ci
           test -x /var/lib/ldap/permora-ci
       - name: Validate test syntax
-        run: python3 -m py_compile scripts/ci-federation.py scripts/ci_federation_worker.py
+        run: |
+          python3 -m py_compile scripts/ci-federation.py scripts/ci_federation_worker.py scripts/ci_federation_faults.py
+          python3 -m unittest discover -s scripts -p test_ci_federation_faults.py
       - name: Execute real LDAPS federation and delegated security matrix
         env:
           PERMORA_SYSTEM_TESTS: isolated
@@ -51,7 +55,8 @@ jobs:
       - name: Record scope without storing secrets or artifacts
         if: always()
         run: |
-          echo 'Real OpenLDAP/LDAPS + Keycloak 26.8.1. Imported/non-imported identities, effective roles, scoped FGAP; imported LDAP also runs real PostgreSQL and Permora.Worker SoD remediation.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Real OpenLDAP/LDAPS + Keycloak 26.8.1 + PostgreSQL 18 + built Permora.Worker and API in both imported/non-imported modes. SoD, LDAP timeout, duplicate directory page, corrupt ambiguous ID, HTTP 503, committed DELETE/reply loss and restart; independent remote readback.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Portal HTTP admission/retry uses explicit loopback Development authentication, not OIDC/MFA. New group grants stay disabled; revocations remain possible. Token Groups.manage overbreadth remains unresolved (#46).' >> "$GITHUB_STEP_SUMMARY"
           echo 'Not Microsoft AD, Kerberos, corporate IAM, multi-host HA or production approval. No test secrets or backups are uploaded.' >> "$GITHUB_STEP_SUMMARY"
   system-gate:
     name: Required system acceptance gate

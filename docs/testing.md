@@ -282,31 +282,18 @@ The domain regression suite separately models the worker's SoD-remediation decis
 
 ## Real end-to-end LDAPS directory-drift worker test (P4)
 
-The `Permora system acceptance` GitHub workflow builds the actual Release
-`Permora.Worker` and runs
-[`ci-federation.py`](../scripts/ci-federation.py) with the
-[`ci_federation_worker.py`](../scripts/ci_federation_worker.py) joined fixture.
-All services and accounts are ephemeral: TLS-validated OpenLDAP, Keycloak
-26.8.1, a PostgreSQL 18 container, and the compiled .NET worker.
+The current [joined acceptance contract](joined-federation-acceptance.md)
+uses actual OpenLDAP/LDAPS, Keycloak 26.8.1, PostgreSQL 18, built Release
+Permora.Worker and Portal API in **both** imported and non-imported modes.
+It specifies HTTP group-grant denial, real LDAP timeouts, duplicated pages,
+ambiguous persisted IDs, Keycloak 503, committed DELETE with lost reply,
+worker termination/restart, SoD readback, audit and no regrant after rejoin.
+Non-imported SoD uses two real LDAP groups; direct individual writes remain
+unsupported and separately rejected in the upstream contract.
 
-The test seeds a real Keycloak client, a direct user role and a group role
-under a separation-of-duties policy. It first requires the real worker to
-synchronize a **nonconflicting** directory snapshot to PostgreSQL. It then
-changes LDAP group membership externally, proves the effective Keycloak
-role conflict, starts the worker to reconcile the new directory snapshot,
-and verifies a **single** targeted group revocation: PostgreSQL domain
-state, system operation, append-only audit, surviving unrelated individual
-access, removed remote group role, and no regrant after external membership
-restoration. A scoped same-token negative probe rejects realm mutation.
-
-The group-role grant is seeded by the isolated administrator as historical
-fixture state. Runtime `AllowGroupRoleGrants=false` remains enforced; only
-emergency group revocation is exercised. The live joined worker case uses
-**imported read-only** LDAP. The non-imported path separately proves inherited
-access and direct-user-write rejection but is not yet a joined-worker case.
-No real AD, LDAP outage/ambiguity fault matrix, key rotation, production RPO/RTO
-or p95/p99/independent security acceptance is implied. The numerical CI
-revocation duration is **not** an approved operational SLO.
-
-A passing exact-commit [system acceptance workflow](../.github/workflows/system-acceptance.yml)
-is required before marking this new engineering proof as verified.
+The API HTTP admission/retry part deliberately uses explicit loopback-only
+Development authentication, not genuine OIDC/MFA. New group grants remain
+disabled. The linked contract distinguishes asserted scenarios from actual
+exact-source workflow evidence; prior 20 October imported-only evidence
+above remains historical. Neither a successful run nor isolated latency
+closes deployment-specific #46 or production release #3.

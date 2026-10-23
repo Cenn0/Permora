@@ -12,7 +12,8 @@ public sealed record ServiceCredential(string ClientId, string SecretFile);
 public sealed record RealmConnection(string BaseUrl, string Realm, string Issuer,
     ServiceCredential Roles, ServiceCredential Assignments, ServiceCredential Directory,
     IReadOnlyList<string> ProtectedSubjectIds, bool AllowGroupRoleGrants = false,
-    IReadOnlyList<string>? ApprovedGroupIds = null);
+    IReadOnlyList<string>? ApprovedGroupIds = null,
+    IReadOnlyList<string>? DirectoryProbeUserIds = null);
 public sealed class KeycloakOptions
 {
     public Dictionary<string, RealmConnection> Realms { get; init; } = [];
@@ -363,7 +364,22 @@ public sealed class KeycloakConnector(HttpClient http, KeycloakOptions options, 
     public async Task<IReadOnlyList<DirectoryPrincipal>> ReadDirectoryAsync(string realmKey, CancellationToken ct)
     {
         var realm = Connection(realmKey);
+        var probes = realm.DirectoryProbeUserIds ?? [];
+        // Some federated search providers can return a successful but filtered
+        // user list during source failure. Explicit operator-owned canaries
+        // must remain individually readable AND present exactly once in search
+        // before a new group-membership snapshot may be declared current.
+        foreach (var id in probes)
+        {
+            var probe = await GetAsync<User>(realmKey, "directory", $"users/{E(id)}", ct);
+            if (probe is null || probe.Id != id || !probe.Enabled || probe.ServiceAccountClientId is not null)
+                throw new DomainException("directory_visibility_lost",
+                    "A configured directory visibility probe is unavailable. The previous snapshot must be retained.", 409);
+        }
         var users = await PagesAsync<User>(realmKey, "directory", "users", ct);
+        if (probes.Any(id => users.Count(u => u.Id == id && u.Enabled && u.ServiceAccountClientId is null) != 1))
+            throw new DomainException("directory_visibility_lost",
+                "Directory search did not uniquely include every configured visibility probe.", 409);
         var groups = await PagesAsync<Group>(realmKey, "directory", "groups", ct);
         var now = clock.GetUtcNow();
         var result = users.Select(u => new DirectoryPrincipal(StableId(realmKey, "user", u.Id), realmKey,

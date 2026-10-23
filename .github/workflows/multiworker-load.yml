@@ -11,6 +11,8 @@ on:
       - 'Directory.*.props'
       - 'global.json'
       - 'scripts/ci-worker-system.py'
+      - 'scripts/ci_federation_faults.py'
+      - 'scripts/test_ci_federation_faults.py'
       - '.github/workflows/multiworker-load.yml'
   workflow_dispatch:
 

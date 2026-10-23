@@ -31,9 +31,14 @@ public static class KeycloakConfiguration
                 || approvedGroupIds.Any(id => id != id.Trim())
                 || approvedGroupIds.Distinct(StringComparer.Ordinal).Count() != approvedGroupIds.Length)
                 throw new InvalidOperationException("Approved Keycloak group IDs must be nonempty, unique and untrimmed.");
+            var probeIds = item.GetSection("DirectoryProbeUserIds").Get<string[]>() ?? [];
+            if (probeIds.Length > 32 || probeIds.Any(id => string.IsNullOrWhiteSpace(id)
+                    || id.Length > 1024 || id != id.Trim())
+                || probeIds.Distinct(StringComparer.Ordinal).Count() != probeIds.Length)
+                throw new InvalidOperationException("Directory probe IDs must be unique nonempty identifiers, bounded to 32 probes of 1024 characters.");
             realms.Add(item.Key, new RealmConnection(Required(item, "BaseUrl"), Required(item, "Realm"),
                 Required(item, "Issuer"), Credential("Roles"), Credential("Assignments"), Credential("Directory"), protectedIds,
-                item.GetValue<bool>("AllowGroupRoleGrants"), approvedGroupIds));
+                item.GetValue<bool>("AllowGroupRoleGrants"), approvedGroupIds, probeIds));
         }
         return new KeycloakOptions
         {

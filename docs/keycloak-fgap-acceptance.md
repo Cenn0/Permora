@@ -47,6 +47,19 @@ upgrade, with all deployed service-account profiles and **actual** FGAP
 policies. **Do not turn on a group grant feature merely because these tests
 pass.**
 
+## Joined disabled-grant/emergency-revoke contract
+
+The [joined federation acceptance](joined-federation-acceptance.md) adds the
+actual Portal API and worker to the real Keycloak/LDAPS/PostgreSQL fixture.
+Both have new group grants disabled. It requires HTTP 403/no queue for a new
+grant, conflict/audit on ambiguous targets, explicit owner retry, HTTP 503,
+actual committed remote DELETE with withheld response, killed worker and
+postcondition-based restart without duplicate writes. Both LDAP import modes
+are covered by assertions; successful exact-source CI is required as evidence.
+Portal authentication here is explicit Development/loopback, not OIDC/MFA.
+This narrows the automated gap in #46; the deployed controls below and the
+actual upstream privilege excess remain separate blockers.
+
 ## Deployment-specific controls (not implemented by the CI fixture)
 
 1. **Scope and identity.** Use separate service identities and independently

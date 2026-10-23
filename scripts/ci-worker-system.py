@@ -16,6 +16,7 @@ from pathlib import Path
 import secrets
 import socket
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -23,6 +24,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+
+# The diagnostic workflow invokes this file through runpy.run_path(), which
+# does not add the script directory to sys.path as direct execution does.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ci_federation_faults import read_request_body
 
 ROOT = Path(__file__).resolve().parents[1]
 KEYCLOAK = 'http://127.0.0.1:18085'
@@ -134,11 +140,13 @@ class FaultProxy(BaseHTTPRequestHandler):
     def do_DELETE(self): self.forward()
 
     def forward(self):
-        length = int(self.headers.get('Content-Length', '0'))
-        if length > 1024 * 1024:
-            self.send_error(413)
+        self.connection.settimeout(25)
+        try:
+            body = read_request_body(self)
+        except (ValueError, OSError):
+            self.send_error(400)
+            self.close_connection = True
             return
-        body = self.rfile.read(length) if length else None
         with self.faults.lock:
             offline = self.faults.offline
             if offline:
